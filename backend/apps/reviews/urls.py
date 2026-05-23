@@ -1,0 +1,11 @@
+from django.urls import path
+
+from . import views
+
+app_name = "reviews"
+
+urlpatterns = [
+    path("reviews/", views.CreateReviewView.as_view(), name="create"),
+    path("profiles/<slug:slug>/reviews/", views.ProfileReviewsView.as_view(), name="list"),
+    path("profiles/<slug:slug>/rating/", views.ProfileRatingView.as_view(), name="rating"),
+]
