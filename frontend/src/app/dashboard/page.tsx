@@ -13,6 +13,8 @@ interface Profile {
   age: number;
   city: City | null;
   verification_status: string;
+  whatsapp: string;
+  telegram: string;
 }
 interface Media {
   id: number;
@@ -73,6 +75,8 @@ export default function DashboardPage() {
       age: Number(form.get("age")),
       description: form.get("description"),
       city_id: form.get("city_id") ? Number(form.get("city_id")) : null,
+      whatsapp: form.get("whatsapp") ?? "",
+      telegram: form.get("telegram") ?? "",
     };
     try {
       if (profile) await dashboard.updateProfile(profile.id, data);
@@ -147,6 +151,19 @@ export default function DashboardPage() {
               </option>
             ))}
           </select>
+          <input
+            name="whatsapp"
+            defaultValue={profile?.whatsapp}
+            placeholder="WhatsApp (ej: 56912345678)"
+            inputMode="tel"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
+          />
+          <input
+            name="telegram"
+            defaultValue={profile?.telegram}
+            placeholder="Telegram (usuario, sin @)"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
+          />
           <textarea
             name="description"
             defaultValue={profile?.description}

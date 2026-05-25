@@ -31,6 +31,8 @@ export interface PublicProfile {
   is_featured: boolean;
   rating_average: number | null;
   rating_count: number;
+  whatsapp: string;
+  telegram: string;
 }
 
 export interface PublicPublication {

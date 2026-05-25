@@ -92,6 +92,42 @@ class FilterAndPaginationTests(APITestCase):
         self.assertEqual(slugs, ["cena", "masaje"])
 
 
+class ContactFieldsTests(APITestCase):
+    """WhatsApp/Telegram se normalizan y validan al guardarse."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="m", email="m@example.com", password="x", role="model"
+        )
+        self.client.force_authenticate(self.user)
+
+    def _post(self, **extra):
+        return self.client.post(
+            "/api/v1/me/profile/",
+            {"stage_name": "Luna", "age": 25, **extra},
+            format="json",
+        )
+
+    def test_whatsapp_keeps_only_digits(self):
+        resp = self._post(whatsapp="+56 9 1234 5678")
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["whatsapp"], "56912345678")
+
+    def test_telegram_strips_prefix_and_arroba(self):
+        resp = self._post(telegram="https://t.me/luna_chile")
+        self.assertEqual(resp.data["telegram"], "luna_chile")
+
+    def test_whatsapp_too_short_is_rejected(self):
+        resp = self._post(whatsapp="123")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("whatsapp", resp.data)
+
+    def test_telegram_invalid_chars_are_rejected(self):
+        resp = self._post(telegram="luna chile!")
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("telegram", resp.data)
+
+
 class CardEnrichmentTests(APITestCase):
     """Verifica que el listado expone rating, is_featured y los ordena correctamente."""
 

@@ -65,6 +65,20 @@ class ModelProfile(models.Model):
     age = models.PositiveSmallIntegerField(help_text="Edad verificada (18+)")
     services = models.ManyToManyField(Service, related_name="profiles", blank=True)
     base_rate = models.PositiveIntegerField("tarifa base (CLP)", null=True, blank=True)
+    # Canales de contacto. Solo se exponen públicamente para perfiles verificados.
+    # El frontend los oculta detrás de un botón "Contactar" para frenar scraping casual.
+    whatsapp = models.CharField(
+        "WhatsApp",
+        max_length=20,
+        blank=True,
+        help_text="Solo dígitos en formato internacional (ej: 56912345678).",
+    )
+    telegram = models.CharField(
+        "Telegram",
+        max_length=40,
+        blank=True,
+        help_text="Usuario sin @, o link t.me/usuario.",
+    )
     city = models.ForeignKey(
         City, on_delete=models.SET_NULL, null=True, related_name="profiles"
     )

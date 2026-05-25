@@ -1,6 +1,22 @@
+import re
+
 from rest_framework import serializers
 
 from .models import City, ModelProfile, Region, Service
+
+
+def _normalize_whatsapp(raw: str) -> str:
+    """Limpia el WhatsApp dejando solo dígitos (formato wa.me)."""
+    return re.sub(r"\D", "", raw or "")
+
+
+def _normalize_telegram(raw: str) -> str:
+    """Normaliza Telegram a 'usuario' (sin @ ni dominio)."""
+    if not raw:
+        return ""
+    s = raw.strip()
+    s = re.sub(r"^https?://(www\.)?t\.me/", "", s, flags=re.I)
+    return s.lstrip("@")
 
 
 class RegionSerializer(serializers.ModelSerializer):
@@ -44,7 +60,9 @@ class ModelProfileSerializer(serializers.ModelSerializer):
         fields = [
             "id", "stage_name", "slug", "description", "age",
             "services", "service_ids", "base_rate",
-            "city", "city_id", "verification_status",
+            "city", "city_id",
+            "whatsapp", "telegram",
+            "verification_status",
             "created_at", "updated_at",
         ]
         read_only_fields = ["slug", "verification_status", "created_at", "updated_at"]
@@ -53,6 +71,22 @@ class ModelProfileSerializer(serializers.ModelSerializer):
         if value < 18:
             raise serializers.ValidationError("La edad debe ser 18 o más.")
         return value
+
+    def validate_whatsapp(self, value):
+        digits = _normalize_whatsapp(value)
+        if digits and not (8 <= len(digits) <= 15):
+            raise serializers.ValidationError(
+                "WhatsApp inválido: deben ser entre 8 y 15 dígitos."
+            )
+        return digits
+
+    def validate_telegram(self, value):
+        normalized = _normalize_telegram(value)
+        if normalized and not re.match(r"^[A-Za-z0-9_]{3,40}$", normalized):
+            raise serializers.ValidationError(
+                "Telegram inválido: solo letras, números o guión bajo (3-40)."
+            )
+        return normalized
 
 
 class PublicProfileSerializer(serializers.ModelSerializer):
@@ -73,6 +107,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             "stage_name", "slug", "description", "age", "services",
             "base_rate", "city", "photos", "cover_photo",
             "is_featured", "rating_average", "rating_count",
+            "whatsapp", "telegram",
         ]
 
     def _abs(self, url: str) -> str:

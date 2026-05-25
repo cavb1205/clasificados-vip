@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getProfile, getProfileRating, getProfileReviews } from "@/lib/api";
+import { ContactPanel } from "@/components/ContactPanel";
 
 type Params = Promise<{ slug: string }>;
 
@@ -72,6 +73,14 @@ export default async function ProfilePage({ params }: { params: Params }) {
       {profile.description && (
         <p className="mt-5 whitespace-pre-line text-neutral-300">{profile.description}</p>
       )}
+
+      <div className="mt-6">
+        <ContactPanel
+          stageName={profile.stage_name}
+          whatsapp={profile.whatsapp}
+          telegram={profile.telegram}
+        />
+      </div>
 
       {profile.services.length > 0 && (
         <div className="mt-5 flex flex-wrap gap-2">
