@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "apps.media_content",
     "apps.publications",
     "apps.reviews",
+    "apps.notifications",
 ]
 
 MIDDLEWARE = [

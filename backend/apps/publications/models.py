@@ -139,6 +139,11 @@ class PaymentReceipt(models.Model):
         self.reviewed_at = timezone.now()
         self.save(update_fields=["status", "reviewed_by", "reviewed_at"])
         self.publication.activate()
+        self._notify_owner(
+            title="✅ Pago aprobado",
+            message=f"Tu anuncio '{self.publication.title}' ya está activo "
+                    f"hasta el {self.publication.expires_at:%d-%m-%Y}.",
+        )
 
     def reject(self, *, reviewer=None, note=""):
         self.status = self.Status.REJECTED
@@ -147,3 +152,15 @@ class PaymentReceipt(models.Model):
         if note:
             self.note = note
         self.save(update_fields=["status", "reviewed_by", "reviewed_at", "note"])
+        self._notify_owner(
+            title="Comprobante rechazado",
+            message=note or f"Revisa el comprobante de '{self.publication.title}' y vuelve a subirlo.",
+        )
+
+    def _notify_owner(self, *, title: str, message: str):
+        # Import perezoso para evitar ciclos a nivel de módulo.
+        from apps.notifications.models import Notification, notify_user
+        notify_user(
+            self.publication.profile.user, kind=Notification.Kind.PAYMENT,
+            title=title, message=message, link="/dashboard",
+        )

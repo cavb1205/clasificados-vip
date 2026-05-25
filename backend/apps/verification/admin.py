@@ -3,6 +3,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
 
+from apps.notifications.models import Notification, notify_user
 from apps.profiles.models import ModelProfile
 from .models import VerificationAccessLog, VerificationRequest
 
@@ -40,6 +41,12 @@ class VerificationRequestAdmin(admin.ModelAdmin):
             obj.reviewed_at = timezone.now()
             obj.save()
             self._set_profile_status(obj.user, ModelProfile.VerificationStatus.VERIFIED)
+            notify_user(
+                obj.user, kind=Notification.Kind.KYC,
+                title="✅ Verificación aprobada",
+                message="Tu identidad fue verificada. Ahora puedes publicar tus anuncios.",
+                link="/dashboard",
+            )
         self.message_user(request, f"{queryset.count()} verificación(es) aprobada(s).")
 
     @admin.action(description="Rechazar verificación")
@@ -50,6 +57,12 @@ class VerificationRequestAdmin(admin.ModelAdmin):
             obj.reviewed_at = timezone.now()
             obj.save()
             self._set_profile_status(obj.user, ModelProfile.VerificationStatus.REJECTED)
+            notify_user(
+                obj.user, kind=Notification.Kind.KYC,
+                title="Verificación rechazada",
+                message="Revisa los documentos enviados y vuelve a intentarlo desde el dashboard.",
+                link="/dashboard",
+            )
         self.message_user(request, f"{queryset.count()} verificación(es) rechazada(s).")
 
 

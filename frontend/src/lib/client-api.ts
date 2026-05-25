@@ -88,4 +88,8 @@ export const dashboard = {
   plans: () => apiFetch<unknown[]>("/plans/"),
   regions: () => apiFetch<unknown[]>("/regions/"),
   cities: (regionSlug: string) => apiFetch<unknown[]>(`/cities/?region=${regionSlug}`),
+  // Notificaciones in-dashboard
+  notifications: () => apiFetch<unknown[]>("/me/notifications/"),
+  unreadNotifications: () => apiFetch<{ unread: number }>("/me/notifications/unread-count/"),
+  markAllRead: () => apiFetch("/me/notifications/mark-all-read/", { method: "POST" }),
 };

@@ -92,12 +92,15 @@ export default function DashboardPage() {
     <div className="space-y-10">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Mi panel</h1>
-        <button
-          onClick={() => auth.logout().then(() => router.push("/"))}
-          className="text-sm text-neutral-400 hover:text-pink-400"
-        >
-          Cerrar sesión
-        </button>
+        <div className="flex items-center gap-3">
+          <NotificationBell />
+          <button
+            onClick={() => auth.logout().then(() => router.push("/"))}
+            className="text-sm text-neutral-400 hover:text-pink-400"
+          >
+            Cerrar sesión
+          </button>
+        </div>
       </div>
       {msg && <p className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-pink-400">{msg}</p>}
 
@@ -688,6 +691,91 @@ function PhotoGrid({ photos, onChange }: { photos: Media[]; onChange: () => void
       <p className="mt-2 text-xs text-neutral-500">
         Arrastra las fotos para reordenar{busy && " · guardando…"}
       </p>
+    </div>
+  );
+}
+
+interface UINotification {
+  id: number;
+  kind: string;
+  title: string;
+  message: string;
+  link: string;
+  created_at: string;
+  read_at: string | null;
+}
+
+function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<UINotification[]>([]);
+  const [unread, setUnread] = useState(0);
+
+  const reload = useCallback(async () => {
+    const [list, count] = await Promise.all([
+      dashboard.notifications() as Promise<UINotification[]>,
+      dashboard.unreadNotifications(),
+    ]);
+    setItems(list);
+    setUnread(count.unread);
+  }, []);
+
+  useEffect(() => {
+    reload();
+    // Sondeo ligero cada 30s para captar aprobaciones del admin.
+    const id = setInterval(reload, 30000);
+    return () => clearInterval(id);
+  }, [reload]);
+
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && unread > 0) {
+      await dashboard.markAllRead();
+      reload();
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={toggle}
+        className="relative rounded-full border border-neutral-700 px-3 py-1.5 text-sm hover:border-pink-600"
+        aria-label="Notificaciones"
+      >
+        🔔
+        {unread > 0 && (
+          <span className="absolute -right-1 -top-1 rounded-full bg-pink-600 px-1.5 text-[10px] font-semibold text-white">
+            {unread}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-neutral-800 bg-neutral-950 p-3 shadow-xl">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Notificaciones
+          </p>
+          {items.length === 0 ? (
+            <p className="text-sm text-neutral-500">Sin avisos por ahora.</p>
+          ) : (
+            <ul className="max-h-80 space-y-2 overflow-y-auto">
+              {items.map((n) => (
+                <li
+                  key={n.id}
+                  className={`rounded-lg border p-2 text-sm ${
+                    n.read_at ? "border-neutral-800" : "border-pink-700/60 bg-pink-950/20"
+                  }`}
+                >
+                  <p className="font-medium">{n.title}</p>
+                  {n.message && <p className="mt-0.5 text-xs text-neutral-400">{n.message}</p>}
+                  <p className="mt-1 text-[10px] uppercase tracking-wide text-neutral-600">
+                    {new Date(n.created_at).toLocaleString("es-CL")}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
