@@ -28,6 +28,9 @@ export interface PublicProfile {
   city: City | null;
   photos: string[];
   cover_photo: string | null;
+  is_featured: boolean;
+  rating_average: number | null;
+  rating_count: number;
 }
 
 export interface PublicPublication {

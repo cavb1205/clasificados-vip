@@ -1,0 +1,82 @@
+import Link from "next/link";
+import Image from "next/image";
+import type { PublicProfile } from "@/lib/types";
+
+/** Estrellas para rating 0-5, soporta media estrella. */
+function Stars({ value }: { value: number }) {
+  const full = Math.floor(value);
+  const half = value - full >= 0.5;
+  const empty = 5 - full - (half ? 1 : 0);
+  return (
+    <span aria-label={`${value.toFixed(1)} de 5`} className="text-amber-400">
+      {"★".repeat(full)}
+      {half && "⯨"}
+      <span className="text-neutral-700">{"★".repeat(empty)}</span>
+    </span>
+  );
+}
+
+export function ProfileCard({ profile }: { profile: PublicProfile }) {
+  const ring = profile.is_featured
+    ? "border-amber-400/70 shadow-[0_0_0_1px_rgba(251,191,36,0.4)]"
+    : "border-neutral-800 hover:border-pink-600";
+
+  return (
+    <Link
+      href={`/perfil/${profile.slug}`}
+      className={`group relative block overflow-hidden rounded-2xl border bg-neutral-900 transition ${ring}`}
+    >
+      <div className="relative">
+        {profile.cover_photo ? (
+          <Image
+            src={profile.cover_photo}
+            alt={profile.stage_name}
+            width={600}
+            height={400}
+            sizes="(max-width: 640px) 100vw, 33vw"
+            className="aspect-[3/2] w-full object-cover"
+          />
+        ) : (
+          <div className="flex aspect-[3/2] items-center justify-center bg-neutral-800 text-neutral-600">
+            Sin foto
+          </div>
+        )}
+
+        {/* Badges flotantes sobre la foto */}
+        <div className="absolute left-2 top-2 flex gap-1.5">
+          <span
+            title="Identidad verificada"
+            className="flex items-center gap-1 rounded-full bg-sky-600/95 px-2 py-0.5 text-[11px] font-medium text-white"
+          >
+            ✓ Verificada
+          </span>
+          {profile.is_featured && (
+            <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-amber-950">
+              Destacada
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-lg font-semibold leading-tight">{profile.stage_name}</h2>
+          {profile.rating_count > 0 && profile.rating_average !== null && (
+            <span className="shrink-0 text-xs">
+              <Stars value={profile.rating_average} />{" "}
+              <span className="text-neutral-500">({profile.rating_count})</span>
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 text-xs text-neutral-400">
+          {profile.age} años
+          {profile.city && ` · ${profile.city.name}`}
+          {profile.base_rate && ` · desde $${profile.base_rate.toLocaleString("es-CL")}`}
+        </p>
+        {profile.description && (
+          <p className="mt-2 line-clamp-2 text-sm text-neutral-500">{profile.description}</p>
+        )}
+      </div>
+    </Link>
+  );
+}

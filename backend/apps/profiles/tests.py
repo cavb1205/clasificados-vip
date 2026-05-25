@@ -3,6 +3,10 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from datetime import timedelta
+from django.utils import timezone
+from apps.publications.models import Publication, SubscriptionPlan
+from apps.reviews.models import Review
 from .models import ModelProfile, Service
 
 User = get_user_model()
@@ -80,3 +84,62 @@ class FilterAndPaginationTests(APITestCase):
         self.assertEqual(resp.status_code, 200)
         slugs = sorted(s["slug"] for s in resp.data)
         self.assertEqual(slugs, ["cena", "masaje"])
+
+
+class CardEnrichmentTests(APITestCase):
+    """Verifica que el listado expone rating, is_featured y los ordena correctamente."""
+
+    def setUp(self):
+        self.plan = SubscriptionPlan.objects.create(
+            name="Mensual", duration_days=30, price=35000
+        )
+        # 3 perfiles verificados.
+        for i, name in enumerate(["Ana", "Bea", "Cami"]):
+            u = _make_user(f"{name.lower()}@example.com")
+            ModelProfile.objects.create(
+                user=u, stage_name=name, age=25,
+                verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            )
+
+    def _make_featured_publication(self, profile):
+        return Publication.objects.create(
+            profile=profile, title="Top", plan=self.plan, is_featured=True,
+            status=Publication.Status.ACTIVE,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+
+    def test_response_includes_rating_and_featured_fields(self):
+        resp = self.client.get(reverse("api:profiles:public-list"))
+        first = resp.data["results"][0]
+        for field in ("rating_average", "rating_count", "is_featured"):
+            self.assertIn(field, first)
+        # Sin reseñas todavía → 0 reseñas, average None.
+        self.assertEqual(first["rating_count"], 0)
+        self.assertIsNone(first["rating_average"])
+        self.assertFalse(first["is_featured"])
+
+    def test_featured_profile_ranks_first(self):
+        bea = ModelProfile.objects.get(stage_name="Bea")
+        self._make_featured_publication(bea)
+        resp = self.client.get(reverse("api:profiles:public-list"))
+        names = [r["stage_name"] for r in resp.data["results"]]
+        self.assertEqual(names[0], "Bea")
+        self.assertTrue(resp.data["results"][0]["is_featured"])
+
+    def test_rating_aggregates_only_approved_reviews(self):
+        ana = ModelProfile.objects.get(stage_name="Ana")
+        client_a = User.objects.create_user(
+            username="ca", email="ca@example.com", password="x",
+            role="client", email_verified=True,
+        )
+        client_b = User.objects.create_user(
+            username="cb", email="cb@example.com", password="x",
+            role="client", email_verified=True,
+        )
+        Review.objects.create(profile=ana, client=client_a, rating=4, status=Review.Status.APPROVED)
+        Review.objects.create(profile=ana, client=client_b, rating=2, status=Review.Status.PENDING)  # se ignora
+
+        resp = self.client.get(reverse("api:profiles:public-list"))
+        ana_row = next(r for r in resp.data["results"] if r["stage_name"] == "Ana")
+        self.assertEqual(ana_row["rating_count"], 1)
+        self.assertEqual(ana_row["rating_average"], 4.0)

@@ -1,7 +1,11 @@
+from django.db.models import Avg, Count, Exists, OuterRef, Q
+from django.utils import timezone
 from rest_framework import generics, permissions, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 
+from apps.publications.models import Publication
+from apps.reviews.models import Review
 from core.permissions import IsModel
 from .models import City, ModelProfile, Region, Service
 from .serializers import (
@@ -17,6 +21,25 @@ class PublicProfilePagination(PageNumberPagination):
     page_size = 12
     page_size_query_param = "page_size"
     max_page_size = 48
+
+
+def annotate_public_profiles(qs):
+    """Anota rating agregado y flag de destacada (publicación activa con is_featured).
+
+    Reutilizado por el listado y el detalle público para que el cliente reciba
+    los mismos campos sin repetir lógica.
+    """
+    featured_pub = Publication.objects.filter(
+        profile=OuterRef("pk"),
+        status=Publication.Status.ACTIVE,
+        is_featured=True,
+        expires_at__gt=timezone.now(),
+    )
+    return qs.annotate(
+        is_featured=Exists(featured_pub),
+        rating_average=Avg("reviews__rating", filter=Q(reviews__status=Review.Status.APPROVED)),
+        rating_count=Count("reviews", filter=Q(reviews__status=Review.Status.APPROVED)),
+    )
 
 
 class RegionListView(generics.ListAPIView):
@@ -80,7 +103,7 @@ class PublicProfileListView(generics.ListAPIView):
 
     def get_queryset(self):
         params = self.request.query_params
-        qs = (
+        qs = annotate_public_profiles(
             ModelProfile.objects.filter(
                 verification_status=ModelProfile.VerificationStatus.VERIFIED
             )
@@ -106,7 +129,8 @@ class PublicProfileListView(generics.ListAPIView):
             if value and value.isdigit():
                 qs = qs.filter(**{lookup: int(value)})
 
-        return qs.order_by("-created_at")
+        # Destacadas primero (mejor rating dentro de cada grupo, luego más reciente).
+        return qs.order_by("-is_featured", "-rating_average", "-created_at")
 
 
 class PublicProfileDetailView(generics.RetrieveAPIView):
@@ -115,6 +139,8 @@ class PublicProfileDetailView(generics.RetrieveAPIView):
     lookup_field = "slug"
 
     def get_queryset(self):
-        return ModelProfile.objects.filter(
-            verification_status=ModelProfile.VerificationStatus.VERIFIED
-        ).select_related("city", "city__region").prefetch_related("services", "media")
+        return annotate_public_profiles(
+            ModelProfile.objects.filter(
+                verification_status=ModelProfile.VerificationStatus.VERIFIED
+            ).select_related("city", "city__region").prefetch_related("services", "media")
+        )

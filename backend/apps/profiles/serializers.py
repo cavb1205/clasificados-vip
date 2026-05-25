@@ -62,12 +62,17 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     services = ServiceSerializer(many=True, read_only=True)
     photos = serializers.SerializerMethodField()
     cover_photo = serializers.SerializerMethodField()
+    # Anotados por la vista (annotate_public_profiles); ausentes en otros contextos.
+    is_featured = serializers.BooleanField(read_only=True, default=False)
+    rating_average = serializers.FloatField(read_only=True, allow_null=True)
+    rating_count = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = ModelProfile
         fields = [
             "stage_name", "slug", "description", "age", "services",
             "base_rate", "city", "photos", "cover_photo",
+            "is_featured", "rating_average", "rating_count",
         ]
 
     def _abs(self, url: str) -> str:

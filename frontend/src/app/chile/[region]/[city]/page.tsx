@@ -1,7 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Metadata } from "next";
 import { getProfiles, getServices, type ProfileQuery } from "@/lib/api";
+import { ProfileCard } from "@/components/ProfileCard";
 
 type Params = Promise<{ region: string; city: string }>;
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -179,37 +179,7 @@ export default async function CityPage({
           <ul className="grid gap-4 sm:grid-cols-2">
             {data.results.map((p) => (
               <li key={p.slug}>
-                <Link
-                  href={`/perfil/${p.slug}`}
-                  className="block overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 hover:border-pink-600"
-                >
-                  {p.cover_photo ? (
-                    <Image
-                      src={p.cover_photo}
-                      alt={p.stage_name}
-                      width={600}
-                      height={400}
-                      sizes="(max-width: 640px) 100vw, 33vw"
-                      className="aspect-[3/2] w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex aspect-[3/2] items-center justify-center bg-neutral-800 text-neutral-600">
-                      Sin foto
-                    </div>
-                  )}
-                  <div className="p-5">
-                    <h2 className="text-lg font-semibold">{p.stage_name}</h2>
-                    <p className="mt-1 text-sm text-neutral-400">
-                      {p.age} años
-                      {p.base_rate && ` · desde $${p.base_rate.toLocaleString("es-CL")}`}
-                    </p>
-                    {p.description && (
-                      <p className="mt-2 line-clamp-2 text-sm text-neutral-500">
-                        {p.description}
-                      </p>
-                    )}
-                  </div>
-                </Link>
+                <ProfileCard profile={p} />
               </li>
             ))}
           </ul>
