@@ -81,6 +81,8 @@ export const dashboard = {
     apiFetch("/me/publications/", { method: "POST", body: data }),
   uploadReceipt: (pubId: number, form: FormData) =>
     apiFetch(`/me/publications/${pubId}/receipt/`, { method: "POST", body: form, isForm: true }),
+  renewPublication: (pubId: number) =>
+    apiFetch(`/me/publications/${pubId}/renew/`, { method: "POST" }),
   // KYC
   submitVerification: (form: FormData) =>
     apiFetch("/verification/submit/", { method: "POST", body: form, isForm: true }),

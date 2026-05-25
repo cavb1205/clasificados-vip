@@ -450,6 +450,14 @@ function PublicationManager({
             {(p.status === "draft" || p.status === "pending_payment") && (
               <ReceiptForm pubId={p.id} onUploaded={onChange} />
             )}
+            {p.status === "expired" && (
+              <button
+                onClick={() => dashboard.renewPublication(p.id).then(onChange)}
+                className="mt-3 rounded-full bg-pink-600 px-4 py-1.5 text-sm font-medium hover:bg-pink-500"
+              >
+                Renovar anuncio
+              </button>
+            )}
           </li>
         ))}
       </ul>

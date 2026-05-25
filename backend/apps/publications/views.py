@@ -52,6 +52,27 @@ class MyPublicationViewSet(viewsets.ModelViewSet):
         publication.save(update_fields=["status", "updated_at"])
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=True, methods=["post"], serializer_class=PublicationSerializer)
+    def renew(self, request, pk=None):
+        """Clona una publicación expirada en una nueva en draft (mismo título y plan).
+
+        Mantiene la publicación original para preservar historial (auditoría, futuras
+        estadísticas) y deja la nueva lista para subir comprobante de pago.
+        """
+        source = self.get_object()
+        if source.status != Publication.Status.EXPIRED:
+            return Response(
+                {"detail": "Solo se pueden renovar publicaciones expiradas."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        renewed = Publication.objects.create(
+            profile=source.profile,
+            plan=source.plan,
+            title=source.title,
+            status=Publication.Status.DRAFT,
+        )
+        return Response(PublicationSerializer(renewed).data, status=status.HTTP_201_CREATED)
+
 
 class PublicPublicationListView(generics.ListAPIView):
     """Anuncios vigentes (activos y no expirados), destacados primero."""

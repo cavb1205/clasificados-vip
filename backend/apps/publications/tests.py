@@ -84,6 +84,38 @@ class SubscriptionPlanTests(_Base):
         self.assertGreater(delta, timedelta(days=29, hours=23))
 
 
+class RenewActionTests(_Base):
+    def setUp(self):
+        super().setUp()
+        self.plan = SubscriptionPlan.objects.create(name="Semanal", duration_days=7, price=12000)
+        self.expired = Publication.objects.create(
+            profile=self.profile, title="Mi anuncio", plan=self.plan,
+            status=Publication.Status.EXPIRED,
+            expires_at=timezone.now() - timedelta(days=1),
+        )
+
+    def test_renew_creates_new_draft_with_same_plan_and_title(self):
+        from rest_framework.test import APIClient
+        client = APIClient()
+        client.force_authenticate(self.user)
+        resp = client.post(f"/api/v1/me/publications/{self.expired.id}/renew/", format="json")
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["title"], "Mi anuncio")
+        self.assertEqual(resp.data["status"], Publication.Status.DRAFT)
+        self.assertEqual(resp.data["plan"]["id"], self.plan.id)
+        self.assertEqual(Publication.objects.filter(profile=self.profile).count(), 2)
+
+    def test_cannot_renew_active_publication(self):
+        from rest_framework.test import APIClient
+        active = Publication.objects.create(
+            profile=self.profile, title="Vigente", plan=self.plan,
+            status=Publication.Status.ACTIVE, expires_at=timezone.now() + timedelta(days=5),
+        )
+        client = APIClient(); client.force_authenticate(self.user)
+        resp = client.post(f"/api/v1/me/publications/{active.id}/renew/", format="json")
+        self.assertEqual(resp.status_code, 400)
+
+
 class ExpireCommandTests(_Base):
     def test_expire_command_marks_overdue_active_as_expired(self):
         overdue = Publication.objects.create(
