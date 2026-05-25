@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
 import type { Plan, Region, City } from "@/lib/types";
@@ -209,6 +210,14 @@ function KycForm({ onDone }: { onDone: () => void }) {
   );
 }
 
+const PHOTO_LIMIT = 6;
+const VIDEO_LIMIT = 1;
+
+interface PendingFile {
+  file: File;
+  preview: string; // object URL
+}
+
 function MediaManager({
   media,
   onChange,
@@ -218,40 +227,174 @@ function MediaManager({
   onChange: () => void;
   disabled: boolean;
 }) {
+  const [pending, setPending] = useState<PendingFile[]>([]);
+  const [type, setType] = useState<"photo" | "video">("photo");
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [err, setErr] = useState("");
-  async function upload(form: FormData) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const photos = media.filter((m) => m.media_type === "photo");
+  const videos = media.filter((m) => m.media_type === "video");
+  const limit = type === "photo" ? PHOTO_LIMIT : VIDEO_LIMIT;
+  const usedNow = type === "photo" ? photos.length : videos.length;
+  const remaining = Math.max(0, limit - usedNow);
+
+  // Liberar URLs de los previews al desmontar o reemplazar selección.
+  useEffect(() => {
+    return () => pending.forEach((p) => URL.revokeObjectURL(p.preview));
+  }, [pending]);
+
+  function onSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+
+    if (files.length > remaining) {
+      setErr(`Solo puedes subir ${remaining} más (límite ${limit}).`);
+    } else {
+      setErr("");
+    }
+    const accepted = files.slice(0, remaining);
+    // Revoca previews anteriores antes de reemplazar.
+    pending.forEach((p) => URL.revokeObjectURL(p.preview));
+    setPending(accepted.map((file) => ({ file, preview: URL.createObjectURL(file) })));
+  }
+
+  function removePending(idx: number) {
+    setPending((curr) => {
+      URL.revokeObjectURL(curr[idx].preview);
+      return curr.filter((_, i) => i !== idx);
+    });
+  }
+
+  async function upload() {
+    setErr("");
+    setProgress({ done: 0, total: pending.length });
     try {
-      await dashboard.uploadMedia(form);
+      // Secuencial: cada subida ejecuta el pipeline del backend y valida el límite.
+      for (let i = 0; i < pending.length; i++) {
+        const fd = new FormData();
+        fd.append("media_type", type);
+        fd.append("upload", pending[i].file);
+        await dashboard.uploadMedia(fd);
+        setProgress({ done: i + 1, total: pending.length });
+      }
+      pending.forEach((p) => URL.revokeObjectURL(p.preview));
+      setPending([]);
+      if (inputRef.current) inputRef.current.value = "";
       onChange();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Error");
+      setErr(e instanceof Error ? e.message : "Error al subir");
+    } finally {
+      setProgress(null);
     }
   }
+
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-3">
-        {media.map((m) => (
-          <div key={m.id} className="rounded-lg border border-neutral-800 p-2 text-xs">
-            <p>{m.media_type}</p>
-            <button
-              onClick={() => dashboard.deleteMedia(m.id).then(onChange)}
-              className="mt-1 text-red-400"
+    <div className="space-y-4">
+      {/* Existentes */}
+      {media.length > 0 && (
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+          {media.map((m) => (
+            <div
+              key={m.id}
+              className="group relative overflow-hidden rounded-lg border border-neutral-800"
             >
-              Eliminar
-            </button>
-          </div>
-        ))}
-      </div>
-      <form action={upload} className="flex flex-wrap items-center gap-2 text-sm">
-        <select name="media_type" className="rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1">
-          <option value="photo">Foto</option>
+              {m.media_type === "photo" ? (
+                <Image
+                  src={m.file_url}
+                  alt="foto"
+                  width={200}
+                  height={200}
+                  className="aspect-square w-full object-cover"
+                />
+              ) : (
+                <div className="flex aspect-square items-center justify-center bg-neutral-800 text-xs text-neutral-400">
+                  Video
+                </div>
+              )}
+              <button
+                onClick={() => dashboard.deleteMedia(m.id).then(onChange)}
+                className="absolute right-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-xs text-red-300 opacity-0 transition group-hover:opacity-100"
+                title="Eliminar"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Selector */}
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <select
+          value={type}
+          onChange={(e) => {
+            setType(e.target.value as "photo" | "video");
+            pending.forEach((p) => URL.revokeObjectURL(p.preview));
+            setPending([]);
+            if (inputRef.current) inputRef.current.value = "";
+          }}
+          className="rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1"
+        >
+          <option value="photo">Fotos</option>
           <option value="video">Video</option>
         </select>
-        <input name="upload" type="file" required disabled={disabled} />
-        <button disabled={disabled} className="rounded-full bg-pink-600 px-4 py-1.5 disabled:opacity-50">
-          Subir
-        </button>
-      </form>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={type === "photo" ? "image/*" : "video/*"}
+          multiple={type === "photo"}
+          disabled={disabled || remaining === 0 || !!progress}
+          onChange={onSelect}
+        />
+        <span className="text-xs text-neutral-500">
+          {usedNow}/{limit} usadas
+        </span>
+      </div>
+
+      {/* Previews */}
+      {pending.length > 0 && (
+        <div>
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+            {pending.map((p, i) => (
+              <div
+                key={p.preview}
+                className="group relative overflow-hidden rounded-lg border border-pink-700/60"
+              >
+                {/* preview local: <img> está bien aquí (no remoto) */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.preview}
+                  alt={p.file.name}
+                  className="aspect-square w-full object-cover"
+                />
+                <button
+                  onClick={() => removePending(i)}
+                  className="absolute right-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-xs text-red-300"
+                  title="Quitar"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={upload}
+              disabled={!!progress}
+              className="rounded-full bg-pink-600 px-4 py-1.5 font-medium hover:bg-pink-500 disabled:opacity-50"
+            >
+              Subir {pending.length} {pending.length === 1 ? "archivo" : "archivos"}
+            </button>
+            {progress && (
+              <span className="text-xs text-neutral-400">
+                Subiendo {progress.done}/{progress.total}…
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {err && <p className="text-sm text-red-400">{err}</p>}
       {disabled && <p className="text-xs text-neutral-500">Crea tu perfil primero.</p>}
     </div>
