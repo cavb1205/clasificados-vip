@@ -104,6 +104,12 @@ export default function DashboardPage() {
       </div>
       {msg && <p className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-pink-400">{msg}</p>}
 
+      {/* Estadísticas */}
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">Estadísticas</h2>
+        <StatsPanel hasProfile={!!profile} />
+      </section>
+
       {/* Perfil */}
       <section>
         <h2 className="mb-3 text-lg font-semibold">
@@ -784,6 +790,47 @@ function NotificationBell() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+interface Stats {
+  views_total: number; views_30d: number; views_7d: number;
+  contacts_total: number; contacts_30d: number; contacts_7d: number;
+}
+
+function StatsPanel({ hasProfile }: { hasProfile: boolean }) {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (!hasProfile) return;
+    dashboard.stats().then(setStats).catch((e) =>
+      setErr(e instanceof Error ? e.message : "Error")
+    );
+  }, [hasProfile]);
+
+  if (!hasProfile) {
+    return <p className="text-xs text-neutral-500">Crea tu perfil para ver estadísticas.</p>;
+  }
+  if (err) return <p className="text-sm text-red-400">{err}</p>;
+  if (!stats) return <p className="text-sm text-neutral-500">Cargando…</p>;
+
+  const Card = ({ label, value }: { label: string; value: number }) => (
+    <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+      <p className="text-2xl font-bold">{value.toLocaleString("es-CL")}</p>
+      <p className="text-xs uppercase tracking-wide text-neutral-500">{label}</p>
+    </div>
+  );
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      <Card label="Visitas (7 días)" value={stats.views_7d} />
+      <Card label="Visitas (30 días)" value={stats.views_30d} />
+      <Card label="Visitas totales" value={stats.views_total} />
+      <Card label="Contactos (7 días)" value={stats.contacts_7d} />
+      <Card label="Contactos (30 días)" value={stats.contacts_30d} />
+      <Card label="Contactos totales" value={stats.contacts_total} />
     </div>
   );
 }

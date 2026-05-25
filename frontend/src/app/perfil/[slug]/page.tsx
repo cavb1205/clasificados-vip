@@ -3,6 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getProfile, getProfileRating, getProfileReviews } from "@/lib/api";
 import { ContactPanel } from "@/components/ContactPanel";
+import { ProfileTracker } from "@/components/ProfileTracker";
 
 type Params = Promise<{ slug: string }>;
 
@@ -76,11 +77,13 @@ export default async function ProfilePage({ params }: { params: Params }) {
 
       <div className="mt-6">
         <ContactPanel
+          slug={slug}
           stageName={profile.stage_name}
           whatsapp={profile.whatsapp}
           telegram={profile.telegram}
         />
       </div>
+      <ProfileTracker slug={slug} />
 
       {profile.services.length > 0 && (
         <div className="mt-5 flex flex-wrap gap-2">

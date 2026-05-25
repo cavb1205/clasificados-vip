@@ -109,3 +109,22 @@ class ModelProfile(models.Model):
                 slug = f"{base}-{n}"
             self.slug = slug
         super().save(*args, **kwargs)
+
+
+class ProfileEvent(models.Model):
+    """Eventos anónimos para estadísticas del perfil.
+
+    No guardamos IP ni user-agent para minimizar datos sensibles: solo el tipo
+    de evento y el timestamp bastan para los contadores que necesita la modelo.
+    """
+
+    class Kind(models.TextChoices):
+        VIEW = "view", "Visita"
+        CONTACT = "contact", "Click contacto"
+
+    profile = models.ForeignKey(ModelProfile, on_delete=models.CASCADE, related_name="events")
+    kind = models.CharField(max_length=10, choices=Kind.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["profile", "kind", "created_at"])]

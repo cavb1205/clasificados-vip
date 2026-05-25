@@ -1,13 +1,17 @@
+from datetime import timedelta
+
 from django.db.models import Avg, Count, Exists, OuterRef, Q
 from django.utils import timezone
-from rest_framework import generics, permissions, viewsets
+from rest_framework import generics, permissions, status, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.publications.models import Publication
 from apps.reviews.models import Review
 from core.permissions import IsModel
-from .models import City, ModelProfile, Region, Service
+from .models import City, ModelProfile, ProfileEvent, Region, Service
 from .serializers import (
     CitySerializer,
     ModelProfileSerializer,
@@ -149,3 +153,55 @@ class PublicProfileDetailView(generics.RetrieveAPIView):
                 verification_status=ModelProfile.VerificationStatus.VERIFIED
             ).select_related("city", "city__region").prefetch_related("services", "media")
         )
+
+
+class LogProfileEventView(APIView):
+    """POST público anónimo: registra una visita o click de contacto.
+
+    El throttle global de anónimos (60/min) limita el spam. Para protección más
+    fuerte, en producción habría que sumar BotID/captcha + dedup por sesión
+    desde el lado servidor; por ahora la dedup se hace en el cliente vía
+    sessionStorage (`viewed_<slug>`).
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, slug):
+        kind = request.data.get("kind")
+        if kind not in (ProfileEvent.Kind.VIEW, ProfileEvent.Kind.CONTACT):
+            return Response({"detail": "kind inválido."}, status=status.HTTP_400_BAD_REQUEST)
+        profile = ModelProfile.objects.filter(
+            slug=slug, verification_status=ModelProfile.VerificationStatus.VERIFIED
+        ).first()
+        if not profile:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        ProfileEvent.objects.create(profile=profile, kind=kind)
+        return Response(status=status.HTTP_201_CREATED)
+
+
+def _count_since(qs, since):
+    return qs.filter(created_at__gte=since).count()
+
+
+class MyProfileStatsView(APIView):
+    """Métricas del perfil propio: contadores 7d/30d para visitas y contactos."""
+
+    permission_classes = [permissions.IsAuthenticated, IsModel]
+
+    def get(self, request):
+        profile = ModelProfile.objects.filter(user=request.user).first()
+        if not profile:
+            return Response({"detail": "Primero crea tu perfil."}, status=400)
+        now = timezone.now()
+        last7, last30 = now - timedelta(days=7), now - timedelta(days=30)
+        events = profile.events.all()
+        views = events.filter(kind=ProfileEvent.Kind.VIEW)
+        contacts = events.filter(kind=ProfileEvent.Kind.CONTACT)
+        return Response({
+            "views_total": views.count(),
+            "views_30d": _count_since(views, last30),
+            "views_7d": _count_since(views, last7),
+            "contacts_total": contacts.count(),
+            "contacts_30d": _count_since(contacts, last30),
+            "contacts_7d": _count_since(contacts, last7),
+        })

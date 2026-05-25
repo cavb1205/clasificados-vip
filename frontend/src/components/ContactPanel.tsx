@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { logContactClick } from "./ProfileTracker";
 
 interface Props {
+  slug: string;
   stageName: string;
   whatsapp: string;
   telegram: string;
@@ -12,7 +14,7 @@ interface Props {
  * Botón "Contactar" que oculta los canales hasta el click.
  * Frena scraping casual y refuerza el call-to-action principal del perfil.
  */
-export function ContactPanel({ stageName, whatsapp, telegram }: Props) {
+export function ContactPanel({ slug, stageName, whatsapp, telegram }: Props) {
   const [revealed, setRevealed] = useState(false);
   const hasAny = Boolean(whatsapp) || Boolean(telegram);
   if (!hasAny) return null;
@@ -24,7 +26,10 @@ export function ContactPanel({ stageName, whatsapp, telegram }: Props) {
   if (!revealed) {
     return (
       <button
-        onClick={() => setRevealed(true)}
+        onClick={() => {
+          logContactClick(slug);
+          setRevealed(true);
+        }}
         className="w-full rounded-2xl bg-pink-600 px-5 py-4 text-base font-semibold text-white shadow-lg shadow-pink-600/20 hover:bg-pink-500"
       >
         Contactar a {stageName}

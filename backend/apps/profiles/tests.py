@@ -128,6 +128,39 @@ class ContactFieldsTests(APITestCase):
         self.assertIn("telegram", resp.data)
 
 
+class ProfileStatsTests(APITestCase):
+    """Eventos públicos + endpoint de stats para la dueña del perfil."""
+
+    def setUp(self):
+        self.user = _make_user("st@example.com")
+        self.profile = ModelProfile.objects.create(
+            user=self.user, stage_name="Luna", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+        )
+
+    def test_log_event_view(self):
+        url = reverse("api:profiles:log-event", args=[self.profile.slug])
+        self.assertEqual(self.client.post(url, {"kind": "view"}, format="json").status_code, 201)
+        self.assertEqual(self.client.post(url, {"kind": "contact"}, format="json").status_code, 201)
+        self.assertEqual(self.client.post(url, {"kind": "x"}, format="json").status_code, 400)
+
+    def test_log_event_only_visible_profiles(self):
+        url = reverse("api:profiles:log-event", args=["fantasma"])
+        self.assertEqual(self.client.post(url, {"kind": "view"}, format="json").status_code, 404)
+
+    def test_stats_endpoint_returns_counters(self):
+        url = reverse("api:profiles:log-event", args=[self.profile.slug])
+        for _ in range(3):
+            self.client.post(url, {"kind": "view"}, format="json")
+        self.client.post(url, {"kind": "contact"}, format="json")
+
+        self.client.force_authenticate(self.user)
+        resp = self.client.get(reverse("api:profiles:my-profile-stats"))
+        self.assertEqual(resp.data["views_total"], 3)
+        self.assertEqual(resp.data["views_7d"], 3)
+        self.assertEqual(resp.data["contacts_total"], 1)
+
+
 class CardEnrichmentTests(APITestCase):
     """Verifica que el listado expone rating, is_featured y los ordena correctamente."""
 

@@ -90,6 +90,11 @@ export const dashboard = {
   plans: () => apiFetch<unknown[]>("/plans/"),
   regions: () => apiFetch<unknown[]>("/regions/"),
   cities: (regionSlug: string) => apiFetch<unknown[]>(`/cities/?region=${regionSlug}`),
+  // Estadísticas del perfil propio
+  stats: () => apiFetch<{
+    views_total: number; views_30d: number; views_7d: number;
+    contacts_total: number; contacts_30d: number; contacts_7d: number;
+  }>("/me/profile/stats/"),
   // Notificaciones in-dashboard
   notifications: () => apiFetch<unknown[]>("/me/notifications/"),
   unreadNotifications: () => apiFetch<{ unread: number }>("/me/notifications/unread-count/"),

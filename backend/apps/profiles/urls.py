@@ -14,4 +14,6 @@ urlpatterns = [
     path("services/", views.ServiceListView.as_view(), name="services"),
     path("profiles/", views.PublicProfileListView.as_view(), name="public-list"),
     path("profiles/<slug:slug>/", views.PublicProfileDetailView.as_view(), name="public-detail"),
+    path("profiles/<slug:slug>/events/", views.LogProfileEventView.as_view(), name="log-event"),
+    path("me/profile/stats/", views.MyProfileStatsView.as_view(), name="my-profile-stats"),
 ] + router.urls
