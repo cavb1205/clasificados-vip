@@ -64,6 +64,18 @@ class MediaLimitTests(TestCase):
         media.full_clean()
         media.save()
 
+    def test_reorder_via_patch_only_updates_order(self):
+        from rest_framework.test import APIClient
+        self._make_photo()
+        self._make_photo()
+        first = MediaContent.objects.first()
+        client = APIClient()
+        client.force_authenticate(self.profile.user)
+        resp = client.patch(f"/api/v1/me/media/{first.id}/", {"order": 9}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        first.refresh_from_db()
+        self.assertEqual(first.order, 9)
+
     def test_photo_limit_enforced(self):
         from django.core.exceptions import ValidationError
 

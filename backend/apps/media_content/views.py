@@ -10,6 +10,7 @@ from .serializers import MediaContentSerializer
 class MyMediaViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
+    mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):

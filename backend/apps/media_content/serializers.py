@@ -20,6 +20,11 @@ class MediaContentSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(url) if request else url
 
     def validate(self, attrs):
+        # En PATCH (partial) no exigimos el contexto de perfil ni el límite,
+        # porque la edición típica es solo `order`.
+        if self.partial:
+            return attrs
+
         profile = self.context["profile"]
         media_type = attrs["media_type"]
         if media_type == MediaContent.MediaType.PHOTO:

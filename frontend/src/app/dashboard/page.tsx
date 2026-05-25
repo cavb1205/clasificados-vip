@@ -18,6 +18,7 @@ interface Media {
   id: number;
   media_type: string;
   file_url: string;
+  order: number;
 }
 interface Publication {
   id: number;
@@ -292,26 +293,19 @@ function MediaManager({
   return (
     <div className="space-y-4">
       {/* Existentes */}
-      {media.length > 0 && (
+      {photos.length > 0 && (
+        <PhotoGrid photos={photos} onChange={onChange} />
+      )}
+      {videos.length > 0 && (
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-          {media.map((m) => (
+          {videos.map((m) => (
             <div
               key={m.id}
               className="group relative overflow-hidden rounded-lg border border-neutral-800"
             >
-              {m.media_type === "photo" ? (
-                <Image
-                  src={m.file_url}
-                  alt="foto"
-                  width={200}
-                  height={200}
-                  className="aspect-square w-full object-cover"
-                />
-              ) : (
-                <div className="flex aspect-square items-center justify-center bg-neutral-800 text-xs text-neutral-400">
-                  Video
-                </div>
-              )}
+              <div className="flex aspect-square items-center justify-center bg-neutral-800 text-xs text-neutral-400">
+                Video
+              </div>
               <button
                 onClick={() => dashboard.deleteMedia(m.id).then(onChange)}
                 className="absolute right-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-xs text-red-300 opacity-0 transition group-hover:opacity-100"
@@ -573,6 +567,110 @@ function ReceiptForm({ pubId, onUploaded }: { pubId: number; onUploaded: () => v
       )}
 
       {err && <p className="text-red-400">{err}</p>}
+    </div>
+  );
+}
+
+function PhotoGrid({ photos, onChange }: { photos: Media[]; onChange: () => void }) {
+  // Estado local para optimismo durante el arrastre.
+  const [items, setItems] = useState<Media[]>(photos);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [overId, setOverId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // Mantener en sync con props cuando el padre recarga.
+  useEffect(() => {
+    setItems([...photos].sort((a, b) => a.order - b.order));
+  }, [photos]);
+
+  function onDragStart(e: React.DragEvent, id: number) {
+    setDraggingId(id);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(id));
+  }
+
+  function onDragOver(e: React.DragEvent, id: number) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (overId !== id) setOverId(id);
+  }
+
+  async function onDrop(e: React.DragEvent, targetId: number) {
+    e.preventDefault();
+    const srcId = draggingId;
+    setDraggingId(null);
+    setOverId(null);
+    if (srcId === null || srcId === targetId) return;
+
+    const fromIdx = items.findIndex((m) => m.id === srcId);
+    const toIdx = items.findIndex((m) => m.id === targetId);
+    if (fromIdx < 0 || toIdx < 0) return;
+
+    // Reordenar localmente (optimista).
+    const reordered = [...items];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    const withNewOrder = reordered.map((m, i) => ({ ...m, order: i * 10 }));
+    setItems(withNewOrder);
+
+    // Persistir solo los que cambiaron de orden.
+    setBusy(true);
+    try {
+      const changed = withNewOrder.filter(
+        (m) => m.order !== items.find((p) => p.id === m.id)?.order,
+      );
+      await Promise.all(
+        changed.map((m) => dashboard.updateMediaOrder(m.id, m.order)),
+      );
+      onChange();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+        {items.map((m) => {
+          const isDragging = draggingId === m.id;
+          const isOver = overId === m.id && draggingId !== m.id;
+          return (
+            <div
+              key={m.id}
+              draggable
+              onDragStart={(e) => onDragStart(e, m.id)}
+              onDragOver={(e) => onDragOver(e, m.id)}
+              onDrop={(e) => onDrop(e, m.id)}
+              onDragEnd={() => {
+                setDraggingId(null);
+                setOverId(null);
+              }}
+              className={`group relative cursor-grab overflow-hidden rounded-lg border bg-neutral-900 transition active:cursor-grabbing ${
+                isOver ? "border-pink-500 ring-2 ring-pink-500/40" : "border-neutral-800"
+              } ${isDragging ? "opacity-50" : ""}`}
+            >
+              <Image
+                src={m.file_url}
+                alt="foto"
+                width={200}
+                height={200}
+                draggable={false}
+                className="aspect-square w-full object-cover"
+              />
+              <button
+                onClick={() => dashboard.deleteMedia(m.id).then(onChange)}
+                className="absolute right-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-xs text-red-300 opacity-0 transition group-hover:opacity-100"
+                title="Eliminar"
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-neutral-500">
+        Arrastra las fotos para reordenar{busy && " · guardando…"}
+      </p>
     </div>
   );
 }

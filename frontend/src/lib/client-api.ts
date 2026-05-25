@@ -73,6 +73,8 @@ export const dashboard = {
   uploadMedia: (form: FormData) =>
     apiFetch("/me/media/", { method: "POST", body: form, isForm: true }),
   deleteMedia: (id: number) => apiFetch(`/me/media/${id}/`, { method: "DELETE" }),
+  updateMediaOrder: (id: number, order: number) =>
+    apiFetch(`/me/media/${id}/`, { method: "PATCH", body: { order } }),
   // Publicaciones y pagos
   listPublications: () => apiFetch<unknown[]>("/me/publications/"),
   createPublication: (data: Record<string, unknown>) =>
