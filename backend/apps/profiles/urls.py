@@ -11,6 +11,7 @@ router.register("me/profile", views.MyProfileViewSet, basename="my-profile")
 urlpatterns = [
     path("regions/", views.RegionListView.as_view(), name="regions"),
     path("cities/", views.CityListView.as_view(), name="cities"),
+    path("services/", views.ServiceListView.as_view(), name="services"),
     path("profiles/", views.PublicProfileListView.as_view(), name="public-list"),
     path("profiles/<slug:slug>/", views.PublicProfileDetailView.as_view(), name="public-detail"),
 ] + router.urls

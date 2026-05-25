@@ -45,7 +45,9 @@ descomentar las variables `POSTGRES_*`.
 | CRUD | `me/profile/` | Perfil propio de la modelo |
 | CRUD | `me/media/` | Multimedia propia (con pipeline + límites) |
 | POST | `verification/submit/` | Subir documentos KYC |
-| GET | `profiles/?region=&city=` · `profiles/<slug>/` | Listado/detalle público |
+| GET | `profiles/?region=&city=&service=&min_age=&max_age=&min_rate=&max_rate=&page=` | Listado público paginado (12/pág) con filtros |
+| GET | `profiles/<slug>/` | Detalle público |
+| GET | `services/` | Catálogo de servicios (filtros) |
 | CRUD | `me/publications/` | Anuncios propios |
 | POST | `me/publications/<pk>/receipt/` | Subir comprobante → `pending_payment` |
 | GET | `publications/?region=&city=` | Anuncios vigentes (públicos) |

@@ -53,5 +53,14 @@ comuna y robots responden con datos reales.
   imágenes desde IPs privadas/localhost; en producción ese guard queda activo y la media debe
   servirse desde un dominio público (S3/R2) — actualizar `remotePatterns` con ese host.
 
+## Filtros y paginación
+- `/chile/[region]/[city]` lee `searchParams` (`service`, `min_age`, `max_age`, `min_rate`,
+  `max_rate`, `page`) y los pasa al backend.
+- Barra de filtros lateral (`<form method="get">`), submit recarga la URL — sin
+  JavaScript del lado cliente para los filtros (full SSR).
+- Paginación Anterior/Siguiente con texto "Página N de M". 12 perfiles por página.
+
 ## Pendiente / mejoras
-- Filtros por servicio/precio, paginación, y subida de comprobante con previsualización.
+- Multi-foto y previews en el dashboard.
+- Búsqueda global por nombre.
+- Subida de comprobante con previsualización.
