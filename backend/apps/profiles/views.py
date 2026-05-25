@@ -118,6 +118,11 @@ class PublicProfileListView(generics.ListAPIView):
         if city:
             qs = qs.filter(city__slug=city)
 
+        # Búsqueda libre.
+        q = (params.get("q") or "").strip()
+        if q:
+            qs = qs.filter(Q(stage_name__icontains=q) | Q(description__icontains=q))
+
         # Filtros adicionales.
         services = params.getlist("service")
         if services:

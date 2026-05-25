@@ -424,14 +424,6 @@ function PublicationManager({
       setErr(e instanceof Error ? e.message : "Error");
     }
   }
-  async function sendReceipt(pubId: number, form: FormData) {
-    try {
-      await dashboard.uploadReceipt(pubId, form);
-      onChange();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Error");
-    }
-  }
   return (
     <div className="space-y-4">
       <ul className="space-y-3">
@@ -442,10 +434,7 @@ function PublicationManager({
               <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-xs">{p.status}</span>
             </div>
             {(p.status === "draft" || p.status === "pending_payment") && (
-              <form action={(f) => sendReceipt(p.id, f)} className="mt-2 flex gap-2 text-sm">
-                <input name="image" type="file" required />
-                <button className="rounded-full bg-pink-600 px-3 py-1">Subir comprobante</button>
-              </form>
+              <ReceiptForm pubId={p.id} onUploaded={onChange} />
             )}
           </li>
         ))}
@@ -470,6 +459,120 @@ function PublicationManager({
         </button>
       </form>
       {err && <p className="text-sm text-red-400">{err}</p>}
+    </div>
+  );
+}
+
+const MAX_RECEIPT_MB = 5;
+
+function ReceiptForm({ pubId, onUploaded }: { pubId: number; onUploaded: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
+
+  function onSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0] ?? null;
+    setErr("");
+    if (preview) URL.revokeObjectURL(preview);
+
+    if (!f) {
+      setFile(null);
+      setPreview(null);
+      return;
+    }
+    if (!f.type.startsWith("image/")) {
+      setErr("El comprobante debe ser una imagen (JPG/PNG).");
+      setFile(null);
+      setPreview(null);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+    if (f.size > MAX_RECEIPT_MB * 1024 * 1024) {
+      setErr(`Imagen muy grande (máx ${MAX_RECEIPT_MB} MB).`);
+      setFile(null);
+      setPreview(null);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+  }
+
+  function clearSelection() {
+    if (preview) URL.revokeObjectURL(preview);
+    setFile(null);
+    setPreview(null);
+    setErr("");
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
+  async function submit() {
+    if (!file) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      await dashboard.uploadReceipt(pubId, fd);
+      clearSelection();
+      onUploaded();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error al subir");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 space-y-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          onChange={onSelect}
+          disabled={busy}
+        />
+        <span className="text-xs text-neutral-500">JPG/PNG · máx {MAX_RECEIPT_MB} MB</span>
+      </div>
+
+      {preview && file && (
+        <div className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-950 p-2">
+          {/* preview local */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={preview} alt="comprobante" className="h-24 w-24 rounded object-cover" />
+          <div className="flex-1 text-xs">
+            <p className="font-medium text-neutral-200">{file.name}</p>
+            <p className="text-neutral-500">{(file.size / 1024).toFixed(0)} KB</p>
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={submit}
+                disabled={busy}
+                className="rounded-full bg-pink-600 px-3 py-1 font-medium hover:bg-pink-500 disabled:opacity-50"
+              >
+                {busy ? "Subiendo…" : "Subir comprobante"}
+              </button>
+              <button
+                onClick={clearSelection}
+                disabled={busy}
+                className="rounded-full border border-neutral-700 px-3 py-1 text-neutral-400 hover:text-neutral-100"
+              >
+                Quitar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {err && <p className="text-red-400">{err}</p>}
     </div>
   );
 }

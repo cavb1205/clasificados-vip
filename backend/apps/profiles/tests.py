@@ -74,6 +74,12 @@ class FilterAndPaginationTests(APITestCase):
         ages = sorted(r["age"] for r in resp.data["results"])
         self.assertEqual(ages, [25, 26, 27])
 
+    def test_full_text_search_by_name(self):
+        url = reverse("api:profiles:public-list") + "?q=M7"
+        resp = self.client.get(url)
+        names = [r["stage_name"] for r in resp.data["results"]]
+        self.assertEqual(names, ["M7"])
+
     def test_filter_by_rate_range(self):
         url = reverse("api:profiles:public-list") + "?min_rate=12000&max_rate=14000&page_size=48"
         resp = self.client.get(url)

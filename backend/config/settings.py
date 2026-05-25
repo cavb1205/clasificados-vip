@@ -182,3 +182,14 @@ CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "http://localhost:3000")
 # Límites de multimedia por perfil (validados en backend).
 MAX_PHOTOS_PER_PROFILE = int(os.getenv("MAX_PHOTOS_PER_PROFILE", "6"))
 MAX_VIDEOS_PER_PROFILE = int(os.getenv("MAX_VIDEOS_PER_PROFILE", "1"))
+
+# --- Email / notificaciones al admin ---------------------------------------
+# Dev: console (imprime en stdout). Prod: SMTP real configurado por env.
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@clasificados.vip")
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+# Destinatarios de mail_admins: lista de emails separados por coma en
+# DJANGO_ADMIN_EMAILS. En dev se setea uno de ejemplo si no hay nada.
+ADMINS = [("Admin", e.strip()) for e in env_list("DJANGO_ADMIN_EMAILS")]
+if not ADMINS and DEBUG:
+    ADMINS = [("Admin Dev", "admin@example.com")]

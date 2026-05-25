@@ -37,6 +37,9 @@ export const getPublications = (region: string, city: string) =>
 export const getServices = () => getJSON<Service[]>("/services/", 3600);
 
 export interface ProfileQuery {
+  region?: string;
+  city?: string;
+  q?: string;
   service?: string[];
   min_age?: string;
   max_age?: string;
@@ -45,17 +48,20 @@ export interface ProfileQuery {
   page?: string;
 }
 
-function buildQuery(region: string, city: string, q: ProfileQuery): string {
-  const params = new URLSearchParams({ region, city });
+function buildQuery(q: ProfileQuery): string {
+  const params = new URLSearchParams();
   q.service?.forEach((s) => params.append("service", s));
-  for (const k of ["min_age", "max_age", "min_rate", "max_rate", "page"] as const) {
+  for (const k of ["region", "city", "q", "min_age", "max_age", "min_rate", "max_rate", "page"] as const) {
     if (q[k]) params.set(k, q[k] as string);
   }
   return params.toString();
 }
 
 export const getProfiles = (region: string, city: string, query: ProfileQuery = {}) =>
-  getJSON<Paginated<PublicProfile>>(`/profiles/?${buildQuery(region, city, query)}`, 60);
+  getJSON<Paginated<PublicProfile>>(`/profiles/?${buildQuery({ ...query, region, city })}`, 60);
+
+export const searchProfiles = (query: ProfileQuery) =>
+  getJSON<Paginated<PublicProfile>>(`/profiles/?${buildQuery(query)}`, 60);
 
 export async function getProfile(slug: string): Promise<PublicProfile | null> {
   const res = await fetch(`${API_URL}/profiles/${slug}/`, { next: { revalidate: 60 } });

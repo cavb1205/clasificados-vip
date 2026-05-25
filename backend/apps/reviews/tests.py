@@ -64,3 +64,19 @@ class ReviewTests(APITestCase):
         resp = self.client.get(reverse("api:reviews:rating", args=[self.profile.slug]))
         self.assertEqual(resp.data["count"], 1)
         self.assertEqual(resp.data["average"], 4.0)
+
+
+from django.core import mail
+from django.test import override_settings
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    ADMINS=[("Admin", "admin@example.com")],
+)
+class ReviewNotificationTests(ReviewTests):
+    def test_admin_receives_email_on_pending_review(self):
+        mail.outbox.clear()
+        self._post_review(rating=5)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Reseña pendiente", mail.outbox[0].subject)

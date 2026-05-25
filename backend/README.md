@@ -45,7 +45,7 @@ descomentar las variables `POSTGRES_*`.
 | CRUD | `me/profile/` | Perfil propio de la modelo |
 | CRUD | `me/media/` | Multimedia propia (con pipeline + límites) |
 | POST | `verification/submit/` | Subir documentos KYC |
-| GET | `profiles/?region=&city=&service=&min_age=&max_age=&min_rate=&max_rate=&page=` | Listado público paginado (12/pág) con filtros |
+| GET | `profiles/?q=&region=&city=&service=&min_age=&max_age=&min_rate=&max_rate=&page=` | Listado público paginado (12/pág) con filtros y búsqueda |
 | GET | `profiles/<slug>/` | Detalle público |
 | GET | `services/` | Catálogo de servicios (filtros) |
 | CRUD | `me/publications/` | Anuncios propios |
@@ -78,6 +78,17 @@ cifrado KYC round-trip, aprobación admin → perfil verificado, visibilidad pú
   */15 * * * *  cd /ruta/backend && .venv/bin/python manage.py expire_publications
   ```
   (`--dry-run` para simular).
+
+## Notificaciones al admin
+Signals `post_save` envían email a `settings.ADMINS` cuando se crea:
+- Un KYC pendiente (`VerificationRequest`).
+- Un comprobante de pago pendiente (`PaymentReceipt`).
+- Una reseña pendiente (`Review`).
+
+En dev el backend de email es `console` (los mensajes salen por el stdout del
+`runserver`). Para activar SMTP real en producción configura `EMAIL_BACKEND`,
+`EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_PORT`,
+`EMAIL_USE_TLS` y `DJANGO_ADMIN_EMAILS=foo@x,bar@y` en `.env`.
 
 ## Reseñas (Fase 3)
 - Solo clientes con `email_verified=True` pueden reseñar; 1 reseña por (cliente, perfil).

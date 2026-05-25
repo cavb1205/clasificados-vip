@@ -60,7 +60,10 @@ comuna y robots responden con datos reales.
   JavaScript del lado cliente para los filtros (full SSR).
 - Paginación Anterior/Siguiente con texto "Página N de M". 12 perfiles por página.
 
+## Búsqueda global
+- Input en el nav (cabecera) que apunta a `/buscar?q=`. Página SSR con
+  paginación; queda excluida del sitemap y `robots.txt`.
+
 ## Pendiente / mejoras
-- Multi-foto y previews en el dashboard.
-- Búsqueda global por nombre.
-- Subida de comprobante con previsualización.
+- Reorder / drag-and-drop de fotos.
+- Producción: hosting backend, Postgres, dominio de media.

@@ -22,11 +22,22 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100">
         <AgeGate />
         <header className="border-b border-neutral-800">
-          <nav className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
+          <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-4">
             <Link href="/" className="text-lg font-semibold tracking-tight">
               Clasificados<span className="text-pink-500">VIP</span>
             </Link>
-            <div className="flex gap-4 text-sm">
+            <form
+              action="/buscar"
+              method="get"
+              className="order-3 w-full sm:order-2 sm:flex-1 sm:max-w-md"
+            >
+              <input
+                name="q"
+                placeholder="Buscar perfiles…"
+                className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-1.5 text-sm focus:border-pink-600 focus:outline-none"
+              />
+            </form>
+            <div className="order-2 ml-auto flex gap-4 text-sm sm:order-3 sm:ml-0">
               <Link href="/login" className="hover:text-pink-400">
                 Ingresar
               </Link>

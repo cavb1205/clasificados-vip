@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from django.core import mail
+from django.test import RequestFactory, TestCase, override_settings
 
 from apps.profiles.models import ModelProfile
 from .admin import VerificationRequestAdmin
@@ -65,3 +66,22 @@ class ApprovalFlowTests(TestCase):
         self.assertEqual(
             self.profile.verification_status, ModelProfile.VerificationStatus.VERIFIED
         )
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    ADMINS=[("Admin", "admin@example.com")],
+)
+class KYCNotificationTests(TestCase):
+    def test_admin_receives_email_on_new_kyc(self):
+        user = User.objects.create_user(
+            username="m", email="m@example.com", password="x", role="model"
+        )
+        mail.outbox.clear()
+        req = VerificationRequest(user=user)
+        req.store_encrypted("id_document", b"x")
+        req.store_encrypted("selfie", b"y")
+        req.save()
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("KYC pendiente", mail.outbox[0].subject)
+        self.assertIn("m@example.com", mail.outbox[0].body)

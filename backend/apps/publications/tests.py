@@ -118,3 +118,23 @@ class ExpireCommandTests(_Base):
         call_command("expire_publications", "--dry-run", stdout=StringIO())
         overdue.refresh_from_db()
         self.assertEqual(overdue.status, Publication.Status.ACTIVE)
+
+
+from django.core import mail
+from django.test import override_settings
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    ADMINS=[("Admin", "admin@example.com")],
+)
+class PaymentNotificationTests(_Base):
+    def test_admin_receives_email_on_new_receipt(self):
+        pub = Publication.objects.create(
+            profile=self.profile, title="Anuncio",
+            status=Publication.Status.PENDING_PAYMENT,
+        )
+        mail.outbox.clear()
+        PaymentReceipt.objects.create(publication=pub, amount=12000)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("comprobante pendiente", mail.outbox[0].subject.lower())
