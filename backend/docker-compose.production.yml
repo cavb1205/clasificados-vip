@@ -32,12 +32,12 @@ services:
       - traefik.docker.network=easypanel
       - traefik.http.services.vip-backend.loadbalancer.server.port=8000
       # HTTPS router con TLS automático (Let's Encrypt via Traefik).
-      - traefik.http.routers.vip-backend.rule=Host(`api-165-22-154-95.sslip.io`)
+      - traefik.http.routers.vip-backend.rule=Host(`api-165-22-154-95.nip.io`)
       - traefik.http.routers.vip-backend.entrypoints=https
       - traefik.http.routers.vip-backend.tls=true
       - traefik.http.routers.vip-backend.tls.certresolver=letsencrypt
       # Redirect HTTP → HTTPS (reusa middleware definido por EasyPanel en file provider).
-      - traefik.http.routers.vip-backend-http.rule=Host(`api-165-22-154-95.sslip.io`)
+      - traefik.http.routers.vip-backend-http.rule=Host(`api-165-22-154-95.nip.io`)
       - traefik.http.routers.vip-backend-http.entrypoints=http
       - traefik.http.routers.vip-backend-http.middlewares=redirect-to-https@file
     healthcheck:

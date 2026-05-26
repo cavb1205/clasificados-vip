@@ -7,19 +7,32 @@
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
+/**
+ * Token CSRF en memoria. No lo leemos desde document.cookie porque cuando
+ * frontend (vercel.app) y backend (nip.io) están en dominios distintos, las
+ * cookies del backend no son accesibles por JS desde el frontend.
+ *
+ * El endpoint GET /auth/csrf/ devuelve el token en el body — la cookie viaja
+ * en la request (con credentials:"include" + SameSite=None) para que Django
+ * pueda compararla con el header X-CSRFToken.
+ */
+let cachedCsrf: string | null = null;
+
+async function ensureCsrf(): Promise<string> {
+  if (cachedCsrf) return cachedCsrf;
+  try {
+    const res = await fetch(`${API}/auth/csrf/`, { credentials: "include" });
+    const data = (await res.json()) as { csrftoken?: string };
+    cachedCsrf = data.csrftoken ?? null;
+  } catch {
+    cachedCsrf = null;
+  }
+  return cachedCsrf ?? "";
 }
 
-/** Asegura que exista la cookie csrftoken (la siembra el backend en GET /auth/csrf/). */
-async function ensureCsrf(): Promise<string> {
-  let token = getCookie("csrftoken");
-  if (!token) {
-    await fetch(`${API}/auth/csrf/`, { credentials: "include" });
-    token = getCookie("csrftoken");
-  }
-  return token ?? "";
+/** Invalida el token cacheado (se llama al recibir 403 para forzar refresh). */
+function invalidateCsrf() {
+  cachedCsrf = null;
 }
 
 interface RequestOptions {
@@ -28,22 +41,36 @@ interface RequestOptions {
   isForm?: boolean;
 }
 
-export async function apiFetch<T = unknown>(
+async function rawFetch(
   path: string,
-  { method = "GET", body, isForm = false }: RequestOptions = {},
-): Promise<T> {
+  method: string,
+  body: unknown,
+  isForm: boolean,
+): Promise<Response> {
   const headers: Record<string, string> = {};
   const isWrite = method !== "GET" && method !== "HEAD";
-
   if (isWrite) headers["X-CSRFToken"] = await ensureCsrf();
   if (body && !isForm) headers["Content-Type"] = "application/json";
 
-  const res = await fetch(`${API}${path}`, {
+  return fetch(`${API}${path}`, {
     method,
     credentials: "include",
     headers,
     body: isForm ? (body as FormData) : body ? JSON.stringify(body) : undefined,
   });
+}
+
+export async function apiFetch<T = unknown>(
+  path: string,
+  { method = "GET", body, isForm = false }: RequestOptions = {},
+): Promise<T> {
+  let res = await rawFetch(path, method, body, isForm);
+
+  // El token CSRF puede haber rotado (login/logout); reintentar una vez con uno nuevo.
+  if (res.status === 403 && method !== "GET" && method !== "HEAD") {
+    invalidateCsrf();
+    res = await rawFetch(path, method, body, isForm);
+  }
 
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
@@ -53,11 +80,18 @@ export async function apiFetch<T = unknown>(
 }
 
 export const auth = {
-  login: (email: string, password: string) =>
-    apiFetch("/auth/login/", { method: "POST", body: { email, password } }),
+  login: async (email: string, password: string) => {
+    const r = await apiFetch("/auth/login/", { method: "POST", body: { email, password } });
+    invalidateCsrf();  // Django rotó el token al iniciar sesión.
+    return r;
+  },
   register: (data: Record<string, unknown>) =>
     apiFetch("/auth/register/", { method: "POST", body: data }),
-  logout: () => apiFetch("/auth/logout/", { method: "POST" }),
+  logout: async () => {
+    const r = await apiFetch("/auth/logout/", { method: "POST" });
+    invalidateCsrf();
+    return r;
+  },
   me: () => apiFetch("/auth/me/"),
 };
 
