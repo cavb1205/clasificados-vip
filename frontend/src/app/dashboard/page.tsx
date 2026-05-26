@@ -61,6 +61,11 @@ export default function DashboardPage() {
     setPublications(pubs);
     setServices(svcs);
     setSelectedTags(new Set(p?.services?.map((s) => s.id) ?? []));
+    // Pre-cargar las comunas de la región actual del perfil para que el select
+    // muestre la opción correcta seleccionada al entrar al dashboard.
+    if (p?.city?.region?.slug) {
+      setCities((await dashboard.cities(p.city.region.slug)) as City[]);
+    }
   }, []);
 
   useEffect(() => {
@@ -78,15 +83,18 @@ export default function DashboardPage() {
   }
 
   async function saveProfile(form: FormData) {
-    const data = {
+    const cityRaw = form.get("city_id");
+    const data: Record<string, unknown> = {
       stage_name: form.get("stage_name"),
       age: Number(form.get("age")),
       description: form.get("description"),
-      city_id: form.get("city_id") ? Number(form.get("city_id")) : null,
       whatsapp: form.get("whatsapp") ?? "",
       telegram: form.get("telegram") ?? "",
       service_ids: Array.from(selectedTags),
     };
+    // Solo enviamos city_id si el usuario eligió una comuna real. Si el select
+    // está en el placeholder, dejamos el valor existente intacto (partial update).
+    if (cityRaw) data.city_id = Number(cityRaw);
     try {
       if (profile) await dashboard.updateProfile(profile.id, data);
       else await dashboard.createProfile(data);
@@ -147,6 +155,7 @@ export default function DashboardPage() {
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
           />
           <select
+            defaultValue={profile?.city?.region?.slug ?? ""}
             onChange={(e) => onRegion(e.target.value)}
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
           >
