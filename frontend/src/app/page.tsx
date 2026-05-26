@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { getRegions } from "@/lib/api";
 
+// Renderiza por request (no pre-render en build): evita que el build falle si
+// el backend está reiniciándose, y mantiene el listado siempre fresco.
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const regions = await getRegions();
 
