@@ -22,5 +22,8 @@ urlpatterns = [
     path("healthz/", lambda r: JsonResponse({"status": "ok"})),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Servimos /media/ desde Django también en producción. Para baja escala es
+# correcto (gunicorn sirve archivos de unos pocos MB sin problema); cuando
+# migremos a S3/R2 esto se desactiva y el storage devuelve URLs absolutas
+# del bucket directamente.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
