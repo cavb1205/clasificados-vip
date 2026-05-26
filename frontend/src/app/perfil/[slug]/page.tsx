@@ -86,12 +86,24 @@ export default async function ProfilePage({ params }: { params: Params }) {
       <ProfileTracker slug={slug} />
 
       {profile.services.length > 0 && (
-        <div className="mt-5 flex flex-wrap gap-2">
-          {profile.services.map((s) => (
-            <span key={s.id} className="rounded-full bg-neutral-800 px-3 py-1 text-xs">
-              {s.name}
-            </span>
-          ))}
+        <div className="mt-5 space-y-2">
+          {(["service", "extra", "feature"] as const).map((cat) => {
+            const tags = profile.services.filter((s) => s.category === cat);
+            if (tags.length === 0) return null;
+            const tone =
+              cat === "service" ? "bg-pink-600/20 text-pink-200"
+              : cat === "extra" ? "bg-amber-600/20 text-amber-200"
+              : "bg-sky-600/20 text-sky-200";
+            return (
+              <div key={cat} className="flex flex-wrap gap-1.5">
+                {tags.map((s) => (
+                  <span key={s.id} className={`rounded-full px-2.5 py-0.5 text-xs ${tone}`}>
+                    {s.name}
+                  </span>
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
 

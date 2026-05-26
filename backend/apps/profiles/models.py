@@ -36,16 +36,29 @@ class City(models.Model):
 
 
 class Service(models.Model):
-    """Catálogo de servicios para filtrado y SEO."""
+    """Catálogo de etiquetas (servicios, extras, características físicas).
+
+    Una sola tabla para los tres tipos, diferenciados por `category`. El admin
+    gestiona el catálogo desde el panel y agrega nuevas etiquetas sin migración.
+    """
+
+    class Category(models.TextChoices):
+        SERVICE = "service", "Servicio"      # masaje, cena, compañía…
+        EXTRA = "extra", "Extra"             # duo, salidas, viajes…
+        FEATURE = "feature", "Característica"  # rubia, tatuajes, delgada…
 
     name = models.CharField(max_length=80, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
+    category = models.CharField(
+        max_length=10, choices=Category.choices, default=Category.SERVICE
+    )
+    order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["category", "order", "name"]
 
     def __str__(self) -> str:
-        return self.name
+        return f"{self.name} ({self.category})"
 
 
 class ModelProfile(models.Model):

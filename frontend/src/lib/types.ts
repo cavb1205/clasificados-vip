@@ -12,11 +12,20 @@ export interface City {
   region: Region;
 }
 
+export type ServiceCategory = "service" | "extra" | "feature";
+
 export interface Service {
   id: number;
   name: string;
   slug: string;
+  category: ServiceCategory;
 }
+
+export const CATEGORY_LABEL: Record<ServiceCategory, string> = {
+  service: "Servicios",
+  extra: "Extras",
+  feature: "Características",
+};
 
 export interface PublicProfile {
   stage_name: string;

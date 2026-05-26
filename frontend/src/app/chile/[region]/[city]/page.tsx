@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { getProfiles, getServices, type ProfileQuery } from "@/lib/api";
 import { ProfileCard } from "@/components/ProfileCard";
+import { CATEGORY_LABEL, type ServiceCategory } from "@/lib/types";
 
 type Params = Promise<{ region: string; city: string }>;
 type Search = Promise<Record<string, string | string[] | undefined>>;
@@ -39,7 +40,7 @@ export default async function CityPage({
   const sp = await searchParams;
 
   const query: ProfileQuery = {
-    service: pickArray(sp.service),
+    tag: pickArray(sp.tag) ?? pickArray(sp.service),  // 'service' por compatibilidad
     min_age: pickString(sp.min_age),
     max_age: pickString(sp.max_age),
     min_rate: pickString(sp.min_rate),
@@ -56,13 +57,22 @@ export default async function CityPage({
   const pageSize = 12;
   const totalPages = Math.max(1, Math.ceil(data.count / pageSize));
   const cityName = titleize(city);
-  const selectedServices = new Set(query.service ?? []);
+  const selectedTags = new Set(query.tag ?? []);
+
+  // Agrupar el catálogo por categoría para mostrar fieldsets distintos.
+  const byCategory = services.reduce<Record<ServiceCategory, typeof services>>(
+    (acc, s) => {
+      (acc[s.category] ||= []).push(s);
+      return acc;
+    },
+    { service: [], extra: [], feature: [] },
+  );
 
   // Helper para construir URL preservando filtros (cambiando página o limpiando).
   const baseHref = `/chile/${region}/${city}`;
   const withParams = (overrides: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
-    query.service?.forEach((s) => p.append("service", s));
+    query.tag?.forEach((s) => p.append("tag", s));
     for (const k of ["min_age", "max_age", "min_rate", "max_rate", "page"] as const) {
       if (query[k]) p.set(k, query[k] as string);
     }
@@ -87,24 +97,39 @@ export default async function CityPage({
         <p className="mt-1 text-xs text-neutral-500">{data.count} resultado(s)</p>
 
         <form method="get" className="mt-6 space-y-5 text-sm">
-          <fieldset className="space-y-1">
-            <legend className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-              Servicios
-            </legend>
-            <div className="space-y-1">
-              {services.map((s) => (
-                <label key={s.id} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    name="service"
-                    value={s.slug}
-                    defaultChecked={selectedServices.has(s.slug)}
-                  />
-                  {s.name}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          {(["service", "extra", "feature"] as const).map((cat) =>
+            byCategory[cat].length === 0 ? null : (
+              <fieldset key={cat} className="space-y-1">
+                <legend className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  {CATEGORY_LABEL[cat]}
+                </legend>
+                <div className="flex flex-wrap gap-1.5">
+                  {byCategory[cat].map((s) => {
+                    const checked = selectedTags.has(s.slug);
+                    return (
+                      <label
+                        key={s.id}
+                        className={`cursor-pointer rounded-full border px-2.5 py-0.5 text-xs ${
+                          checked
+                            ? "border-pink-500 bg-pink-600/20 text-pink-200"
+                            : "border-neutral-700 text-neutral-400 hover:border-pink-500"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          name="tag"
+                          value={s.slug}
+                          defaultChecked={checked}
+                          className="sr-only"
+                        />
+                        {s.name}
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ),
+          )}
 
           <fieldset>
             <legend className="text-xs font-semibold uppercase tracking-wide text-neutral-500">

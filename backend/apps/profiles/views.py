@@ -127,10 +127,14 @@ class PublicProfileListView(generics.ListAPIView):
         if q:
             qs = qs.filter(Q(stage_name__icontains=q) | Q(description__icontains=q))
 
-        # Filtros adicionales.
-        services = params.getlist("service")
-        if services:
-            qs = qs.filter(services__slug__in=services).distinct()
+        # Filtros adicionales por etiquetas (servicios, extras, características).
+        # Acepta tanto el alias histórico `service=` como el nuevo `tag=`.
+        tags = params.getlist("tag") + params.getlist("service")
+        if tags:
+            # Si llegan varias etiquetas, requerir TODAS (AND).
+            for slug in set(tags):
+                qs = qs.filter(services__slug=slug)
+            qs = qs.distinct()
 
         for key, lookup in (("min_age", "age__gte"), ("max_age", "age__lte"),
                             ("min_rate", "base_rate__gte"), ("max_rate", "base_rate__lte")):

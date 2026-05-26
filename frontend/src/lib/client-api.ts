@@ -90,6 +90,7 @@ export const dashboard = {
   plans: () => apiFetch<unknown[]>("/plans/"),
   regions: () => apiFetch<unknown[]>("/regions/"),
   cities: (regionSlug: string) => apiFetch<unknown[]>(`/cities/?region=${regionSlug}`),
+  services: () => apiFetch<unknown[]>("/services/"),
   // Estadísticas del perfil propio
   stats: () => apiFetch<{
     views_total: number; views_30d: number; views_7d: number;

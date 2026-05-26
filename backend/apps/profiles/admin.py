@@ -19,7 +19,9 @@ class CityAdmin(admin.ModelAdmin):
 
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug")
+    list_display = ("name", "category", "order")
+    list_filter = ("category",)
+    list_editable = ("category", "order")
     prepopulated_fields = {"slug": ("name",)}
 
 

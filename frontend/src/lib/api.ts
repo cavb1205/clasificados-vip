@@ -40,7 +40,8 @@ export interface ProfileQuery {
   region?: string;
   city?: string;
   q?: string;
-  service?: string[];
+  /** Slugs de etiquetas (servicios/extras/características). AND-mode en backend. */
+  tag?: string[];
   min_age?: string;
   max_age?: string;
   min_rate?: string;
@@ -50,7 +51,7 @@ export interface ProfileQuery {
 
 function buildQuery(q: ProfileQuery): string {
   const params = new URLSearchParams();
-  q.service?.forEach((s) => params.append("service", s));
+  q.tag?.forEach((s) => params.append("tag", s));
   for (const k of ["region", "city", "q", "min_age", "max_age", "min_rate", "max_rate", "page"] as const) {
     if (q[k]) params.set(k, q[k] as string);
   }

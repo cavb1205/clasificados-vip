@@ -36,7 +36,7 @@ class CitySerializer(serializers.ModelSerializer):
 class ServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
-        fields = ["id", "name", "slug"]
+        fields = ["id", "name", "slug", "category"]
 
 
 class ModelProfileSerializer(serializers.ModelSerializer):

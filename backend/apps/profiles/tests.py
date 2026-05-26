@@ -90,6 +90,29 @@ class FilterAndPaginationTests(APITestCase):
         self.assertEqual(resp.status_code, 200)
         slugs = sorted(s["slug"] for s in resp.data)
         self.assertEqual(slugs, ["cena", "masaje"])
+        # Cada item ahora trae category (default 'service' al no haberlo seteado).
+        self.assertIn("category", resp.data[0])
+
+    def test_tag_filter_is_and_mode(self):
+        # Crear 3 perfiles con combinaciones distintas para validar AND.
+        rubia = Service.objects.create(name="Rubia", slug="rubia", category="feature")
+        u1 = _make_user("a@e.com"); u2 = _make_user("b@e.com")
+        p1 = ModelProfile.objects.create(
+            user=u1, stage_name="A", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+        )
+        p2 = ModelProfile.objects.create(
+            user=u2, stage_name="B", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+        )
+        p1.services.add(self.s_masaje, rubia)   # masaje + rubia
+        p2.services.add(self.s_masaje)           # solo masaje
+
+        # AND: pedir masaje Y rubia → solo p1.
+        url = reverse("api:profiles:public-list") + "?tag=masaje&tag=rubia"
+        resp = self.client.get(url)
+        names = [r["stage_name"] for r in resp.data["results"]]
+        self.assertEqual(names, ["A"])
 
 
 class ContactFieldsTests(APITestCase):

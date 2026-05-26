@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
-import type { Plan, Region, City } from "@/lib/types";
+import type { Plan, Region, City, Service, ServiceCategory } from "@/lib/types";
+import { CATEGORY_LABEL } from "@/lib/types";
 
 interface Profile {
   id: number;
@@ -15,6 +16,7 @@ interface Profile {
   verification_status: string;
   whatsapp: string;
   telegram: string;
+  services: Service[];
 }
 interface Media {
   id: number;
@@ -36,23 +38,29 @@ export default function DashboardPage() {
   const [regions, setRegions] = useState<Region[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [media, setMedia] = useState<Media[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [selectedTags, setSelectedTags] = useState<Set<number>>(new Set());
   const [plans, setPlans] = useState<Plan[]>([]);
   const [publications, setPublications] = useState<Publication[]>([]);
   const [msg, setMsg] = useState("");
 
   const loadAll = useCallback(async () => {
-    const [profs, regs, pls, meds, pubs] = await Promise.all([
+    const [profs, regs, pls, meds, pubs, svcs] = await Promise.all([
       dashboard.getProfile() as Promise<Profile[]>,
       dashboard.regions() as Promise<Region[]>,
       dashboard.plans() as Promise<Plan[]>,
       dashboard.listMedia() as Promise<Media[]>,
       dashboard.listPublications() as Promise<Publication[]>,
+      dashboard.services() as Promise<Service[]>,
     ]);
-    setProfile(profs[0] ?? null);
+    const p = profs[0] ?? null;
+    setProfile(p);
     setRegions(regs);
     setPlans(pls);
     setMedia(meds);
     setPublications(pubs);
+    setServices(svcs);
+    setSelectedTags(new Set(p?.services?.map((s) => s.id) ?? []));
   }, []);
 
   useEffect(() => {
@@ -77,6 +85,7 @@ export default function DashboardPage() {
       city_id: form.get("city_id") ? Number(form.get("city_id")) : null,
       whatsapp: form.get("whatsapp") ?? "",
       telegram: form.get("telegram") ?? "",
+      service_ids: Array.from(selectedTags),
     };
     try {
       if (profile) await dashboard.updateProfile(profile.id, data);
@@ -178,6 +187,15 @@ export default function DashboardPage() {
             defaultValue={profile?.description}
             placeholder="Descripción"
             className="sm:col-span-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
+          />
+          <TagSelector
+            services={services}
+            selected={selectedTags}
+            onToggle={(id) => {
+              const next = new Set(selectedTags);
+              next.has(id) ? next.delete(id) : next.add(id);
+              setSelectedTags(next);
+            }}
           />
           <button className="rounded-full bg-pink-600 px-5 py-2 font-medium hover:bg-pink-500 sm:w-fit">
             Guardar perfil
@@ -831,6 +849,57 @@ function StatsPanel({ hasProfile }: { hasProfile: boolean }) {
       <Card label="Contactos (7 días)" value={stats.contacts_7d} />
       <Card label="Contactos (30 días)" value={stats.contacts_30d} />
       <Card label="Contactos totales" value={stats.contacts_total} />
+    </div>
+  );
+}
+
+function TagSelector({
+  services,
+  selected,
+  onToggle,
+}: {
+  services: Service[];
+  selected: Set<number>;
+  onToggle: (id: number) => void;
+}) {
+  if (services.length === 0) return null;
+  const byCat = services.reduce<Record<ServiceCategory, Service[]>>(
+    (acc, s) => {
+      (acc[s.category] ||= []).push(s);
+      return acc;
+    },
+    { service: [], extra: [], feature: [] },
+  );
+  return (
+    <div className="sm:col-span-2 space-y-3">
+      {(["service", "extra", "feature"] as const).map((cat) =>
+        byCat[cat].length === 0 ? null : (
+          <div key={cat}>
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              {CATEGORY_LABEL[cat]}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {byCat[cat].map((s) => {
+                const checked = selected.has(s.id);
+                return (
+                  <button
+                    type="button"
+                    key={s.id}
+                    onClick={() => onToggle(s.id)}
+                    className={`rounded-full border px-3 py-1 text-xs transition ${
+                      checked
+                        ? "border-pink-500 bg-pink-600/20 text-pink-200"
+                        : "border-neutral-700 text-neutral-300 hover:border-pink-500"
+                    }`}
+                  >
+                    {s.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ),
+      )}
     </div>
   );
 }
