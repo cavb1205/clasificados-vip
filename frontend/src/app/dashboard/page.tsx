@@ -113,9 +113,12 @@ export default function DashboardPage() {
           <NotificationBell />
           <button
             onClick={() => auth.logout().then(() => router.push("/"))}
-            className="text-sm text-neutral-400 hover:text-pink-400"
+            className="rounded-full border border-neutral-700 px-3 py-1.5 text-sm text-neutral-400 hover:text-pink-400"
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
           >
-            Cerrar sesión
+            <span className="md:hidden" aria-hidden>↪</span>
+            <span className="hidden md:inline">Cerrar sesión</span>
           </button>
         </div>
       </div>
@@ -143,7 +146,7 @@ export default function DashboardPage() {
             defaultValue={profile?.stage_name}
             placeholder="Nombre artístico"
             required
-            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
           <input
             name="age"
@@ -152,12 +155,12 @@ export default function DashboardPage() {
             defaultValue={profile?.age}
             placeholder="Edad"
             required
-            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
           <select
             defaultValue={profile?.city?.region?.slug ?? ""}
             onChange={(e) => onRegion(e.target.value)}
-            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           >
             <option value="">Región…</option>
             {regions.map((r) => (
@@ -169,7 +172,7 @@ export default function DashboardPage() {
           <select
             name="city_id"
             defaultValue={profile?.city?.id}
-            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           >
             <option value="">Comuna…</option>
             {cities.map((c) => (
@@ -183,19 +186,20 @@ export default function DashboardPage() {
             defaultValue={profile?.whatsapp}
             placeholder="WhatsApp (ej: 56912345678)"
             inputMode="tel"
-            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
           <input
             name="telegram"
             defaultValue={profile?.telegram}
             placeholder="Telegram (usuario, sin @)"
-            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
           <textarea
             name="description"
             defaultValue={profile?.description}
             placeholder="Descripción"
-            className="sm:col-span-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
+            rows={4}
+            className="sm:col-span-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
           <TagSelector
             services={services}
@@ -206,7 +210,7 @@ export default function DashboardPage() {
               setSelectedTags(next);
             }}
           />
-          <button className="rounded-full bg-pink-600 px-5 py-2 font-medium hover:bg-pink-500 sm:w-fit">
+          <button className="w-full rounded-full bg-pink-600 px-5 py-2.5 font-medium hover:bg-pink-500 sm:w-fit">
             Guardar perfil
           </button>
         </form>
@@ -249,17 +253,19 @@ function KycForm({ onDone }: { onDone: () => void }) {
     }
   }
   return (
-    <form action={submit} className="space-y-2 text-sm">
+    <form action={submit} className="space-y-3 text-sm">
       <label className="block">
-        Cédula
-        <input name="id_document" type="file" required className="block w-full" />
+        <span className="mb-1 block text-neutral-400">Cédula</span>
+        <input name="id_document" type="file" accept="image/*" required className="block w-full text-base" />
       </label>
       <label className="block">
-        Selfie
-        <input name="selfie" type="file" required className="block w-full" />
+        <span className="mb-1 block text-neutral-400">Selfie</span>
+        <input name="selfie" type="file" accept="image/*" required className="block w-full text-base" />
       </label>
       {err && <p className="text-red-400">{err}</p>}
-      <button className="rounded-full bg-pink-600 px-4 py-1.5 hover:bg-pink-500">Enviar</button>
+      <button className="w-full rounded-full bg-pink-600 px-5 py-2.5 font-medium hover:bg-pink-500 sm:w-fit">
+        Enviar
+      </button>
     </form>
   );
 }
@@ -494,22 +500,28 @@ function PublicationManager({
           </li>
         ))}
       </ul>
-      <form action={create} className="flex flex-wrap items-center gap-2 text-sm">
+      <form action={create} className="grid gap-2 text-sm sm:grid-cols-[1fr_auto_auto]">
         <input
           name="title"
           placeholder="Título del anuncio"
           required
           disabled={disabled}
-          className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5"
+          className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
         />
-        <select name="plan_id" className="rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1.5">
+        <select
+          name="plan_id"
+          className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
+        >
           {plans.map((pl) => (
             <option key={pl.id} value={pl.id}>
               {pl.name} — ${pl.price} / {pl.duration_days}d
             </option>
           ))}
         </select>
-        <button disabled={disabled} className="rounded-full bg-pink-600 px-4 py-1.5 disabled:opacity-50">
+        <button
+          disabled={disabled}
+          className="rounded-full bg-pink-600 px-5 py-2.5 font-medium hover:bg-pink-500 disabled:opacity-50"
+        >
           Crear anuncio
         </button>
       </form>
@@ -814,7 +826,7 @@ function NotificationBell() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-neutral-800 bg-neutral-950 p-3 shadow-xl">
+        <div className="fixed inset-x-4 top-16 z-20 max-w-sm rounded-xl border border-neutral-800 bg-neutral-950 p-3 shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
             Notificaciones
           </p>
@@ -874,7 +886,7 @@ function StatsPanel({ hasProfile }: { hasProfile: boolean }) {
   );
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       <Card label="Visitas (7 días)" value={stats.views_7d} />
       <Card label="Visitas (30 días)" value={stats.views_30d} />
       <Card label="Visitas totales" value={stats.views_total} />
