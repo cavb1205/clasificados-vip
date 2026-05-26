@@ -53,7 +53,7 @@ export default async function ProfilePage({ params }: { params: Params }) {
   };
 
   return (
-    <article>
+    <article className="pb-28 md:pb-0">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -75,13 +75,25 @@ export default async function ProfilePage({ params }: { params: Params }) {
         <p className="mt-5 whitespace-pre-line text-neutral-300">{profile.description}</p>
       )}
 
-      <div className="mt-6">
-        <ContactPanel
-          slug={slug}
-          stageName={profile.stage_name}
-          whatsapp={profile.whatsapp}
-          telegram={profile.telegram}
-        />
+      {/*
+        Mobile: sticky al fondo del viewport (zona del pulgar) con safe-area
+        para el notch. Desktop: inline después de la descripción, sin sticky.
+      */}
+      <div
+        className="
+          fixed inset-x-0 bottom-0 z-30 border-t border-neutral-800 bg-neutral-950/95
+          px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur
+          md:static md:mt-6 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none
+        "
+      >
+        <div className="mx-auto max-w-5xl">
+          <ContactPanel
+            slug={slug}
+            stageName={profile.stage_name}
+            whatsapp={profile.whatsapp}
+            telegram={profile.telegram}
+          />
+        </div>
       </div>
       <ProfileTracker slug={slug} />
 
