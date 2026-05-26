@@ -41,6 +41,12 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     X_FRAME_OPTIONS = "DENY"
+    # Frontend en Vercel y backend en otro dominio = cross-site.
+    # SameSite=None + Secure es lo que permite al browser enviar cookies cross-site
+    # (requerido para que csrftoken y session viajen desde clasificados-vip.vercel.app
+    # hacia api-165-22-154-95.nip.io).
+    CSRF_COOKIE_SAMESITE = "None"
+    SESSION_COOKIE_SAMESITE = "None"
 
 # Clave Fernet para cifrar documentos KYC en reposo (32 bytes url-safe base64).
 KYC_ENCRYPTION_KEY = os.getenv("KYC_ENCRYPTION_KEY", "")

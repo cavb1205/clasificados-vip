@@ -13,7 +13,11 @@ services:
     image: clasificados-vip-backend:latest
     container_name: vip-backend
     restart: unless-stopped
-    env_file: .env.production
+    env_file:
+      # `format: raw` (compose v2.30+) deshabilita la interpolación de ${VAR}
+      # dentro del .env, evitando que un SECRET_KEY con `$x` se mutile.
+      - path: .env.production
+        format: raw
     environment:
       # Forzar el seed inicial de regiones/comunas/planes al primer arranque
       # (los comandos seed_* son idempotentes, no daña re-correrlos).
