@@ -656,45 +656,47 @@ function PhotoGrid({ photos, onChange }: { photos: Media[]; onChange: () => void
     if (overId !== id) setOverId(id);
   }
 
-  async function onDrop(e: React.DragEvent, targetId: number) {
-    e.preventDefault();
-    const srcId = draggingId;
-    setDraggingId(null);
-    setOverId(null);
-    if (srcId === null || srcId === targetId) return;
-
-    const fromIdx = items.findIndex((m) => m.id === srcId);
-    const toIdx = items.findIndex((m) => m.id === targetId);
-    if (fromIdx < 0 || toIdx < 0) return;
-
-    // Reordenar localmente (optimista).
+  /** Mueve el elemento en `fromIdx` a la posición `toIdx` y persiste. */
+  async function reorder(fromIdx: number, toIdx: number) {
+    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || toIdx >= items.length) return;
     const reordered = [...items];
     const [moved] = reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moved);
     const withNewOrder = reordered.map((m, i) => ({ ...m, order: i * 10 }));
+    const previous = items;
     setItems(withNewOrder);
-
-    // Persistir solo los que cambiaron de orden.
     setBusy(true);
     try {
       const changed = withNewOrder.filter(
-        (m) => m.order !== items.find((p) => p.id === m.id)?.order,
+        (m) => m.order !== previous.find((p) => p.id === m.id)?.order,
       );
-      await Promise.all(
-        changed.map((m) => dashboard.updateMediaOrder(m.id, m.order)),
-      );
+      await Promise.all(changed.map((m) => dashboard.updateMediaOrder(m.id, m.order)));
       onChange();
     } finally {
       setBusy(false);
     }
   }
 
+  async function onDrop(e: React.DragEvent, targetId: number) {
+    e.preventDefault();
+    const srcId = draggingId;
+    setDraggingId(null);
+    setOverId(null);
+    if (srcId === null || srcId === targetId) return;
+    await reorder(
+      items.findIndex((m) => m.id === srcId),
+      items.findIndex((m) => m.id === targetId),
+    );
+  }
+
   return (
     <div>
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
-        {items.map((m) => {
+        {items.map((m, idx) => {
           const isDragging = draggingId === m.id;
           const isOver = overId === m.id && draggingId !== m.id;
+          const isFirst = idx === 0;
+          const isLast = idx === items.length - 1;
           return (
             <div
               key={m.id}
@@ -718,9 +720,30 @@ function PhotoGrid({ photos, onChange }: { photos: Media[]; onChange: () => void
                 draggable={false}
                 className="aspect-square w-full object-cover"
               />
+              {/* Botones ↑↓: visibles siempre (fallback táctil al drag&drop). */}
+              <div className="absolute inset-x-1 bottom-1 flex justify-between">
+                <button
+                  type="button"
+                  disabled={isFirst || busy}
+                  onClick={() => reorder(idx, idx - 1)}
+                  aria-label="Mover foto a la izquierda"
+                  className="rounded-full bg-black/70 px-2 py-1 text-xs leading-none text-neutral-200 disabled:opacity-30"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  disabled={isLast || busy}
+                  onClick={() => reorder(idx, idx + 1)}
+                  aria-label="Mover foto a la derecha"
+                  className="rounded-full bg-black/70 px-2 py-1 text-xs leading-none text-neutral-200 disabled:opacity-30"
+                >
+                  →
+                </button>
+              </div>
               <button
                 onClick={() => dashboard.deleteMedia(m.id).then(onChange)}
-                className="absolute right-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-xs text-red-300 opacity-0 transition group-hover:opacity-100"
+                className="absolute right-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-xs text-red-300"
                 title="Eliminar"
               >
                 ✕
@@ -730,7 +753,7 @@ function PhotoGrid({ photos, onChange }: { photos: Media[]; onChange: () => void
         })}
       </div>
       <p className="mt-2 text-xs text-neutral-500">
-        Arrastra las fotos para reordenar{busy && " · guardando…"}
+        Usa ← → o arrastra para reordenar{busy && " · guardando…"}
       </p>
     </div>
   );
