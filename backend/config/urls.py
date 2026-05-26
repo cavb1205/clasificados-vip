@@ -2,6 +2,7 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import include, path
 
 api_v1 = [
@@ -17,6 +18,8 @@ api_v1 = [
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/", include((api_v1, "api"))),
+    # Healthcheck para Docker / Traefik (responde si la app está viva).
+    path("healthz/", lambda r: JsonResponse({"status": "ok"})),
 ]
 
 if settings.DEBUG:

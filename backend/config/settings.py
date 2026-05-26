@@ -29,6 +29,19 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", True)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
+# Detrás de Traefik (reverse proxy con TLS). Reconocer el header X-Forwarded-Proto
+# para que request.is_secure() devuelva True y las cookies HttpOnly+Secure funcionen.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+if not DEBUG:
+    # Hardening adicional cuando corremos en producción.
+    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # 30 días para empezar
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    X_FRAME_OPTIONS = "DENY"
+
 # Clave Fernet para cifrar documentos KYC en reposo (32 bytes url-safe base64).
 KYC_ENCRYPTION_KEY = os.getenv("KYC_ENCRYPTION_KEY", "")
 
@@ -56,6 +69,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -138,7 +152,8 @@ STORAGES = {
         "BACKEND": "core.storages.PrivateMediaStorage",
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        # Whitenoise: comprime y agrega hash a los nombres para cache-busting.
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
@@ -194,3 +209,27 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 ADMINS = [("Admin", e.strip()) for e in env_list("DJANGO_ADMIN_EMAILS")]
 if not ADMINS and DEBUG:
     ADMINS = [("Admin Dev", "admin@example.com")]
+
+# --- Logging ---------------------------------------------------------------
+# En contenedor: todo va a stdout/stderr para que Docker/Traefik los capture.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {"handlers": ["console"], "level": os.getenv("LOG_LEVEL", "INFO")},
+    "loggers": {
+        "django.security": {"level": "WARNING"},
+        "django.request": {"level": "WARNING"},
+    },
+}

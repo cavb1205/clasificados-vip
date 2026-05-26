@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 .env
+.env.production
+.env.*.local
 db.sqlite3
 /media/
 /private_media/

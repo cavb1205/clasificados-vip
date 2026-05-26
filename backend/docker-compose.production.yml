@@ -1,0 +1,52 @@
+# Producción · VPS DigitalOcean con Traefik existente (EasyPanel).
+#
+# Despliegue:
+#   1) `scp` este archivo + ./backend al VPS (o git clone).
+#   2) Crear /opt/vip/.env.production a partir de .env.production.example.
+#   3) `docker compose -f docker-compose.production.yml up -d --build`.
+
+services:
+  vip-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: clasificados-vip-backend:latest
+    container_name: vip-backend
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      # Forzar el seed inicial de regiones/comunas/planes al primer arranque
+      # (los comandos seed_* son idempotentes, no daña re-correrlos).
+      SEED_ON_START: "1"
+    volumes:
+      - vip_media:/app/media
+      - vip_private_media:/app/private_media
+    networks:
+      - easypanel
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=easypanel
+      - traefik.http.services.vip-backend.loadbalancer.server.port=8000
+      # HTTPS router con TLS automático (Let's Encrypt via Traefik).
+      - traefik.http.routers.vip-backend.rule=Host(`api-165-22-154-95.sslip.io`)
+      - traefik.http.routers.vip-backend.entrypoints=https
+      - traefik.http.routers.vip-backend.tls=true
+      - traefik.http.routers.vip-backend.tls.certresolver=letsencrypt
+      # Redirect HTTP → HTTPS (reusa middleware definido por EasyPanel en file provider).
+      - traefik.http.routers.vip-backend-http.rule=Host(`api-165-22-154-95.sslip.io`)
+      - traefik.http.routers.vip-backend-http.entrypoints=http
+      - traefik.http.routers.vip-backend-http.middlewares=redirect-to-https@file
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz/', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  easypanel:
+    external: true
+
+volumes:
+  vip_media:
+  vip_private_media:

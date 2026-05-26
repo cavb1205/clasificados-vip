@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+db.sqlite3
+db.sqlite3-journal
+media/
+private_media/
+staticfiles/
+.git/
+.gitignore
+README.md
+*.md
