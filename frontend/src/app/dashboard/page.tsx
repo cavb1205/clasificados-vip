@@ -245,29 +245,79 @@ export default function DashboardPage() {
   );
 }
 
+const MAX_KYC_MB = 10;
+
 function KycForm({ onDone }: { onDone: () => void }) {
   const [err, setErr] = useState("");
-  async function submit(form: FormData) {
+  const [busy, setBusy] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErr("");
+    const fd = new FormData(e.currentTarget);
+    const id = fd.get("id_document");
+    const selfie = fd.get("selfie");
+
+    if (!(id instanceof File) || id.size === 0 || !(selfie instanceof File) || selfie.size === 0) {
+      setErr("Selecciona ambas imágenes (cédula y selfie).");
+      return;
+    }
+    for (const [label, file] of [["Cédula", id], ["Selfie", selfie]] as const) {
+      if (!file.type.startsWith("image/")) {
+        setErr(`${label} debe ser una imagen.`);
+        return;
+      }
+      if (file.size > MAX_KYC_MB * 1024 * 1024) {
+        setErr(`${label} muy grande (máx ${MAX_KYC_MB} MB). Tiene ${(file.size / 1_048_576).toFixed(1)} MB.`);
+        return;
+      }
+    }
+
+    setBusy(true);
     try {
-      await dashboard.submitVerification(form);
+      await dashboard.submitVerification(fd);
+      formRef.current?.reset();
       onDone();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Error");
+    } catch (caught) {
+      setErr(caught instanceof Error ? caught.message : "Error al enviar");
+    } finally {
+      setBusy(false);
     }
   }
+
   return (
-    <form action={submit} className="space-y-3 text-sm">
+    <form ref={formRef} onSubmit={onSubmit} className="space-y-3 text-sm">
       <label className="block">
-        <span className="mb-1 block text-neutral-400">Cédula</span>
-        <input name="id_document" type="file" accept="image/*" required className="block w-full text-base" />
+        <span className="mb-1 block text-neutral-400">Cédula (frente)</span>
+        <input
+          name="id_document"
+          type="file"
+          accept="image/*"
+          required
+          disabled={busy}
+          className="block w-full text-base"
+        />
       </label>
       <label className="block">
-        <span className="mb-1 block text-neutral-400">Selfie</span>
-        <input name="selfie" type="file" accept="image/*" required className="block w-full text-base" />
+        <span className="mb-1 block text-neutral-400">Selfie sosteniendo la cédula</span>
+        <input
+          name="selfie"
+          type="file"
+          accept="image/*"
+          required
+          disabled={busy}
+          className="block w-full text-base"
+        />
       </label>
-      {err && <p className="text-red-400">{err}</p>}
-      <button className="w-full rounded-full bg-pink-600 px-5 py-2.5 font-medium hover:bg-pink-500 sm:w-fit">
-        Enviar
+      <p className="text-xs text-neutral-500">Formato: JPG/PNG · máx {MAX_KYC_MB} MB por imagen.</p>
+      {err && <p className="rounded-lg bg-red-950/40 px-3 py-2 text-sm text-red-300">{err}</p>}
+      <button
+        type="submit"
+        disabled={busy}
+        className="w-full rounded-full bg-pink-600 px-5 py-2.5 font-medium hover:bg-pink-500 disabled:opacity-50 sm:w-fit"
+      >
+        {busy ? "Enviando…" : "Enviar"}
       </button>
     </form>
   );
