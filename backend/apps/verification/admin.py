@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
@@ -46,6 +46,18 @@ class VerificationRequestAdmin(admin.ModelAdmin):
         """
         new_status = obj.status
         was_unreviewed = obj.reviewed_at is None
+
+        # No permitir aprobar sin video de consentimiento (requisito legal).
+        if was_unreviewed and new_status == VerificationRequest.Status.VERIFIED and not obj.consent_video:
+            obj.status = VerificationRequest.Status.PENDING
+            super().save_model(request, obj, form, change)
+            messages.error(
+                request,
+                f"No se puede aprobar: la solicitud #{obj.id} no incluye video de "
+                "consentimiento. Pídele al usuario que re-envíe el KYC.",
+            )
+            return
+
         super().save_model(request, obj, form, change)
 
         if not was_unreviewed:
@@ -89,7 +101,17 @@ class VerificationRequestAdmin(admin.ModelAdmin):
 
     @admin.action(description="Aprobar verificación (marca perfil como verificado)")
     def approve(self, request, queryset):
+        approved = skipped = 0
         for obj in queryset:
+            if not obj.consent_video:
+                self.message_user(
+                    request,
+                    f"VR #{obj.id} ({obj.user.email}): SIN video de consentimiento — "
+                    "no se aprobó. Pide al usuario re-enviar.",
+                    level=messages.ERROR,
+                )
+                skipped += 1
+                continue
             obj.status = VerificationRequest.Status.VERIFIED
             obj.reviewed_by = request.user
             obj.reviewed_at = timezone.now()
@@ -101,7 +123,11 @@ class VerificationRequestAdmin(admin.ModelAdmin):
                 message="Tu identidad fue verificada. Ahora puedes publicar tus anuncios.",
                 link="/dashboard",
             )
-        self.message_user(request, f"{queryset.count()} verificación(es) aprobada(s).")
+            approved += 1
+        self.message_user(
+            request,
+            f"{approved} aprobada(s)" + (f", {skipped} omitida(s) sin video." if skipped else "."),
+        )
 
     @admin.action(description="Rechazar verificación")
     def reject(self, request, queryset):
