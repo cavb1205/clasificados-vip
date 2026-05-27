@@ -57,6 +57,7 @@ class ModelProfileSerializer(serializers.ModelSerializer):
     )
 
     trial_ends_at = serializers.SerializerMethodField()
+    pending_verification = serializers.SerializerMethodField()
 
     class Meta:
         model = ModelProfile
@@ -66,12 +67,20 @@ class ModelProfileSerializer(serializers.ModelSerializer):
             "city", "city_id",
             "whatsapp", "telegram",
             "verification_status", "verified_at", "trial_ends_at",
+            "pending_verification",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "slug", "verification_status", "verified_at", "trial_ends_at",
-            "created_at", "updated_at",
+            "pending_verification", "created_at", "updated_at",
         ]
+
+    def get_pending_verification(self, obj) -> bool:
+        """True si el usuario subió KYC y está esperando revisión del admin."""
+        from apps.verification.models import VerificationRequest
+        return VerificationRequest.objects.filter(
+            user=obj.user, status=VerificationRequest.Status.PENDING
+        ).exists()
 
     def get_trial_ends_at(self, obj):
         if not obj.verified_at:

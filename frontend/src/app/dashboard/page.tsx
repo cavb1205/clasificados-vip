@@ -16,6 +16,7 @@ interface Profile {
   verification_status: string;
   verified_at: string | null;
   trial_ends_at: string | null;
+  pending_verification: boolean;
   whatsapp: string;
   telegram: string;
   services: Service[];
@@ -1018,6 +1019,15 @@ function VisibilityBanner({
   }
 
   if (profile.verification_status === "pending") {
+    if (profile.pending_verification) {
+      return (
+        <div className="rounded-xl border border-sky-700/50 bg-sky-950/30 px-4 py-3 text-sm text-sky-200">
+          📤 <strong>Documentos en revisión.</strong> El admin los está validando;
+          te avisaremos por notificación cuando se apruebe. Esto puede tardar
+          unas horas.
+        </div>
+      );
+    }
     return (
       <div className="rounded-xl border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
         ⏳ Tu perfil aún no es público. Sube tus documentos en{" "}

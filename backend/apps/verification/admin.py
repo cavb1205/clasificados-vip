@@ -19,8 +19,9 @@ class VerificationRequestAdmin(admin.ModelAdmin):
 
     @admin.display(description="Documentos (descifra y audita)")
     def documents(self, obj):
-        id_url = reverse("verification:document", args=[obj.pk, "id_document"])
-        selfie_url = reverse("verification:document", args=[obj.pk, "selfie"])
+        # Las URLs viven bajo /api/v1/ (namespace "api") → "api:verification:document".
+        id_url = reverse("api:verification:document", args=[obj.pk, "id_document"])
+        selfie_url = reverse("api:verification:document", args=[obj.pk, "selfie"])
         return format_html(
             '<a href="{}" target="_blank">Cédula</a> · <a href="{}" target="_blank">Selfie</a>',
             id_url,

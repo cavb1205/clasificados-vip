@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { AgeGate } from "@/components/AgeGate";
+import { AuthNav } from "@/components/AuthNav";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
@@ -37,16 +38,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-1.5 text-sm focus:border-pink-600 focus:outline-none"
               />
             </form>
-            <div className="order-2 ml-auto flex gap-4 text-sm sm:order-3 sm:ml-0">
-              <Link href="/login" className="hover:text-pink-400">
-                Ingresar
-              </Link>
-              <Link
-                href="/registro"
-                className="rounded-full bg-pink-600 px-4 py-1.5 font-medium hover:bg-pink-500"
-              >
-                Publicar
-              </Link>
+            <div className="order-2 ml-auto sm:order-3 sm:ml-0">
+              <AuthNav />
             </div>
           </nav>
         </header>
