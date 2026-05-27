@@ -29,9 +29,16 @@ class VerificationRequestAdmin(admin.ModelAdmin):
 
     def _set_profile_status(self, user, status):
         profile = ModelProfile.objects.filter(user=user).first()
-        if profile:
-            profile.verification_status = status
-            profile.save(update_fields=["verification_status"])
+        if not profile:
+            return
+        profile.verification_status = status
+        fields = ["verification_status"]
+        # Anclar el inicio del trial gratuito en la PRIMERA aprobación.
+        # Re-aprobaciones posteriores no reinician el trial (anti-abuso).
+        if status == ModelProfile.VerificationStatus.VERIFIED and profile.verified_at is None:
+            profile.verified_at = timezone.now()
+            fields.append("verified_at")
+        profile.save(update_fields=fields)
 
     @admin.action(description="Aprobar verificación (marca perfil como verificado)")
     def approve(self, request, queryset):

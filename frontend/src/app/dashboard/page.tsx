@@ -14,6 +14,8 @@ interface Profile {
   age: number;
   city: City | null;
   verification_status: string;
+  verified_at: string | null;
+  trial_ends_at: string | null;
   whatsapp: string;
   telegram: string;
   services: Service[];
@@ -123,6 +125,7 @@ export default function DashboardPage() {
         </div>
       </div>
       {msg && <p className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-pink-400">{msg}</p>}
+      <VisibilityBanner profile={profile} publications={publications} />
 
       {/* Estadísticas */}
       <section>
@@ -944,6 +947,74 @@ function TagSelector({
           </div>
         ),
       )}
+    </div>
+  );
+}
+
+function VisibilityBanner({
+  profile,
+  publications,
+}: {
+  profile: Profile | null;
+  publications: Publication[];
+}) {
+  if (!profile) {
+    return (
+      <div className="rounded-xl border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+        Crea tu perfil para empezar. Tras llenarlo, sube tus documentos KYC y
+        publica tu primer anuncio.
+      </div>
+    );
+  }
+
+  if (profile.verification_status === "pending") {
+    return (
+      <div className="rounded-xl border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+        ⏳ Tu perfil aún no es público. Sube tus documentos en{" "}
+        <strong>Verificación de identidad</strong> para que el admin los apruebe.
+      </div>
+    );
+  }
+
+  if (profile.verification_status === "rejected") {
+    return (
+      <div className="rounded-xl border border-red-700/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+        Tu verificación fue rechazada. Vuelve a subir tus documentos.
+      </div>
+    );
+  }
+
+  // Verificado: revisar trial y publicación activa.
+  const now = Date.now();
+  const trialEnds = profile.trial_ends_at ? new Date(profile.trial_ends_at).getTime() : 0;
+  const inTrial = trialEnds > now;
+  const hasActivePub = publications.some(
+    (p) => p.status === "active" && p.expires_at && new Date(p.expires_at).getTime() > now,
+  );
+
+  if (hasActivePub) {
+    return (
+      <div className="rounded-xl border border-emerald-700/50 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
+        ✅ Tu anuncio está activo y visible en el listado público.
+      </div>
+    );
+  }
+
+  if (inTrial) {
+    const hoursLeft = Math.ceil((trialEnds - now) / 3_600_000);
+    return (
+      <div className="rounded-xl border border-pink-700/50 bg-pink-950/30 px-4 py-3 text-sm text-pink-200">
+        🎁 <strong>Trial gratuito activo</strong> · tu perfil es visible por las
+        próximas <strong>{hoursLeft} h</strong>. Crea un anuncio y sube el
+        comprobante de pago para seguir visible cuando termine.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-neutral-700 bg-neutral-900 px-4 py-3 text-sm text-neutral-300">
+      Tu perfil ya no aparece en el listado público. Crea un anuncio activo en{" "}
+      <strong>Mis anuncios</strong> para volver a ser visible.
     </div>
   );
 }

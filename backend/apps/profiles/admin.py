@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import City, ModelProfile, Region, Service
+from .models import City, ModelProfile, Region, Service, SiteConfig
 
 
 @admin.register(Region)
@@ -31,3 +31,18 @@ class ModelProfileAdmin(admin.ModelAdmin):
     list_filter = ("verification_status", "city__region")
     search_fields = ("stage_name", "user__email")
     readonly_fields = ("slug", "created_at", "updated_at")
+
+
+@admin.register(SiteConfig)
+class SiteConfigAdmin(admin.ModelAdmin):
+    """Editor del singleton de configuración. No se puede agregar ni borrar."""
+
+    list_display = ("__str__", "trial_days")
+    fields = ("trial_days",)
+
+    def has_add_permission(self, request):
+        # Sólo permitir "agregar" si todavía no hay registro.
+        return not SiteConfig.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

@@ -1,8 +1,9 @@
 import re
+from datetime import timedelta
 
 from rest_framework import serializers
 
-from .models import City, ModelProfile, Region, Service
+from .models import City, ModelProfile, Region, Service, SiteConfig
 
 
 def _normalize_whatsapp(raw: str) -> str:
@@ -55,6 +56,8 @@ class ModelProfileSerializer(serializers.ModelSerializer):
         required=False,
     )
 
+    trial_ends_at = serializers.SerializerMethodField()
+
     class Meta:
         model = ModelProfile
         fields = [
@@ -62,10 +65,18 @@ class ModelProfileSerializer(serializers.ModelSerializer):
             "services", "service_ids", "base_rate",
             "city", "city_id",
             "whatsapp", "telegram",
-            "verification_status",
+            "verification_status", "verified_at", "trial_ends_at",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["slug", "verification_status", "created_at", "updated_at"]
+        read_only_fields = [
+            "slug", "verification_status", "verified_at", "trial_ends_at",
+            "created_at", "updated_at",
+        ]
+
+    def get_trial_ends_at(self, obj):
+        if not obj.verified_at:
+            return None
+        return obj.verified_at + timedelta(days=SiteConfig.get().trial_days)
 
     def validate_age(self, value):
         if value < 18:

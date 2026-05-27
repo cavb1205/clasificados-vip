@@ -23,8 +23,12 @@ class PublicVisibilityTests(APITestCase):
         )
 
     def _make_profile(self, status_value):
+        verified_at = (
+            timezone.now() if status_value == ModelProfile.VerificationStatus.VERIFIED else None
+        )
         return ModelProfile.objects.create(
-            user=self.user, stage_name="Luna", age=25, verification_status=status_value
+            user=self.user, stage_name="Luna", age=25,
+            verification_status=status_value, verified_at=verified_at,
         )
 
     def test_pending_profile_is_hidden(self):
@@ -50,6 +54,7 @@ class FilterAndPaginationTests(APITestCase):
             p = ModelProfile.objects.create(
                 user=u, stage_name=f"M{i}", age=20 + i, base_rate=10000 + i * 1000,
                 verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
             )
             # Asignar masaje a los pares, cena a los impares.
             p.services.add(self.s_masaje if i % 2 == 0 else self.s_cena)
@@ -100,10 +105,12 @@ class FilterAndPaginationTests(APITestCase):
         p1 = ModelProfile.objects.create(
             user=u1, stage_name="A", age=25,
             verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
         )
         p2 = ModelProfile.objects.create(
             user=u2, stage_name="B", age=25,
             verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
         )
         p1.services.add(self.s_masaje, rubia)   # masaje + rubia
         p2.services.add(self.s_masaje)           # solo masaje
@@ -151,6 +158,54 @@ class ContactFieldsTests(APITestCase):
         self.assertIn("telegram", resp.data)
 
 
+class TrialVisibilityTests(APITestCase):
+    """Reglas de visibilidad: verificado + (trial activo o publicación activa)."""
+
+    def setUp(self):
+        self.plan = SubscriptionPlan.objects.create(name="Mensual", duration_days=30, price=35000)
+
+    def _make_verified_profile(self, name, verified_minutes_ago):
+        u = _make_user(f"{name}@example.com")
+        return ModelProfile.objects.create(
+            user=u, stage_name=name, age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now() - timedelta(minutes=verified_minutes_ago),
+        )
+
+    def test_profile_visible_during_trial(self):
+        from apps.profiles.models import SiteConfig
+        SiteConfig.objects.update_or_create(pk=1, defaults={"trial_days": 1})
+        self._make_verified_profile("Trial", verified_minutes_ago=10)
+        resp = self.client.get(reverse("api:profiles:public-list"))
+        names = [r["stage_name"] for r in resp.data["results"]]
+        self.assertIn("Trial", names)
+
+    def test_profile_hidden_after_trial_without_publication(self):
+        from apps.profiles.models import SiteConfig
+        SiteConfig.objects.update_or_create(pk=1, defaults={"trial_days": 1})
+        # Verificado hace 2 días → trial vencido, sin publicación.
+        self._make_verified_profile("Old", verified_minutes_ago=60 * 24 * 2)
+        resp = self.client.get(reverse("api:profiles:public-list"))
+        names = [r["stage_name"] for r in resp.data["results"]]
+        self.assertNotIn("Old", names)
+
+    def test_profile_visible_with_active_publication_even_after_trial(self):
+        p = self._make_verified_profile("Paid", verified_minutes_ago=60 * 24 * 2)
+        Publication.objects.create(
+            profile=p, title="Anuncio", plan=self.plan,
+            status=Publication.Status.ACTIVE,
+            expires_at=timezone.now() + timedelta(days=10),
+        )
+        resp = self.client.get(reverse("api:profiles:public-list"))
+        names = [r["stage_name"] for r in resp.data["results"]]
+        self.assertIn("Paid", names)
+
+    def test_detail_404_when_not_visible(self):
+        p = self._make_verified_profile("Hidden", verified_minutes_ago=60 * 24 * 30)
+        resp = self.client.get(reverse("api:profiles:public-detail", args=[p.slug]))
+        self.assertEqual(resp.status_code, 404)
+
+
 class ProfileStatsTests(APITestCase):
     """Eventos públicos + endpoint de stats para la dueña del perfil."""
 
@@ -159,6 +214,7 @@ class ProfileStatsTests(APITestCase):
         self.profile = ModelProfile.objects.create(
             user=self.user, stage_name="Luna", age=25,
             verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
         )
 
     def test_log_event_view(self):
@@ -197,6 +253,7 @@ class CardEnrichmentTests(APITestCase):
             ModelProfile.objects.create(
                 user=u, stage_name=name, age=25,
                 verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
             )
 
     def _make_featured_publication(self, profile):

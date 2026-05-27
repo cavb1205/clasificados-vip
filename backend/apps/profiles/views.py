@@ -11,7 +11,7 @@ from rest_framework.views import APIView
 from apps.publications.models import Publication
 from apps.reviews.models import Review
 from core.permissions import IsModel
-from .models import City, ModelProfile, ProfileEvent, Region, Service
+from .models import City, ModelProfile, ProfileEvent, Region, Service, SiteConfig
 from .serializers import (
     CitySerializer,
     ModelProfileSerializer,
@@ -107,10 +107,21 @@ class PublicProfileListView(generics.ListAPIView):
 
     def get_queryset(self):
         params = self.request.query_params
+        now = timezone.now()
+        trial_cutoff = now - timedelta(days=SiteConfig.get().trial_days)
+        # Visibilidad: verificada Y (en trial gratuito O con publicación activa).
         qs = annotate_public_profiles(
             ModelProfile.objects.filter(
                 verification_status=ModelProfile.VerificationStatus.VERIFIED
             )
+            .filter(
+                Q(verified_at__gte=trial_cutoff)
+                | Q(
+                    publications__status=Publication.Status.ACTIVE,
+                    publications__expires_at__gt=now,
+                )
+            )
+            .distinct()
             .select_related("city", "city__region")
             .prefetch_related("services", "media")
         )
@@ -152,10 +163,22 @@ class PublicProfileDetailView(generics.RetrieveAPIView):
     lookup_field = "slug"
 
     def get_queryset(self):
+        now = timezone.now()
+        trial_cutoff = now - timedelta(days=SiteConfig.get().trial_days)
         return annotate_public_profiles(
             ModelProfile.objects.filter(
                 verification_status=ModelProfile.VerificationStatus.VERIFIED
-            ).select_related("city", "city__region").prefetch_related("services", "media")
+            )
+            .filter(
+                Q(verified_at__gte=trial_cutoff)
+                | Q(
+                    publications__status=Publication.Status.ACTIVE,
+                    publications__expires_at__gt=now,
+                )
+            )
+            .distinct()
+            .select_related("city", "city__region")
+            .prefetch_related("services", "media")
         )
 
 

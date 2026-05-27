@@ -100,6 +100,9 @@ class ModelProfile(models.Model):
         choices=VerificationStatus.choices,
         default=VerificationStatus.PENDING,
     )
+    # Marca la primera aprobación de KYC. Inmutable a re-aprobaciones.
+    # Sirve de ancla para calcular el periodo de trial gratuito.
+    verified_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -141,3 +144,37 @@ class ProfileEvent(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["profile", "kind", "created_at"])]
+
+
+class SiteConfig(models.Model):
+    """Configuración global del sitio editable desde el admin (singleton).
+
+    Solo existe un registro (pk=1). Para leerla:
+        config = SiteConfig.get()
+    """
+
+    trial_days = models.PositiveIntegerField(
+        "días de trial gratuito post-KYC",
+        default=1,
+        help_text=(
+            "Tras aprobar el KYC, el perfil queda visible públicamente sin "
+            "pago durante este número de días. Pasado ese periodo se exige "
+            "una publicación active."
+        ),
+    )
+
+    class Meta:
+        verbose_name = "Configuración del sitio"
+        verbose_name_plural = "Configuración del sitio"
+
+    @classmethod
+    def get(cls) -> "SiteConfig":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def save(self, *args, **kwargs):
+        self.pk = 1  # forzar singleton
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return "Configuración del sitio"
