@@ -1,6 +1,8 @@
 from django.http import HttpResponse, Http404
 from rest_framework import generics, permissions
+from rest_framework.authentication import SessionAuthentication
 
+from apps.users.authentication import CookieJWTAuthentication
 from core.permissions import IsModel
 from .models import VerificationAccessLog, VerificationRequest
 from .serializers import VerificationRequestSerializer
@@ -19,8 +21,13 @@ class SubmitVerificationView(generics.CreateAPIView):
 
 
 class KYCDocumentView(generics.GenericAPIView):
-    """Descarga descifrada de un documento KYC. Solo staff y siempre auditada."""
+    """Descarga descifrada de un documento KYC. Solo staff y siempre auditada.
 
+    Acepta tanto sesión de Django (admin) como cookie JWT — el admin abre el
+    link desde /admin/ donde está logueado con session cookie, no con JWT.
+    """
+
+    authentication_classes = [SessionAuthentication, CookieJWTAuthentication]
     permission_classes = [permissions.IsAdminUser]
     queryset = VerificationRequest.objects.all()
 
