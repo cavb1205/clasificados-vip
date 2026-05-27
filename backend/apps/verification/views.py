@@ -43,4 +43,26 @@ class KYCDocumentView(generics.GenericAPIView):
             ip_address=_client_ip(request),
         )
         # Se sirve en memoria; nunca se escribe el archivo descifrado a disco.
-        return HttpResponse(data, content_type="application/octet-stream")
+        # Inline + content-type real para verlo en la pestaña sin descargar.
+        # Sin caché para que no quede copia en el disco del navegador.
+        response = HttpResponse(data, content_type=_sniff_image_mime(data))
+        response["Content-Disposition"] = "inline"
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, private, max-age=0"
+        response["Pragma"] = "no-cache"
+        response["Expires"] = "0"
+        response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        return response
+
+
+def _sniff_image_mime(data: bytes) -> str:
+    """Detecta JPG/PNG/WebP/GIF mirando los primeros bytes (no confiamos en
+    extensión porque el archivo en disco se llama '.enc')."""
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if len(data) > 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return "image/gif"
+    return "application/octet-stream"
