@@ -246,31 +246,72 @@ export default function DashboardPage() {
   );
 }
 
-const MAX_KYC_MB = 10;
+const MAX_IMG_MB = 10;
+const MAX_VIDEO_MB = 50;
+
+interface Challenge {
+  code: string;
+  statement: string;
+  expires_at: string;
+}
 
 function KycForm({ onDone }: { onDone: () => void }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [challenge, setChallenge] = useState<Challenge | null>(null);
+  const [loadingChallenge, setLoadingChallenge] = useState(true);
   const formRef = useRef<HTMLFormElement>(null);
+
+  // Pedir el challenge al montar; lo refrescamos si el usuario lo solicita.
+  const fetchChallenge = useCallback(async () => {
+    setLoadingChallenge(true);
+    setErr("");
+    try {
+      setChallenge(await dashboard.issueKycChallenge());
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo obtener el código de validación");
+    } finally {
+      setLoadingChallenge(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChallenge();
+  }, [fetchChallenge]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErr("");
-    const fd = new FormData(e.currentTarget);
-    const id = fd.get("id_document");
-    const selfie = fd.get("selfie");
-
-    if (!(id instanceof File) || id.size === 0 || !(selfie instanceof File) || selfie.size === 0) {
-      setErr("Selecciona ambas imágenes (cédula y selfie).");
+    if (!challenge) {
+      setErr("Espera a que se genere el código de validación.");
       return;
     }
-    for (const [label, file] of [["Cédula", id], ["Selfie", selfie]] as const) {
-      if (!file.type.startsWith("image/")) {
-        setErr(`${label} debe ser una imagen.`);
+    const fd = new FormData(e.currentTarget);
+    fd.append("challenge_code", challenge.code);
+
+    const id = fd.get("id_document");
+    const selfie = fd.get("selfie");
+    const video = fd.get("consent_video");
+
+    if (
+      !(id instanceof File) || id.size === 0 ||
+      !(selfie instanceof File) || selfie.size === 0 ||
+      !(video instanceof File) || video.size === 0
+    ) {
+      setErr("Selecciona los tres archivos: cédula, selfie y video.");
+      return;
+    }
+    for (const [label, file, kind, maxMB] of [
+      ["Cédula", id, "image/", MAX_IMG_MB],
+      ["Selfie", selfie, "image/", MAX_IMG_MB],
+      ["Video", video, "video/", MAX_VIDEO_MB],
+    ] as const) {
+      if (!file.type.startsWith(kind)) {
+        setErr(`${label} debe ser ${kind === "image/" ? "una imagen" : "un video"}.`);
         return;
       }
-      if (file.size > MAX_KYC_MB * 1024 * 1024) {
-        setErr(`${label} muy grande (máx ${MAX_KYC_MB} MB). Tiene ${(file.size / 1_048_576).toFixed(1)} MB.`);
+      if (file.size > maxMB * 1_048_576) {
+        setErr(`${label} muy grande (máx ${maxMB} MB). Tiene ${(file.size / 1_048_576).toFixed(1)} MB.`);
         return;
       }
     }
@@ -282,15 +323,56 @@ function KycForm({ onDone }: { onDone: () => void }) {
       onDone();
     } catch (caught) {
       setErr(caught instanceof Error ? caught.message : "Error al enviar");
+      // Si el código se invalida (ya usado, expirado), pide uno nuevo automáticamente.
+      if (caught instanceof Error && /desaf[íi]o/i.test(caught.message)) {
+        fetchChallenge();
+      }
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} className="space-y-3 text-sm">
+    <form ref={formRef} onSubmit={onSubmit} className="space-y-4 text-sm">
+      {/* Frase guionada con el código */}
+      <div className="rounded-xl border border-sky-700/50 bg-sky-950/30 p-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-300">
+          Texto a leer en el video
+        </p>
+        {loadingChallenge ? (
+          <p className="text-neutral-400">Generando código…</p>
+        ) : challenge ? (
+          <>
+            <p className="text-neutral-200">
+              {challenge.statement.split(challenge.code).map((part, i, arr) => (
+                <span key={i}>
+                  {part}
+                  {i < arr.length - 1 && (
+                    <strong className="rounded bg-sky-900 px-1.5 py-0.5 font-mono text-sky-100">
+                      {challenge.code}
+                    </strong>
+                  )}
+                </span>
+              ))}
+            </p>
+            <p className="mt-2 text-xs text-neutral-500">
+              El código es válido por 1 hora.{" "}
+              <button
+                type="button"
+                onClick={fetchChallenge}
+                className="underline hover:text-pink-400"
+              >
+                Generar otro
+              </button>
+            </p>
+          </>
+        ) : (
+          <p className="text-red-400">No se pudo obtener el código.</p>
+        )}
+      </div>
+
       <label className="block">
-        <span className="mb-1 block text-neutral-400">Cédula (frente)</span>
+        <span className="mb-1 block text-neutral-400">1. Cédula (frente)</span>
         <input
           name="id_document"
           type="file"
@@ -300,8 +382,9 @@ function KycForm({ onDone }: { onDone: () => void }) {
           className="block w-full text-base"
         />
       </label>
+
       <label className="block">
-        <span className="mb-1 block text-neutral-400">Selfie sosteniendo la cédula</span>
+        <span className="mb-1 block text-neutral-400">2. Selfie sosteniendo la cédula</span>
         <input
           name="selfie"
           type="file"
@@ -311,14 +394,34 @@ function KycForm({ onDone }: { onDone: () => void }) {
           className="block w-full text-base"
         />
       </label>
-      <p className="text-xs text-neutral-500">Formato: JPG/PNG · máx {MAX_KYC_MB} MB por imagen.</p>
+
+      <label className="block">
+        <span className="mb-1 block text-neutral-400">
+          3. Video corto (15-30 seg) leyendo el texto de arriba con tu cédula visible
+        </span>
+        <input
+          name="consent_video"
+          type="file"
+          accept="video/*"
+          capture="user"
+          required
+          disabled={busy}
+          className="block w-full text-base"
+        />
+      </label>
+
+      <p className="text-xs text-neutral-500">
+        Cédula y selfie: JPG/PNG · máx {MAX_IMG_MB} MB. Video: MP4/MOV/WebM · máx {MAX_VIDEO_MB} MB.
+      </p>
+
       {err && <p className="rounded-lg bg-red-950/40 px-3 py-2 text-sm text-red-300">{err}</p>}
+
       <button
         type="submit"
-        disabled={busy}
+        disabled={busy || !challenge}
         className="w-full rounded-full bg-pink-600 px-5 py-2.5 font-medium hover:bg-pink-500 disabled:opacity-50 sm:w-fit"
       >
-        {busy ? "Enviando…" : "Enviar"}
+        {busy ? "Enviando…" : "Enviar verificación"}
       </button>
     </form>
   );

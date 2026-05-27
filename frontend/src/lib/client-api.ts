@@ -118,6 +118,10 @@ export const dashboard = {
   renewPublication: (pubId: number) =>
     apiFetch(`/me/publications/${pubId}/renew/`, { method: "POST" }),
   // KYC
+  issueKycChallenge: () =>
+    apiFetch<{ code: string; statement: string; expires_at: string }>(
+      "/verification/challenge/", { method: "POST" },
+    ),
   submitVerification: (form: FormData) =>
     apiFetch("/verification/submit/", { method: "POST", body: form, isForm: true }),
   // Catálogos

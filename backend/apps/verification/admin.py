@@ -13,8 +13,10 @@ class VerificationRequestAdmin(admin.ModelAdmin):
     list_display = ("user", "status", "created_at", "reviewed_by", "documents")
     list_filter = ("status",)
     search_fields = ("user__email",)
-    readonly_fields = ("user", "created_at", "reviewed_at", "reviewed_by", "documents")
-    exclude = ("id_document", "selfie")
+    readonly_fields = (
+        "user", "challenge_code", "created_at", "reviewed_at", "reviewed_by", "documents",
+    )
+    exclude = ("id_document", "selfie", "consent_video")
     actions = ("approve", "reject")
 
     @admin.display(description="Documentos (descifra y audita)")
@@ -22,10 +24,16 @@ class VerificationRequestAdmin(admin.ModelAdmin):
         # Las URLs viven bajo /api/v1/ (namespace "api") → "api:verification:document".
         id_url = reverse("api:verification:document", args=[obj.pk, "id_document"])
         selfie_url = reverse("api:verification:document", args=[obj.pk, "selfie"])
+        links = [
+            ("Cédula", id_url),
+            ("Selfie", selfie_url),
+        ]
+        if obj.consent_video:
+            video_url = reverse("api:verification:document", args=[obj.pk, "consent_video"])
+            links.append(("Video", video_url))
         return format_html(
-            '<a href="{}" target="_blank">Cédula</a> · <a href="{}" target="_blank">Selfie</a>',
-            id_url,
-            selfie_url,
+            " · ".join('<a href="{}" target="_blank">{}</a>' for _ in links),
+            *[item for pair in links for item in (pair[1], pair[0])],
         )
 
     def save_model(self, request, obj, form, change):

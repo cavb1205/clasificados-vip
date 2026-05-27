@@ -205,9 +205,9 @@ CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "http://localhost:3000")
 MAX_PHOTOS_PER_PROFILE = int(os.getenv("MAX_PHOTOS_PER_PROFILE", "6"))
 MAX_VIDEOS_PER_PROFILE = int(os.getenv("MAX_VIDEOS_PER_PROFILE", "1"))
 
-# Límite de tamaño de uploads (default Django 2.5MB es bajo para fotos de
-# celular). Subimos a 10MB; el frontend valida lo mismo antes de enviar.
-DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("MAX_UPLOAD_BYTES", str(10 * 1024 * 1024)))
+# Límite de tamaño de uploads. 50MB acomoda el video de consentimiento KYC
+# (~30s a calidad media); el frontend valida lo mismo antes de enviar.
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
 FILE_UPLOAD_MAX_MEMORY_SIZE = DATA_UPLOAD_MAX_MEMORY_SIZE
 
 # --- Email / notificaciones al admin ---------------------------------------
