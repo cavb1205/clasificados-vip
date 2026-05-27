@@ -28,6 +28,44 @@ class VerificationRequestAdmin(admin.ModelAdmin):
             selfie_url,
         )
 
+    def save_model(self, request, obj, form, change):
+        """Si el admin cambia `status` desde el formulario (no desde la
+        acción del menú), igual disparar la lógica de sincronización:
+        marca reviewed_by/at, actualiza el perfil y notifica al usuario.
+
+        Sin esto, editar el dropdown a mano deja el sistema inconsistente
+        (VerificationRequest verified pero ModelProfile pending).
+        """
+        new_status = obj.status
+        was_unreviewed = obj.reviewed_at is None
+        super().save_model(request, obj, form, change)
+
+        if not was_unreviewed:
+            return  # ya fue revisada antes, no re-disparar
+
+        if new_status == VerificationRequest.Status.VERIFIED:
+            obj.reviewed_by = request.user
+            obj.reviewed_at = timezone.now()
+            obj.save(update_fields=["reviewed_by", "reviewed_at"])
+            self._set_profile_status(obj.user, ModelProfile.VerificationStatus.VERIFIED)
+            notify_user(
+                obj.user, kind=Notification.Kind.KYC,
+                title="✅ Verificación aprobada",
+                message="Tu identidad fue verificada. Trial gratuito activo.",
+                link="/dashboard",
+            )
+        elif new_status == VerificationRequest.Status.REJECTED:
+            obj.reviewed_by = request.user
+            obj.reviewed_at = timezone.now()
+            obj.save(update_fields=["reviewed_by", "reviewed_at"])
+            self._set_profile_status(obj.user, ModelProfile.VerificationStatus.REJECTED)
+            notify_user(
+                obj.user, kind=Notification.Kind.KYC,
+                title="Verificación rechazada",
+                message="Revisa los documentos enviados y vuelve a intentarlo.",
+                link="/dashboard",
+            )
+
     def _set_profile_status(self, user, status):
         profile = ModelProfile.objects.filter(user=user).first()
         if not profile:
