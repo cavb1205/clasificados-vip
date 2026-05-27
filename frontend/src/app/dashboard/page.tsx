@@ -7,6 +7,17 @@ import { auth, dashboard } from "@/lib/client-api";
 import type { Plan, Region, City, Service, ServiceCategory } from "@/lib/types";
 import { CATEGORY_LABEL } from "@/lib/types";
 
+interface LatestVerification {
+  id: number;
+  status: "pending" | "verified" | "rejected";
+  has_id_document: boolean;
+  has_selfie: boolean;
+  has_consent_video: boolean;
+  created_at: string;
+  reviewed_at: string | null;
+  rejection_reason: string;
+}
+
 interface Profile {
   id: number;
   stage_name: string;
@@ -17,6 +28,7 @@ interface Profile {
   verified_at: string | null;
   trial_ends_at: string | null;
   pending_verification: boolean;
+  latest_verification: LatestVerification | null;
   whatsapp: string;
   telegram: string;
   services: Service[];
@@ -223,7 +235,13 @@ export default function DashboardPage() {
       {/* Verificación KYC */}
       <section>
         <h2 className="mb-3 text-lg font-semibold">Verificación de identidad</h2>
-        <KycForm onDone={() => setMsg("Documentos enviados a revisión.")} />
+        <KycForm
+          latest={profile?.latest_verification ?? null}
+          onDone={() => {
+            setMsg("Documentos enviados a revisión.");
+            loadAll();
+          }}
+        />
       </section>
 
       {/* Multimedia */}
@@ -255,14 +273,26 @@ interface Challenge {
   expires_at: string;
 }
 
-function KycForm({ onDone }: { onDone: () => void }) {
+function KycForm({
+  latest,
+  onDone,
+}: {
+  latest: LatestVerification | null;
+  onDone: () => void;
+}) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [challenge, setChallenge] = useState<Challenge | null>(null);
-  const [loadingChallenge, setLoadingChallenge] = useState(true);
+  const [loadingChallenge, setLoadingChallenge] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Pedir el challenge al montar; lo refrescamos si el usuario lo solicita.
+  // Si hay una verificación pendiente, mostramos resumen y NO el form
+  // automáticamente: el usuario decide si quiere reemplazarla.
+  const showingSummary = latest?.status === "pending";
+  const [resubmitting, setResubmitting] = useState(false);
+  const formVisible = !showingSummary || resubmitting;
+
+  // Pedir el challenge solo cuando el form va a verse (evita gastar códigos).
   const fetchChallenge = useCallback(async () => {
     setLoadingChallenge(true);
     setErr("");
@@ -276,8 +306,8 @@ function KycForm({ onDone }: { onDone: () => void }) {
   }, []);
 
   useEffect(() => {
-    fetchChallenge();
-  }, [fetchChallenge]);
+    if (formVisible) fetchChallenge();
+  }, [formVisible, fetchChallenge]);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -332,8 +362,52 @@ function KycForm({ onDone }: { onDone: () => void }) {
     }
   }
 
+  // Resumen de envío pendiente (sin previsualizar archivos sensibles).
+  const summary = latest && (
+    <div className="rounded-xl border border-sky-700/50 bg-sky-950/30 p-4 text-sm">
+      <p className="font-semibold text-sky-200">
+        {latest.status === "pending" && "📤 Documentos enviados · esperando revisión"}
+        {latest.status === "rejected" && "❌ Verificación rechazada"}
+        {latest.status === "verified" && "✅ Identidad verificada"}
+      </p>
+      <p className="mt-1 text-xs text-neutral-400">
+        Enviado el {new Date(latest.created_at).toLocaleString("es-CL")}
+        {latest.reviewed_at &&
+          ` · revisado el ${new Date(latest.reviewed_at).toLocaleString("es-CL")}`}
+      </p>
+      <ul className="mt-3 space-y-1 text-xs">
+        <li>{latest.has_id_document ? "✓" : "✗"} Cédula</li>
+        <li>{latest.has_selfie ? "✓" : "✗"} Selfie</li>
+        <li>{latest.has_consent_video ? "✓" : "✗"} Video de consentimiento</li>
+      </ul>
+      {latest.status === "rejected" && latest.rejection_reason && (
+        <p className="mt-3 rounded-lg bg-red-950/40 px-3 py-2 text-xs text-red-300">
+          Motivo: {latest.rejection_reason}
+        </p>
+      )}
+    </div>
+  );
+
+  // Cuando hay una verificación pendiente, mostramos el resumen sin el form.
+  if (showingSummary && !resubmitting) {
+    return (
+      <div className="space-y-3">
+        {summary}
+        <button
+          type="button"
+          onClick={() => setResubmitting(true)}
+          className="text-sm text-neutral-400 underline hover:text-pink-400"
+        >
+          Enviar de nuevo (reemplaza el envío anterior)
+        </button>
+      </div>
+    );
+  }
+
   return (
     <form ref={formRef} onSubmit={onSubmit} className="space-y-4 text-sm">
+      {/* Si estamos re-enviando, recordatorio arriba del form */}
+      {resubmitting && summary}
       {/* Frase guionada con el código */}
       <div className="rounded-xl border border-sky-700/50 bg-sky-950/30 p-4">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-300">

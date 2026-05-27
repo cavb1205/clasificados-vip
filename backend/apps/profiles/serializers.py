@@ -58,6 +58,7 @@ class ModelProfileSerializer(serializers.ModelSerializer):
 
     trial_ends_at = serializers.SerializerMethodField()
     pending_verification = serializers.SerializerMethodField()
+    latest_verification = serializers.SerializerMethodField()
 
     class Meta:
         model = ModelProfile
@@ -67,12 +68,13 @@ class ModelProfileSerializer(serializers.ModelSerializer):
             "city", "city_id",
             "whatsapp", "telegram",
             "verification_status", "verified_at", "trial_ends_at",
-            "pending_verification",
+            "pending_verification", "latest_verification",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "slug", "verification_status", "verified_at", "trial_ends_at",
-            "pending_verification", "created_at", "updated_at",
+            "pending_verification", "latest_verification",
+            "created_at", "updated_at",
         ]
 
     def get_pending_verification(self, obj) -> bool:
@@ -81,6 +83,27 @@ class ModelProfileSerializer(serializers.ModelSerializer):
         return VerificationRequest.objects.filter(
             user=obj.user, status=VerificationRequest.Status.PENDING
         ).exists()
+
+    def get_latest_verification(self, obj):
+        """Resumen de la última verificación enviada (no expone los archivos)."""
+        from apps.verification.models import VerificationRequest
+        vr = (
+            VerificationRequest.objects.filter(user=obj.user)
+            .order_by("-created_at")
+            .first()
+        )
+        if vr is None:
+            return None
+        return {
+            "id": vr.id,
+            "status": vr.status,
+            "has_id_document": bool(vr.id_document),
+            "has_selfie": bool(vr.selfie),
+            "has_consent_video": bool(vr.consent_video),
+            "created_at": vr.created_at,
+            "reviewed_at": vr.reviewed_at,
+            "rejection_reason": vr.rejection_reason,
+        }
 
     def get_trial_ends_at(self, obj):
         if not obj.verified_at:
