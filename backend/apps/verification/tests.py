@@ -47,6 +47,8 @@ class ApprovalFlowTests(TestCase):
         self.req = VerificationRequest(user=self.model_user)
         self.req.store_encrypted("id_document", SECRET_DOC)
         self.req.store_encrypted("selfie", b"s")
+        # Video de consentimiento ahora obligatorio para aprobación.
+        self.req.store_encrypted("consent_video", b"fake-video")
         self.req.save()
 
     def test_admin_approval_marks_profile_verified(self):
@@ -66,6 +68,37 @@ class ApprovalFlowTests(TestCase):
         self.assertEqual(
             self.profile.verification_status, ModelProfile.VerificationStatus.VERIFIED
         )
+
+
+class ApprovalRequiresVideoTests(TestCase):
+    """No se puede aprobar una VR que no tenga consent_video."""
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username="admin", email="admin@example.com", password="x"
+        )
+        self.model_user = User.objects.create_user(
+            username="m", email="m@example.com", password="x", role="model"
+        )
+        self.profile = ModelProfile.objects.create(
+            user=self.model_user, stage_name="NoVideo", age=25
+        )
+        self.req = VerificationRequest(user=self.model_user)
+        self.req.store_encrypted("id_document", b"x")
+        self.req.store_encrypted("selfie", b"y")
+        # NO almacenamos consent_video → la VR no tiene video.
+        self.req.save()
+
+    def test_action_skips_when_no_video(self):
+        admin = VerificationRequestAdmin(VerificationRequest, AdminSite())
+        request = RequestFactory().post("/")
+        request.user = self.admin_user
+        admin.message_user = lambda *a, **k: None
+        admin.approve(request, VerificationRequest.objects.filter(pk=self.req.pk))
+        self.req.refresh_from_db()
+        self.profile.refresh_from_db()
+        self.assertEqual(self.req.status, VerificationRequest.Status.PENDING)
+        self.assertEqual(self.profile.verification_status, ModelProfile.VerificationStatus.PENDING)
 
 
 @override_settings(
