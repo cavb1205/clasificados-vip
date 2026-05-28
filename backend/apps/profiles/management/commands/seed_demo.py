@@ -76,37 +76,91 @@ CITY_DISTRIBUTION = {
 }
 
 
-def _fetch_face_image(timeout: int = 12) -> bytes:
-    """Trae una cara AI-generada o devuelve un placeholder colorido."""
-    try:
-        req = urllib.request.Request(
-            "https://thispersondoesnotexist.com/",
-            headers={
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                              "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
-                "Accept": "image/jpeg,image/png,*/*",
-            },
+def _stylized_avatar(stage_name: str, variant: int = 0) -> bytes:
+    """Genera un avatar estilizado: gradiente + inicial.
+
+    Por construcción no representa a ninguna persona real; sirve para validar
+    UI (tarjetas, galería, layout) sin entrar en problemas de copyright,
+    identidad ni ambigüedad de edad.
+    """
+    W, H = 1200, 1200
+    # Color base estable por nombre (mismo perfil = mismo color en todas sus fotos)
+    seed = sum(ord(c) for c in stage_name) + variant * 17
+    rng = random.Random(seed)
+    h1 = (rng.randint(0, 360))
+    h2 = (h1 + rng.choice([30, 50, 90, 180, 270])) % 360
+
+    # Convertir HSL → RGB con saturación y luminosidad razonables
+    def hsl_to_rgb(h, s=0.55, l=0.45):
+        import colorsys
+        r, g, b = colorsys.hls_to_rgb(h / 360, l, s)
+        return (int(r * 255), int(g * 255), int(b * 255))
+
+    c1 = hsl_to_rgb(h1, s=0.55, l=0.30)
+    c2 = hsl_to_rgb(h2, s=0.60, l=0.55)
+
+    # Gradiente diagonal
+    img = Image.new("RGB", (W, H), c1)
+    for y in range(H):
+        t = y / H
+        r = int(c1[0] * (1 - t) + c2[0] * t)
+        g = int(c1[1] * (1 - t) + c2[1] * t)
+        b = int(c1[2] * (1 - t) + c2[2] * t)
+        ImageDraw.Draw(img).line([(0, y), (W, y)], fill=(r, g, b))
+
+    # Capa: círculo central con la inicial
+    draw = ImageDraw.Draw(img, "RGBA")
+    cx, cy, R = W // 2, H // 2, 380
+    draw.ellipse([cx - R, cy - R, cx + R, cy + R], fill=(255, 255, 255, 30))
+
+    initial = stage_name[:1].upper() or "?"
+    # Tamaño de fuente grande
+    font = None
+    for path in (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/Library/Fonts/Arial Bold.ttf",
+    ):
+        try:
+            font = ImageFont.truetype(path, 480)
+            break
+        except OSError:
+            continue
+    if font is None:
+        font = ImageFont.load_default()
+
+    bbox = draw.textbbox((0, 0), initial, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    draw.text(
+        (cx - tw // 2 - bbox[0], cy - th // 2 - bbox[1] - 30),
+        initial,
+        font=font,
+        fill=(255, 255, 255, 240),
+    )
+
+    # Etiqueta inferior de demo
+    small_font = None
+    for path in (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/Library/Fonts/Arial.ttf",
+    ):
+        try:
+            small_font = ImageFont.truetype(path, 38)
+            break
+        except OSError:
+            continue
+    if small_font:
+        label = "PERFIL DEMO"
+        bbox = draw.textbbox((0, 0), label, font=small_font)
+        tw = bbox[2] - bbox[0]
+        draw.text(
+            ((W - tw) // 2, H - 100),
+            label,
+            font=small_font,
+            fill=(255, 255, 255, 180),
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = resp.read()
-            if len(data) > 5_000 and data[:3] == b"\xff\xd8\xff":
-                return data
-    except Exception:
-        pass
-    # Fallback: placeholder de color sólido con un círculo.
-    img = Image.new("RGB", (800, 800), (
-        random.randint(60, 180),
-        random.randint(60, 180),
-        random.randint(80, 200),
-    ))
-    draw = ImageDraw.Draw(img)
-    draw.ellipse([200, 200, 600, 600], fill=(
-        random.randint(180, 240),
-        random.randint(180, 240),
-        random.randint(200, 250),
-    ))
+
     buf = BytesIO()
-    img.save(buf, "JPEG", quality=85)
+    img.save(buf, "JPEG", quality=88, optimize=True)
     return buf.getvalue()
 
 
@@ -204,9 +258,10 @@ class Command(BaseCommand):
                     profile.services.add(*random.sample(list(extras_qs), k=random.randint(0, 3)))
                 profile.services.add(*random.sample(list(features_qs), k=random.randint(1, 4)))
 
-                # 1-3 fotos.
-                for _ in range(random.randint(1, 3)):
-                    raw = _fetch_face_image()
+                # 1-3 fotos: avatares estilizados (gradiente + inicial),
+                # mismo color base por perfil, leves variaciones por foto.
+                for variant in range(random.randint(1, 3)):
+                    raw = _stylized_avatar(name, variant=variant)
                     processed = process_image(raw, filename_stem="demo")
                     m = MediaContent(profile=profile, media_type="photo")
                     m.file.save(processed.name, processed, save=False)
