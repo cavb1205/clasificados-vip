@@ -24,10 +24,20 @@ async function getJSON<T>(path: string, revalidate = 60): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export const getRegions = () => getJSON<Region[]>("/regions/", 3600);
+export const getRegions = (opts?: { onlyPopulated?: boolean }) =>
+  getJSON<Region[]>(
+    opts?.onlyPopulated ? "/regions/?has_profiles=true" : "/regions/",
+    opts?.onlyPopulated ? 300 : 3600,  // populadas cambian más seguido
+  );
 
-export const getCities = (regionSlug: string) =>
-  getJSON<City[]>(`/cities/?region=${regionSlug}`, 3600);
+export const getCities = (
+  regionSlug: string,
+  opts?: { onlyPopulated?: boolean },
+) =>
+  getJSON<City[]>(
+    `/cities/?region=${regionSlug}` + (opts?.onlyPopulated ? "&has_profiles=true" : ""),
+    opts?.onlyPopulated ? 300 : 3600,
+  );
 
 export const getPlans = () => getJSON<Plan[]>("/plans/", 3600);
 

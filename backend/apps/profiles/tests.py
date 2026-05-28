@@ -122,6 +122,43 @@ class FilterAndPaginationTests(APITestCase):
         self.assertEqual(names, ["A"])
 
 
+class HasProfilesFilterTests(APITestCase):
+    """?has_profiles=true filtra regiones/comunas vacías."""
+
+    def setUp(self):
+        # 16 regiones existen de antes (seed_chile) en TestCase no aplica;
+        # creamos a mano dos para aislar.
+        from apps.profiles.models import Region, City
+        r1 = Region.objects.create(name="Reg A", slug="reg-a", order=1)
+        r2 = Region.objects.create(name="Reg B (vacía)", slug="reg-b", order=2)
+        self.c_pop = City.objects.create(name="Pop", slug="pop", region=r1)
+        City.objects.create(name="Empty", slug="empty", region=r1)
+        City.objects.create(name="Sin perfiles", slug="sin", region=r2)
+        # Un perfil verificado y en trial en c_pop.
+        user = _make_user("u@ex.com")
+        ModelProfile.objects.create(
+            user=user, stage_name="Ana", age=25, city=self.c_pop,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
+        )
+
+    def test_regions_with_has_profiles_only_returns_populated(self):
+        url = reverse("api:profiles:regions") + "?has_profiles=true"
+        resp = self.client.get(url)
+        slugs = sorted(r["slug"] for r in resp.data)
+        self.assertEqual(slugs, ["reg-a"])
+
+    def test_cities_with_has_profiles_only_returns_populated(self):
+        url = reverse("api:profiles:cities") + "?region=reg-a&has_profiles=true"
+        resp = self.client.get(url)
+        slugs = sorted(c["slug"] for c in resp.data)
+        self.assertEqual(slugs, ["pop"])
+
+    def test_without_flag_returns_all(self):
+        resp = self.client.get(reverse("api:profiles:cities") + "?region=reg-a")
+        self.assertEqual(len(resp.data), 2)  # Pop + Empty
+
+
 class ContactFieldsTests(APITestCase):
     """WhatsApp/Telegram se normalizan y validan al guardarse."""
 

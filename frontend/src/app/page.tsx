@@ -6,7 +6,7 @@ import { getRegions } from "@/lib/api";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const regions = await getRegions();
+  const regions = await getRegions({ onlyPopulated: true });
 
   return (
     <div>
@@ -21,8 +21,13 @@ export default async function HomePage() {
       </section>
 
       <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        Regiones
+        Regiones con anuncios
       </h2>
+      {regions.length === 0 && (
+        <p className="text-sm text-neutral-400">
+          Aún no hay anuncios activos. Vuelve pronto.
+        </p>
+      )}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {regions.map((region) => (
           <li key={region.id}>

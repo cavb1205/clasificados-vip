@@ -46,11 +46,43 @@ def annotate_public_profiles(qs):
     )
 
 
+def _visible_profile_subquery(city_field_outer):
+    """Subquery Exists() de perfiles visibles para anclar a city/region.
+
+    Usa la misma regla de visibilidad pública: verified + (en trial o con
+    publicación activa no expirada).
+    """
+    from apps.publications.models import Publication
+    now = timezone.now()
+    trial_cutoff = now - timedelta(days=SiteConfig.get().trial_days)
+    return Exists(
+        ModelProfile.objects.filter(
+            city_field_outer,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+        ).filter(
+            Q(verified_at__gte=trial_cutoff)
+            | Q(
+                publications__status=Publication.Status.ACTIVE,
+                publications__expires_at__gt=now,
+            )
+        )
+    )
+
+
 class RegionListView(generics.ListAPIView):
-    queryset = Region.objects.all()
     serializer_class = RegionSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = None
+
+    def get_queryset(self):
+        qs = Region.objects.all()
+        # ?has_profiles=true → solo regiones que tienen al menos una comuna
+        # con perfiles visibles.
+        if self.request.query_params.get("has_profiles") == "true":
+            qs = qs.annotate(
+                _has=_visible_profile_subquery(Q(city__region=OuterRef("pk")))
+            ).filter(_has=True)
+        return qs
 
 
 class ServiceListView(generics.ListAPIView):
@@ -69,6 +101,11 @@ class CityListView(generics.ListAPIView):
         region_slug = self.request.query_params.get("region")
         if region_slug:
             qs = qs.filter(region__slug=region_slug)
+        # ?has_profiles=true → solo comunas con al menos un perfil visible.
+        if self.request.query_params.get("has_profiles") == "true":
+            qs = qs.annotate(
+                _has=_visible_profile_subquery(Q(city=OuterRef("pk")))
+            ).filter(_has=True)
         return qs
 
 
