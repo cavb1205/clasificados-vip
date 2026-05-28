@@ -8,6 +8,7 @@ interface Me {
   email: string;
   username: string;
   role: "model" | "client" | "admin";
+  is_staff?: boolean;
 }
 
 /**
@@ -43,7 +44,15 @@ export function AuthNav() {
   if (me) {
     const panel = me.role === "model" ? "/dashboard" : "/";
     return (
-      <div className="flex gap-3 text-sm">
+      <div className="flex gap-2 text-sm">
+        {me.is_staff && (
+          <Link
+            href="/admin/kyc"
+            className="rounded-full border border-sky-700 px-3 py-1.5 text-sky-300 hover:bg-sky-950/30"
+          >
+            Admin
+          </Link>
+        )}
         <Link
           href={panel}
           className="rounded-full bg-pink-600 px-4 py-1.5 font-medium hover:bg-pink-500"

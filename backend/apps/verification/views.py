@@ -1,13 +1,17 @@
 from django.http import HttpResponse, Http404
-from rest_framework import generics, permissions
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from rest_framework import generics, permissions, status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.notifications.models import Notification, notify_user
+from apps.profiles.models import ModelProfile
 from apps.users.authentication import CookieJWTAuthentication
 from core.permissions import IsModel
 from .models import VerificationAccessLog, VerificationChallenge, VerificationRequest
-from .serializers import VerificationRequestSerializer
+from .serializers import AdminQueueSerializer, VerificationRequestSerializer
 
 
 def _client_ip(request):
@@ -97,3 +101,85 @@ def _sniff_image_mime(data: bytes) -> str:
     if data.startswith(b"\x1a\x45\xdf\xa3"):  # EBML → WebM/Matroska
         return "video/webm"
     return "application/octet-stream"
+
+
+def _sync_profile_on_decision(user, status_value):
+    """Refleja la decisión de KYC en el ModelProfile (verified_at first-time only)."""
+    profile = ModelProfile.objects.filter(user=user).first()
+    if not profile:
+        return
+    profile.verification_status = status_value
+    fields = ["verification_status"]
+    if status_value == ModelProfile.VerificationStatus.VERIFIED and profile.verified_at is None:
+        profile.verified_at = timezone.now()
+        fields.append("verified_at")
+    profile.save(update_fields=fields)
+
+
+class AdminKYCQueueView(generics.ListAPIView):
+    """Lista de verificaciones pendientes para moderar desde el panel frontend."""
+
+    serializer_class = AdminQueueSerializer
+    permission_classes = [permissions.IsAdminUser]
+    pagination_class = None
+
+    def get_queryset(self):
+        return VerificationRequest.objects.filter(
+            status=VerificationRequest.Status.PENDING
+        ).select_related("user").order_by("created_at")
+
+
+class AdminKYCActionView(APIView):
+    """POST con `decision` ('approve'|'reject') y `reason` opcional."""
+
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, pk):
+        vr = get_object_or_404(VerificationRequest, pk=pk)
+        decision = request.data.get("decision")
+        reason = request.data.get("reason", "").strip()
+
+        if vr.status != VerificationRequest.Status.PENDING:
+            return Response(
+                {"detail": "Esta solicitud ya fue revisada."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        if decision == "approve":
+            if not vr.consent_video:
+                return Response(
+                    {"detail": "No se puede aprobar sin video de consentimiento."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            vr.status = VerificationRequest.Status.VERIFIED
+            vr.reviewed_by = request.user
+            vr.reviewed_at = timezone.now()
+            vr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+            _sync_profile_on_decision(vr.user, ModelProfile.VerificationStatus.VERIFIED)
+            notify_user(
+                vr.user, kind=Notification.Kind.KYC,
+                title="✅ Verificación aprobada",
+                message="Tu identidad fue verificada. Trial gratuito activo.",
+                link="/dashboard",
+            )
+            return Response({"status": "verified"})
+
+        if decision == "reject":
+            vr.status = VerificationRequest.Status.REJECTED
+            vr.reviewed_by = request.user
+            vr.reviewed_at = timezone.now()
+            vr.rejection_reason = reason
+            vr.save(update_fields=["status", "reviewed_by", "reviewed_at", "rejection_reason"])
+            _sync_profile_on_decision(vr.user, ModelProfile.VerificationStatus.REJECTED)
+            notify_user(
+                vr.user, kind=Notification.Kind.KYC,
+                title="Verificación rechazada",
+                message=reason or "Revisa tus documentos y vuelve a enviarlos.",
+                link="/dashboard",
+            )
+            return Response({"status": "rejected"})
+
+        return Response(
+            {"detail": "decision debe ser 'approve' o 'reject'."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )

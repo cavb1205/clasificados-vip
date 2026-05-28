@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.profiles.models import ModelProfile
 from .models import VerificationChallenge, VerificationRequest
 
 
@@ -55,3 +56,35 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
         request_obj.save()
         self._challenge.consume()
         return request_obj
+
+
+class AdminQueueSerializer(serializers.ModelSerializer):
+    """Vista compacta de una VR pendiente para la cola de moderación."""
+
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    user_username = serializers.CharField(source="user.username", read_only=True)
+    stage_name = serializers.SerializerMethodField()
+    has_id_document = serializers.SerializerMethodField()
+    has_selfie = serializers.SerializerMethodField()
+    has_consent_video = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VerificationRequest
+        fields = [
+            "id", "user_email", "user_username", "stage_name", "challenge_code",
+            "has_id_document", "has_selfie", "has_consent_video",
+            "status", "created_at",
+        ]
+
+    def get_stage_name(self, obj):
+        profile = ModelProfile.objects.filter(user=obj.user).first()
+        return profile.stage_name if profile else None
+
+    def get_has_id_document(self, obj) -> bool:
+        return bool(obj.id_document)
+
+    def get_has_selfie(self, obj) -> bool:
+        return bool(obj.selfie)
+
+    def get_has_consent_video(self, obj) -> bool:
+        return bool(obj.consent_video)

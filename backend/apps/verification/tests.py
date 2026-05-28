@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import RequestFactory, TestCase, override_settings
+from rest_framework.test import APITestCase
 
 from apps.profiles.models import ModelProfile
 from .admin import VerificationRequestAdmin
@@ -118,3 +119,73 @@ class KYCNotificationTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("KYC pendiente", mail.outbox[0].subject)
         self.assertIn("m@example.com", mail.outbox[0].body)
+
+
+class AdminQueueAPITests(APITestCase):
+    """Endpoints staff para la cola de KYC."""
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+        self.client = APIClient()
+        self.admin = User.objects.create_superuser(
+            username="adm", email="adm@example.com", password="x"
+        )
+        self.model_user = User.objects.create_user(
+            username="m", email="m@example.com", password="x", role="model"
+        )
+        ModelProfile.objects.create(user=self.model_user, stage_name="Luna", age=25)
+        self.vr = VerificationRequest(user=self.model_user)
+        self.vr.store_encrypted("id_document", b"x")
+        self.vr.store_encrypted("selfie", b"y")
+        self.vr.store_encrypted("consent_video", b"z")
+        self.vr.save()
+
+    def test_queue_requires_admin(self):
+        self.client.force_authenticate(self.model_user)
+        resp = self.client.get("/api/v1/admin/kyc/queue/")
+        self.assertIn(resp.status_code, (401, 403))
+
+    def test_queue_lists_pending_with_flags(self):
+        self.client.force_authenticate(self.admin)
+        resp = self.client.get("/api/v1/admin/kyc/queue/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        item = resp.data[0]
+        self.assertEqual(item["stage_name"], "Luna")
+        self.assertTrue(item["has_consent_video"])
+
+    def test_approve_marks_profile_verified(self):
+        from rest_framework.test import APIClient
+        self.client.force_authenticate(self.admin)
+        resp = self.client.post(
+            f"/api/v1/admin/kyc/{self.vr.id}/action/",
+            {"decision": "approve"}, format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.vr.refresh_from_db()
+        self.assertEqual(self.vr.status, VerificationRequest.Status.VERIFIED)
+        profile = ModelProfile.objects.get(user=self.model_user)
+        self.assertEqual(profile.verification_status, ModelProfile.VerificationStatus.VERIFIED)
+
+    def test_reject_with_reason(self):
+        self.client.force_authenticate(self.admin)
+        resp = self.client.post(
+            f"/api/v1/admin/kyc/{self.vr.id}/action/",
+            {"decision": "reject", "reason": "Video borroso"}, format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.vr.refresh_from_db()
+        self.assertEqual(self.vr.status, VerificationRequest.Status.REJECTED)
+        self.assertEqual(self.vr.rejection_reason, "Video borroso")
+
+    def test_cannot_approve_without_video(self):
+        no_video = VerificationRequest(user=self.model_user)
+        no_video.store_encrypted("id_document", b"a")
+        no_video.store_encrypted("selfie", b"b")
+        no_video.save()  # sin consent_video
+        self.client.force_authenticate(self.admin)
+        resp = self.client.post(
+            f"/api/v1/admin/kyc/{no_video.id}/action/",
+            {"decision": "approve"}, format="json",
+        )
+        self.assertEqual(resp.status_code, 400)

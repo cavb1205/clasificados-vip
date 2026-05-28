@@ -117,6 +117,13 @@ export const dashboard = {
     apiFetch(`/me/publications/${pubId}/receipt/`, { method: "POST", body: form, isForm: true }),
   renewPublication: (pubId: number) =>
     apiFetch(`/me/publications/${pubId}/renew/`, { method: "POST" }),
+  // KYC admin
+  kycQueue: () => apiFetch<unknown[]>("/admin/kyc/queue/"),
+  kycAction: (id: number, decision: "approve" | "reject", reason?: string) =>
+    apiFetch(`/admin/kyc/${id}/action/`, {
+      method: "POST",
+      body: { decision, reason },
+    }),
   // KYC
   issueKycChallenge: () =>
     apiFetch<{ code: string; statement: string; expires_at: string }>(
