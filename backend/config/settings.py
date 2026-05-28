@@ -201,6 +201,10 @@ CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "http://localhost:3000")
 
+# URL pública del frontend (para componer links absolutos en emails como el de
+# recuperación de contraseña).
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
 # Límites de multimedia por perfil (validados en backend).
 MAX_PHOTOS_PER_PROFILE = int(os.getenv("MAX_PHOTOS_PER_PROFILE", "6"))
 MAX_VIDEOS_PER_PROFILE = int(os.getenv("MAX_VIDEOS_PER_PROFILE", "1"))

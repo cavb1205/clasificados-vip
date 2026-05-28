@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, panelHrefFor } from "@/lib/client-api";
 
@@ -52,6 +53,12 @@ export default function LoginPage() {
       >
         {loading ? "Ingresando…" : "Ingresar"}
       </button>
+      <Link
+        href="/recuperar"
+        className="block text-center text-sm text-neutral-400 hover:text-pink-400"
+      >
+        ¿Olvidaste tu contraseña?
+      </Link>
     </form>
   );
 }

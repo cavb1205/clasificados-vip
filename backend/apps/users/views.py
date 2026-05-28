@@ -1,7 +1,13 @@
 from django.conf import settings
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.tokens import default_token_generator
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -11,6 +17,8 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import RegisterSerializer, UserSerializer
+
+User = get_user_model()
 
 
 def _set_jwt_cookies(response, access: str, refresh: str | None = None):
@@ -104,3 +112,73 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+
+class ForgotPasswordView(APIView):
+    """Solicita el envío del email con link de reseteo.
+
+    Siempre responde 200 (con o sin email registrado) para no permitir
+    enumeración de cuentas. El email se manda solo si el usuario existe.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = (request.data.get("email") or "").strip().lower()
+        if email:
+            user = User.objects.filter(email__iexact=email).first()
+            if user and user.is_active:
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                token = default_token_generator.make_token(user)
+                base = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+                link = f"{base}/recuperar/{uid}/{token}"
+                send_mail(
+                    subject="Recupera tu contraseña · Clasificados VIP",
+                    message=(
+                        f"Hola,\n\n"
+                        f"Recibimos una solicitud para recuperar la contraseña de tu "
+                        f"cuenta en Clasificados VIP. Si fuiste tú, abre este link "
+                        f"para crear una nueva contraseña:\n\n{link}\n\n"
+                        f"El link es válido por unas pocas horas. Si no pediste esto, "
+                        f"ignora este mensaje.\n"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+        return Response({"detail": "Si el correo existe, recibirás un mensaje en breve."})
+
+
+class ResetPasswordView(APIView):
+    """Recibe uid+token+password y resetea la contraseña."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        uid = request.data.get("uid", "")
+        token = request.data.get("token", "")
+        password = request.data.get("password", "")
+
+        try:
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id, is_active=True)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response(
+                {"detail": "Link inválido o expirado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not default_token_generator.check_token(user, token):
+            return Response(
+                {"detail": "Link inválido o expirado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            validate_password(password, user)
+        except ValidationError as e:
+            return Response({"password": e.messages}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(password)
+        user.save(update_fields=["password"])
+        return Response({"detail": "Contraseña actualizada."})

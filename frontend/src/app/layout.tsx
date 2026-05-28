@@ -45,7 +45,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
         <footer className="border-t border-neutral-800 px-4 py-6 text-center text-xs text-neutral-500">
-          Solo mayores de 18 años · No intermediamos transacciones · © Clasificados VIP
+          <p>Solo mayores de 18 años · No intermediamos transacciones · © Clasificados VIP</p>
+          <p className="mt-2 flex justify-center gap-4">
+            <Link href="/terminos" className="hover:text-pink-400">
+              Términos
+            </Link>
+            <Link href="/privacidad" className="hover:text-pink-400">
+              Privacidad
+            </Link>
+          </p>
         </footer>
       </body>
     </html>
