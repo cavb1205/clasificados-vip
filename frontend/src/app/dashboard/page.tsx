@@ -1016,6 +1016,26 @@ function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<UINotification[]>([]);
   const [unread, setUnread] = useState(0);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar al hacer click/tap fuera del dropdown.
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(e: PointerEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   const reload = useCallback(async () => {
     const [list, count] = await Promise.all([
@@ -1043,7 +1063,7 @@ function NotificationBell() {
   }
 
   return (
-    <div className="relative">
+    <div ref={wrapperRef} className="relative">
       <button
         onClick={toggle}
         className="relative rounded-full border border-neutral-700 px-3 py-1.5 text-sm hover:border-pink-600"

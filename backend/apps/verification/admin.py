@@ -37,19 +37,24 @@ class VerificationRequestAdmin(admin.ModelAdmin):
         )
 
     def save_model(self, request, obj, form, change):
-        """Si el admin cambia `status` desde el formulario (no desde la
-        acción del menú), igual disparar la lógica de sincronización:
-        marca reviewed_by/at, actualiza el perfil y notifica al usuario.
-
-        Sin esto, editar el dropdown a mano deja el sistema inconsistente
-        (VerificationRequest verified pero ModelProfile pending).
+        """Cualquier cambio de status disparado desde el formulario sincroniza
+        el ModelProfile (avanza o revoca según corresponda) + notifica.
         """
+        # Status anterior antes del save.
+        previous_status = None
+        if change and obj.pk:
+            original = VerificationRequest.objects.filter(pk=obj.pk).first()
+            if original:
+                previous_status = original.status
         new_status = obj.status
-        was_unreviewed = obj.reviewed_at is None
 
         # No permitir aprobar sin video de consentimiento (requisito legal).
-        if was_unreviewed and new_status == VerificationRequest.Status.VERIFIED and not obj.consent_video:
-            obj.status = VerificationRequest.Status.PENDING
+        if (
+            new_status == VerificationRequest.Status.VERIFIED
+            and previous_status != VerificationRequest.Status.VERIFIED
+            and not obj.consent_video
+        ):
+            obj.status = previous_status or VerificationRequest.Status.PENDING
             super().save_model(request, obj, form, change)
             messages.error(
                 request,
@@ -58,15 +63,42 @@ class VerificationRequestAdmin(admin.ModelAdmin):
             )
             return
 
-        super().save_model(request, obj, form, change)
-
-        if not was_unreviewed:
-            return  # ya fue revisada antes, no re-disparar
-
-        if new_status == VerificationRequest.Status.VERIFIED:
+        # Setear reviewed_by/at si la VR está cambiando a un estado terminal
+        # por primera vez (verified/rejected) y no había sido revisada antes.
+        if (
+            new_status in (VerificationRequest.Status.VERIFIED, VerificationRequest.Status.REJECTED)
+            and obj.reviewed_at is None
+        ):
             obj.reviewed_by = request.user
             obj.reviewed_at = timezone.now()
-            obj.save(update_fields=["reviewed_by", "reviewed_at"])
+
+        super().save_model(request, obj, form, change)
+
+        # No hacemos nada si el status no cambió.
+        if previous_status == new_status:
+            return
+
+        # Transición verified → no verified: revocar perfil (limpia verified_at).
+        if previous_status == VerificationRequest.Status.VERIFIED:
+            profile_status = (
+                ModelProfile.VerificationStatus.REJECTED
+                if new_status == VerificationRequest.Status.REJECTED
+                else ModelProfile.VerificationStatus.PENDING
+            )
+            self._set_profile_status(obj.user, profile_status)
+            notify_user(
+                obj.user, kind=Notification.Kind.KYC,
+                title="Verificación revertida",
+                message=(
+                    "Tu verificación fue puesta en revisión nuevamente. Tu perfil ya "
+                    "no aparece públicamente hasta que se apruebe de nuevo."
+                ),
+                link="/dashboard",
+            )
+            return
+
+        # Transición pending/null → verified.
+        if new_status == VerificationRequest.Status.VERIFIED:
             self._set_profile_status(obj.user, ModelProfile.VerificationStatus.VERIFIED)
             notify_user(
                 obj.user, kind=Notification.Kind.KYC,
@@ -74,29 +106,40 @@ class VerificationRequestAdmin(admin.ModelAdmin):
                 message="Tu identidad fue verificada. Trial gratuito activo.",
                 link="/dashboard",
             )
-        elif new_status == VerificationRequest.Status.REJECTED:
-            obj.reviewed_by = request.user
-            obj.reviewed_at = timezone.now()
-            obj.save(update_fields=["reviewed_by", "reviewed_at"])
+            return
+
+        # Transición pending → rejected.
+        if new_status == VerificationRequest.Status.REJECTED:
             self._set_profile_status(obj.user, ModelProfile.VerificationStatus.REJECTED)
             notify_user(
                 obj.user, kind=Notification.Kind.KYC,
                 title="Verificación rechazada",
-                message="Revisa los documentos enviados y vuelve a intentarlo.",
+                message=obj.rejection_reason or "Revisa los documentos y vuelve a intentarlo.",
                 link="/dashboard",
             )
 
     def _set_profile_status(self, user, status):
+        """Sincroniza el ModelProfile. Maneja:
+        - Primera aprobación: setea verified_at (ancla del trial).
+        - Re-aprobación: deja verified_at intacto (anti-abuso del trial).
+        - Revocación (verified → pending/rejected): LIMPIA verified_at.
+          Esto es lo que quita la visibilidad pública inmediatamente.
+        """
         profile = ModelProfile.objects.filter(user=user).first()
         if not profile:
             return
         profile.verification_status = status
         fields = ["verification_status"]
-        # Anclar el inicio del trial gratuito en la PRIMERA aprobación.
-        # Re-aprobaciones posteriores no reinician el trial (anti-abuso).
-        if status == ModelProfile.VerificationStatus.VERIFIED and profile.verified_at is None:
-            profile.verified_at = timezone.now()
-            fields.append("verified_at")
+        if status == ModelProfile.VerificationStatus.VERIFIED:
+            if profile.verified_at is None:
+                profile.verified_at = timezone.now()
+                fields.append("verified_at")
+        else:
+            # Revocación: si el perfil tenía verified_at, lo limpiamos para
+            # que el filtro de visibilidad pública lo deje de mostrar.
+            if profile.verified_at is not None:
+                profile.verified_at = None
+                fields.append("verified_at")
         profile.save(update_fields=fields)
 
     @admin.action(description="Aprobar verificación (marca perfil como verificado)")

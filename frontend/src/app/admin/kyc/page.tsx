@@ -184,8 +184,17 @@ function ReviewDetail({
         </Block>
       </div>
       <p className="rounded-lg bg-sky-950/30 px-3 py-2 text-xs text-sky-200">
-        Verifica que en el audio del video se mencione el código{" "}
-        <strong className="font-mono">{vr.challenge_code}</strong> y la fecha de hoy.
+        Verifica que en el audio se mencione el código{" "}
+        <strong className="font-mono">{vr.challenge_code}</strong> y la fecha del
+        envío:{" "}
+        <strong>
+          {new Date(vr.created_at).toLocaleDateString("es-CL", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          })}
+        </strong>
+        .
       </p>
 
       {!rejecting ? (
