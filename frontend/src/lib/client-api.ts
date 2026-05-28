@@ -79,10 +79,18 @@ export async function apiFetch<T = unknown>(
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
+/** Notifica a componentes que escuchan (AuthNav, etc.) que la sesión cambió. */
+function emitAuthChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("auth-changed"));
+  }
+}
+
 export const auth = {
   login: async (email: string, password: string) => {
     const r = await apiFetch("/auth/login/", { method: "POST", body: { email, password } });
     invalidateCsrf();  // Django rotó el token al iniciar sesión.
+    emitAuthChanged();
     return r;
   },
   register: (data: Record<string, unknown>) =>
@@ -90,10 +98,18 @@ export const auth = {
   logout: async () => {
     const r = await apiFetch("/auth/logout/", { method: "POST" });
     invalidateCsrf();
+    emitAuthChanged();
     return r;
   },
   me: () => apiFetch("/auth/me/"),
 };
+
+/** Path al panel apropiado según rol/permisos. */
+export function panelHrefFor(me: { role?: string; is_staff?: boolean }) {
+  if (me.is_staff) return "/admin/kyc";
+  if (me.role === "model") return "/dashboard";
+  return "/";
+}
 
 export const dashboard = {
   // Perfil propio

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "@/lib/client-api";
+import { auth, panelHrefFor } from "@/lib/client-api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,8 +16,9 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      await auth.login(email, password);
-      router.push("/dashboard");
+      // LoginView devuelve UserSerializer.data (role + is_staff).
+      const me = (await auth.login(email, password)) as { role?: string; is_staff?: boolean };
+      router.push(panelHrefFor(me));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al ingresar");
     } finally {

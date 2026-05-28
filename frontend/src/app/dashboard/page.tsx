@@ -1234,9 +1234,24 @@ function VisibilityBanner({
   }
 
   if (profile.verification_status === "rejected") {
+    const reason = profile.latest_verification?.rejection_reason?.trim();
     return (
       <div className="rounded-xl border border-red-700/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-        Tu verificación fue rechazada. Vuelve a subir tus documentos.
+        <p className="font-semibold">❌ Tu verificación fue rechazada</p>
+        {reason ? (
+          <p className="mt-1">
+            <span className="text-red-300/80">Motivo del admin: </span>
+            {reason}
+          </p>
+        ) : (
+          <p className="mt-1 text-red-300/80">
+            El admin no dejó un motivo específico.
+          </p>
+        )}
+        <p className="mt-2">
+          Corrige lo indicado y vuelve a enviar tus documentos desde{" "}
+          <strong>Verificación de identidad</strong>.
+        </p>
       </div>
     );
   }
