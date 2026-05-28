@@ -21,6 +21,7 @@ interface LatestVerification {
 interface Profile {
   id: number;
   stage_name: string;
+  gender: "female" | "trans" | "male";
   description: string;
   age: number;
   city: City | null;
@@ -101,6 +102,7 @@ export default function DashboardPage() {
     const cityRaw = form.get("city_id");
     const data: Record<string, unknown> = {
       stage_name: form.get("stage_name"),
+      gender: form.get("gender") ?? "female",
       age: Number(form.get("age")),
       description: form.get("description"),
       whatsapp: form.get("whatsapp") ?? "",
@@ -164,6 +166,15 @@ export default function DashboardPage() {
             required
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
+          <select
+            name="gender"
+            defaultValue={profile?.gender ?? "female"}
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
+          >
+            <option value="female">Mujer</option>
+            <option value="trans">Trans</option>
+            <option value="male">Hombre</option>
+          </select>
           <input
             name="age"
             type="number"

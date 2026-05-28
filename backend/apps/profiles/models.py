@@ -69,8 +69,16 @@ class ModelProfile(models.Model):
         VERIFIED = "verified", "Verificado"
         REJECTED = "rejected", "Rechazado"
 
+    class Gender(models.TextChoices):
+        FEMALE = "female", "Mujer"
+        TRANS = "trans", "Trans"
+        MALE = "male", "Hombre"
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="model_profile"
+    )
+    gender = models.CharField(
+        "categoría", max_length=10, choices=Gender.choices, default=Gender.FEMALE
     )
     stage_name = models.CharField("nombre artístico", max_length=120)
     slug = models.SlugField(max_length=160, unique=True, blank=True)

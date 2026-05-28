@@ -63,7 +63,7 @@ class ModelProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ModelProfile
         fields = [
-            "id", "stage_name", "slug", "description", "age",
+            "id", "stage_name", "slug", "gender", "description", "age",
             "services", "service_ids", "base_rate",
             "city", "city_id",
             "whatsapp", "telegram",
@@ -147,7 +147,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ModelProfile
         fields = [
-            "stage_name", "slug", "description", "age", "services",
+            "stage_name", "slug", "gender", "description", "age", "services",
             "base_rate", "city", "photos", "cover_photo",
             "is_featured", "rating_average", "rating_count",
             "whatsapp", "telegram",

@@ -42,6 +42,21 @@ FEMALE_NAMES = [
     "Laura", "Andrea", "Ignacia", "Renata", "Almendra",
     "Belén", "Maite", "Amanda", "Emilia", "Rocío",
 ]
+TRANS_NAMES = [
+    "Bianca", "Estefanía", "Roxana", "Karla", "Mía",
+    "Romina", "Alessia", "Salomé",
+]
+MALE_NAMES = [
+    "Mateo", "Joaquín", "Tomás", "Diego", "Cristóbal",
+    "Vicente", "Benjamín", "Lucas",
+]
+# Distribución por género dentro de cada ciudad:
+# 70% mujeres, 20% trans, 10% hombres.
+GENDER_WEIGHTS = [
+    ("female", FEMALE_NAMES, 0.70),
+    ("trans", TRANS_NAMES, 0.20),
+    ("male", MALE_NAMES, 0.10),
+]
 
 DESCRIPTIONS = [
     "Hola amor, soy una chica dulce y cariñosa que sabe cómo hacerte pasar un buen momento. Atención de calidad, sin apuros, en ambiente discreto y cómodo.",
@@ -219,9 +234,14 @@ class Command(BaseCommand):
                 continue
 
             for i in range(count):
-                # Nombre único.
+                # Elegir género ponderado y un nombre coherente.
+                gender = random.choices(
+                    [g for g, _, _ in GENDER_WEIGHTS],
+                    weights=[w for _, _, w in GENDER_WEIGHTS],
+                )[0]
+                pool = next(names for g, names, _ in GENDER_WEIGHTS if g == gender)
                 for _ in range(50):
-                    name = random.choice(FEMALE_NAMES)
+                    name = random.choice(pool)
                     if name not in used_names:
                         break
                 else:
@@ -239,6 +259,7 @@ class Command(BaseCommand):
                 profile = ModelProfile.objects.create(
                     user=user,
                     stage_name=name,
+                    gender=gender,
                     age=random.randint(22, 38),
                     description=random.choice(DESCRIPTIONS),
                     base_rate=random.choice([60_000, 80_000, 100_000, 120_000, 150_000, 180_000]),

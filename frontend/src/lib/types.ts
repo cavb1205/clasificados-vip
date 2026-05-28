@@ -12,6 +12,27 @@ export interface City {
   region: Region;
 }
 
+export type Gender = "female" | "trans" | "male";
+export type GenderSlug = "mujeres" | "trans" | "hombres";
+
+export const GENDER_BY_SLUG: Record<GenderSlug, Gender> = {
+  mujeres: "female",
+  trans: "trans",
+  hombres: "male",
+};
+export const SLUG_BY_GENDER: Record<Gender, GenderSlug> = {
+  female: "mujeres",
+  trans: "trans",
+  male: "hombres",
+};
+export const GENDER_LABEL: Record<GenderSlug, string> = {
+  mujeres: "Mujeres",
+  trans: "Trans",
+  hombres: "Hombres",
+};
+export const ALL_GENDER_SLUGS: GenderSlug[] = ["mujeres", "trans", "hombres"];
+export const DEFAULT_GENDER_SLUG: GenderSlug = "mujeres";
+
 export type ServiceCategory = "service" | "extra" | "feature";
 
 export interface Service {
@@ -30,6 +51,7 @@ export const CATEGORY_LABEL: Record<ServiceCategory, string> = {
 export interface PublicProfile {
   stage_name: string;
   slug: string;
+  gender: Gender;
   description: string;
   age: number;
   services: Service[];

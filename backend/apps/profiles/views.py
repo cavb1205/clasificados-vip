@@ -46,27 +46,28 @@ def annotate_public_profiles(qs):
     )
 
 
-def _visible_profile_subquery(city_field_outer):
+def _visible_profile_subquery(city_field_outer, gender=None):
     """Subquery Exists() de perfiles visibles para anclar a city/region.
 
     Usa la misma regla de visibilidad pública: verified + (en trial o con
-    publicación activa no expirada).
+    publicación activa no expirada). Opcionalmente restringe por género.
     """
     from apps.publications.models import Publication
     now = timezone.now()
     trial_cutoff = now - timedelta(days=SiteConfig.get().trial_days)
-    return Exists(
-        ModelProfile.objects.filter(
-            city_field_outer,
-            verification_status=ModelProfile.VerificationStatus.VERIFIED,
-        ).filter(
-            Q(verified_at__gte=trial_cutoff)
-            | Q(
-                publications__status=Publication.Status.ACTIVE,
-                publications__expires_at__gt=now,
-            )
+    profiles = ModelProfile.objects.filter(
+        city_field_outer,
+        verification_status=ModelProfile.VerificationStatus.VERIFIED,
+    ).filter(
+        Q(verified_at__gte=trial_cutoff)
+        | Q(
+            publications__status=Publication.Status.ACTIVE,
+            publications__expires_at__gt=now,
         )
     )
+    if gender:
+        profiles = profiles.filter(gender=gender)
+    return Exists(profiles)
 
 
 class RegionListView(generics.ListAPIView):
@@ -77,10 +78,11 @@ class RegionListView(generics.ListAPIView):
     def get_queryset(self):
         qs = Region.objects.all()
         # ?has_profiles=true → solo regiones que tienen al menos una comuna
-        # con perfiles visibles.
+        # con perfiles visibles. ?gender= restringe por categoría.
         if self.request.query_params.get("has_profiles") == "true":
+            gender = self.request.query_params.get("gender")
             qs = qs.annotate(
-                _has=_visible_profile_subquery(Q(city__region=OuterRef("pk")))
+                _has=_visible_profile_subquery(Q(city__region=OuterRef("pk")), gender=gender)
             ).filter(_has=True)
         return qs
 
@@ -102,9 +104,11 @@ class CityListView(generics.ListAPIView):
         if region_slug:
             qs = qs.filter(region__slug=region_slug)
         # ?has_profiles=true → solo comunas con al menos un perfil visible.
+        # ?gender= restringe por categoría.
         if self.request.query_params.get("has_profiles") == "true":
+            gender = self.request.query_params.get("gender")
             qs = qs.annotate(
-                _has=_visible_profile_subquery(Q(city=OuterRef("pk")))
+                _has=_visible_profile_subquery(Q(city=OuterRef("pk")), gender=gender)
             ).filter(_has=True)
         return qs
 
@@ -165,10 +169,17 @@ class PublicProfileListView(generics.ListAPIView):
 
         region = self.kwargs.get("region") or params.get("region")
         city = self.kwargs.get("city") or params.get("city")
+        gender = params.get("gender")
         if region:
             qs = qs.filter(city__region__slug=region)
         if city:
             qs = qs.filter(city__slug=city)
+        if gender in (
+            ModelProfile.Gender.FEMALE,
+            ModelProfile.Gender.TRANS,
+            ModelProfile.Gender.MALE,
+        ):
+            qs = qs.filter(gender=gender)
 
         # Búsqueda libre.
         q = (params.get("q") or "").strip()
