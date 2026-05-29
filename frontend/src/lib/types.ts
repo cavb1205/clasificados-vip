@@ -12,6 +12,14 @@ export interface City {
   region: Region;
 }
 
+export interface Story {
+  id: number;
+  kind: "photo" | "video";
+  file_url: string;
+  created_at: string;
+  expires_at: string;
+}
+
 export type Gender = "female" | "trans" | "male";
 export type GenderSlug = "mujeres" | "trans" | "hombres";
 

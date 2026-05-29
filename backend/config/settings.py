@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "apps.publications",
     "apps.reviews",
     "apps.notifications",
+    "apps.stories",
 ]
 
 MIDDLEWARE = [

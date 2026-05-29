@@ -143,6 +143,12 @@ export const dashboard = {
     apiFetch(`/me/publications/${pubId}/receipt/`, { method: "POST", body: form, isForm: true }),
   renewPublication: (pubId: number) =>
     apiFetch(`/me/publications/${pubId}/renew/`, { method: "POST" }),
+  // Stories propias
+  myStories: () => apiFetch<unknown[]>("/me/stories/"),
+  uploadStory: (form: FormData) =>
+    apiFetch("/me/stories/", { method: "POST", body: form, isForm: true }),
+  deleteStory: (id: number) =>
+    apiFetch(`/me/stories/${id}/`, { method: "DELETE" }),
   // KYC admin
   kycQueue: () => apiFetch<unknown[]>("/admin/kyc/queue/"),
   kycAction: (id: number, decision: "approve" | "reject", reason?: string) =>

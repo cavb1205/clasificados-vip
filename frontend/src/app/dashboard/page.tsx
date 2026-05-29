@@ -148,6 +148,9 @@ export default function DashboardPage() {
           onChange={loadAll}
         />
       )}
+      {profile && profile.verification_status === "verified" && (
+        <StoriesPanel publications={publications} />
+      )}
 
       {/* Estadísticas */}
       <section>
@@ -1395,6 +1398,121 @@ function AvailabilityPanel({
           </button>
         ))}
       </div>
+    </section>
+  );
+}
+
+interface DashboardStory {
+  id: number;
+  kind: "photo" | "video";
+  file_url: string;
+  created_at: string;
+  expires_at: string;
+}
+
+function StoriesPanel({ publications }: { publications: Publication[] }) {
+  const [stories, setStories] = useState<DashboardStory[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const eligible = publications.some(
+    (p) => p.status === "active" && p.expires_at &&
+      new Date(p.expires_at).getTime() > Date.now(),
+    // Importante: además debe ser featured. El backend lo valida; aquí
+    // mostramos el panel como pista. Si no es eligible, mostramos mensaje
+    // explicativo abajo.
+  );
+
+  const reload = useCallback(async () => {
+    try {
+      setStories((await dashboard.myStories()) as DashboardStory[]);
+    } catch {
+      // sin permiso (no destacada) → vacío
+    }
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setErr("");
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("upload", f);
+      await dashboard.uploadStory(fd);
+      if (inputRef.current) inputRef.current.value = "";
+      await reload();
+    } catch (caught) {
+      setErr(caught instanceof Error ? caught.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">Historias 24h</p>
+          <p className="mt-1 text-xs text-neutral-500">
+            Solo para perfiles con anuncio <strong>destacado</strong> activo.
+            Se borran automáticamente a las 24h.
+          </p>
+        </div>
+        <label className="cursor-pointer rounded-full bg-pink-600 px-4 py-2 text-sm font-medium text-white hover:bg-pink-500">
+          {busy ? "Subiendo…" : "+ Subir"}
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*,video/*"
+            disabled={busy}
+            onChange={onUpload}
+            className="hidden"
+          />
+        </label>
+      </div>
+
+      {err && <p className="mt-2 text-xs text-red-400">{err}</p>}
+
+      {stories.length === 0 ? (
+        <p className="mt-3 text-xs text-neutral-500">
+          {eligible
+            ? "Aún no subiste historias. Toca + Subir para empezar."
+            : "Primero activa un anuncio con plan destacado para poder publicar historias."}
+        </p>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-3">
+          {stories.map((s) => (
+            <div key={s.id} className="group relative">
+              <div className="overflow-hidden rounded-lg border border-neutral-800 bg-black">
+                {s.kind === "photo" ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={s.file_url} alt="" className="h-24 w-24 object-cover" />
+                ) : (
+                  <video src={s.file_url} className="h-24 w-24 object-cover" muted />
+                )}
+              </div>
+              <button
+                onClick={async () => {
+                  await dashboard.deleteStory(s.id);
+                  reload();
+                }}
+                className="absolute -right-1 -top-1 rounded-full bg-black/80 px-1.5 py-0.5 text-xs text-red-300"
+              >
+                ✕
+              </button>
+              <p className="mt-1 text-center text-[10px] text-neutral-500">
+                {Math.round(
+                  (new Date(s.expires_at).getTime() - Date.now()) / 3_600_000,
+                )}{" "}
+                h
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

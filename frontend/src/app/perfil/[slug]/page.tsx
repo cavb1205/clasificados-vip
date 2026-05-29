@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { getProfile, getProfileRating, getProfileReviews } from "@/lib/api";
+import { getProfile, getProfileRating, getProfileReviews, getProfileStories } from "@/lib/api";
+import { StoriesStrip } from "@/components/StoriesStrip";
 import { ContactPanel } from "@/components/ContactPanel";
 import { ProfileTracker } from "@/components/ProfileTracker";
 
@@ -29,9 +30,10 @@ export default async function ProfilePage({ params }: { params: Params }) {
   const profile = await getProfile(slug);
   if (!profile) notFound();
 
-  const [reviews, rating] = await Promise.all([
+  const [reviews, rating, stories] = await Promise.all([
     getProfileReviews(slug),
     getProfileRating(slug),
+    getProfileStories(slug).catch(() => []),
   ]);
 
   const jsonLd = {
@@ -55,6 +57,16 @@ export default async function ProfilePage({ params }: { params: Params }) {
   return (
     <article className="pb-28 md:pb-0">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
+      {stories.length > 0 && (
+        <div className="mb-4">
+          <StoriesStrip
+            stories={stories}
+            stageName={profile.stage_name}
+            coverPhoto={profile.cover_photo}
+          />
+        </div>
+      )}
 
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>

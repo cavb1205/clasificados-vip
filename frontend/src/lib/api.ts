@@ -12,6 +12,7 @@ import type {
   Region,
   Review,
   Service,
+  Story,
 } from "./types";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000/api/v1";
@@ -85,6 +86,9 @@ export async function getProfile(slug: string): Promise<PublicProfile | null> {
   if (!res.ok) throw new Error(`API profile -> ${res.status}`);
   return res.json();
 }
+
+export const getProfileStories = (slug: string) =>
+  getJSON<Story[]>(`/profiles/${slug}/stories/`, 60);
 
 export const getProfileReviews = (slug: string) =>
   getJSON<Review[]>(`/profiles/${slug}/reviews/`, 60);
