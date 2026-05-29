@@ -40,6 +40,13 @@ export const getCities = (
     opts?.onlyPopulated ? 300 : 3600,
   );
 
+/**
+ * Todas las comunas del país que tienen al menos un perfil visible.
+ * Pensado para el selector global de comuna (home + cambio rápido en city page).
+ */
+export const getAllPopulatedCities = () =>
+  getJSON<City[]>("/cities/?has_profiles=true", 300);
+
 export const getPlans = () => getJSON<Plan[]>("/plans/", 3600);
 
 export const getPublications = (region: string, city: string) =>

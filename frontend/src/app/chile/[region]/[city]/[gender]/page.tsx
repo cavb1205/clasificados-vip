@@ -1,10 +1,16 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getProfiles, getServices, type ProfileQuery } from "@/lib/api";
+import {
+  getAllPopulatedCities,
+  getProfiles,
+  getServices,
+  type ProfileQuery,
+} from "@/lib/api";
 import { ProfileCard } from "@/components/ProfileCard";
 import { FiltersDrawer } from "@/components/FiltersDrawer";
 import { GenderTabs } from "@/components/GenderTabs";
+import { CityPicker } from "@/components/CityPicker";
 import {
   CATEGORY_LABEL,
   GENDER_BY_SLUG,
@@ -17,7 +23,7 @@ type Params = Promise<{ region: string; city: string; gender: string }>;
 type Search = Promise<Record<string, string | string[] | undefined>>;
 
 function isGenderSlug(s: string): s is GenderSlug {
-  return s === "mujeres" || s === "trans" || s === "hombres";
+  return s === "todos" || s === "mujeres" || s === "trans" || s === "hombres";
 }
 
 function titleize(slug: string) {
@@ -36,10 +42,17 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { region, city, gender } = await params;
   if (!isGenderSlug(gender)) return {};
   const cityName = titleize(city);
-  const genderLabel = GENDER_LABEL[gender];
+  const title =
+    gender === "todos"
+      ? `Anuncios en ${cityName}`
+      : `${GENDER_LABEL[gender]} en ${cityName}`;
+  const description =
+    gender === "todos"
+      ? `Perfiles con identidad verificada en ${cityName}.`
+      : `${GENDER_LABEL[gender]} con identidad verificada en ${cityName}.`;
   return {
-    title: `${genderLabel} en ${cityName}`,
-    description: `${genderLabel} con identidad verificada en ${cityName}.`,
+    title,
+    description,
     alternates: { canonical: `/chile/${region}/${city}/${gender}` },
   };
 }
@@ -56,6 +69,7 @@ export default async function CityPage({
   const sp = await searchParams;
 
   const query: ProfileQuery = {
+    // `todos` no envía filtro → backend devuelve mujeres + trans + hombres.
     gender: GENDER_BY_SLUG[gender],
     tag: pickArray(sp.tag) ?? pickArray(sp.service),
     min_age: pickString(sp.min_age),
@@ -67,9 +81,10 @@ export default async function CityPage({
   };
   const availableNow = query.available_now === "true";
 
-  const [data, services] = await Promise.all([
+  const [data, services, allCities] = await Promise.all([
     getProfiles(region, city, query),
     getServices(),
+    getAllPopulatedCities(),
   ]);
 
   const page = Number(query.page ?? "1");
@@ -112,6 +127,10 @@ export default async function CityPage({
       {/* Header siempre primero (en mobile y desktop). */}
       <div className="mb-4">
         <p className="text-sm text-neutral-500">
+          <Link href="/" className="hover:text-pink-400">
+            Chile
+          </Link>{" "}
+          /{" "}
           <Link href={`/chile/${region}`} className="hover:text-pink-400">
             {titleize(region)}
           </Link>{" "}
@@ -119,11 +138,20 @@ export default async function CityPage({
         </p>
         <div className="mt-1 flex items-baseline justify-between gap-2">
           <h1 className="text-2xl font-bold">
-            {GENDER_LABEL[gender]} en {cityName}
+            {gender === "todos"
+              ? `Anuncios en ${cityName}`
+              : `${GENDER_LABEL[gender]} en ${cityName}`}
           </h1>
           <p className="text-xs text-neutral-500">
             {data.count} resultado{data.count === 1 ? "" : "s"}
           </p>
+        </div>
+        <div className="mt-3 max-w-xs">
+          <CityPicker
+            cities={allCities}
+            label={`Cambiar comuna · ${cityName}`}
+            currentCitySlug={city}
+          />
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <GenderTabs region={region} city={city} current={gender} />

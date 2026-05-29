@@ -21,9 +21,10 @@ export interface Story {
 }
 
 export type Gender = "female" | "trans" | "male";
-export type GenderSlug = "mujeres" | "trans" | "hombres";
+/** Slugs que aparecen en la URL. `todos` no filtra por categoría. */
+export type GenderSlug = "todos" | "mujeres" | "trans" | "hombres";
 
-export const GENDER_BY_SLUG: Record<GenderSlug, Gender> = {
+export const GENDER_BY_SLUG: Partial<Record<GenderSlug, Gender>> = {
   mujeres: "female",
   trans: "trans",
   hombres: "male",
@@ -34,12 +35,14 @@ export const SLUG_BY_GENDER: Record<Gender, GenderSlug> = {
   male: "hombres",
 };
 export const GENDER_LABEL: Record<GenderSlug, string> = {
+  todos: "Todos",
   mujeres: "Mujeres",
   trans: "Trans",
   hombres: "Hombres",
 };
-export const ALL_GENDER_SLUGS: GenderSlug[] = ["mujeres", "trans", "hombres"];
-export const DEFAULT_GENDER_SLUG: GenderSlug = "mujeres";
+/** Orden en que aparecen los tabs en la página de comuna. */
+export const ALL_GENDER_SLUGS: GenderSlug[] = ["todos", "mujeres", "trans", "hombres"];
+export const DEFAULT_GENDER_SLUG: GenderSlug = "todos";
 
 export type ServiceCategory = "service" | "extra" | "feature";
 
