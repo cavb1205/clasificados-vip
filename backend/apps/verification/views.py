@@ -183,3 +183,33 @@ class AdminKYCActionView(APIView):
             {"detail": "decision debe ser 'approve' o 'reject'."},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+
+# ─── Auditoría KYC ──────────────────────────────────────────────────────────
+from rest_framework import generics, serializers as drf_serializers  # noqa: E402
+from .models import VerificationAccessLog  # noqa: E402
+
+
+class KYCAccessLogSerializer(drf_serializers.ModelSerializer):
+    request_id = drf_serializers.IntegerField(source="request.id", read_only=True)
+    target_email = drf_serializers.CharField(source="request.user.email", read_only=True)
+    accessed_by_email = drf_serializers.CharField(
+        source="accessed_by.email", read_only=True, default=None
+    )
+
+    class Meta:
+        model = VerificationAccessLog
+        fields = [
+            "id", "request_id", "target_email", "accessed_by_email",
+            "field_name", "accessed_at", "ip_address",
+        ]
+
+
+class AdminKYCAuditView(generics.ListAPIView):
+    serializer_class = KYCAccessLogSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return VerificationAccessLog.objects.select_related(
+            "request", "request__user", "accessed_by"
+        )[:200]

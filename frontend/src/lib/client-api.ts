@@ -178,6 +178,14 @@ export const dashboard = {
       method: "POST",
       body: { action },
     }),
+  adminReviews: (status: "pending" | "approved" | "rejected" = "pending") =>
+    apiFetch<unknown[]>(`/admin/reviews/?status=${status}`),
+  adminReviewAction: (id: number, action: "approve" | "reject") =>
+    apiFetch(`/admin/reviews/${id}/action/`, {
+      method: "POST",
+      body: { action },
+    }),
+  adminKycAudit: () => apiFetch<unknown[]>("/admin/kyc/audit/"),
   // KYC
   issueKycChallenge: () =>
     apiFetch<{ code: string; statement: string; expires_at: string }>(

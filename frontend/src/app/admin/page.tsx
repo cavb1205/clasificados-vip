@@ -73,8 +73,7 @@ export default function AdminHomePage() {
           <PendingCard
             label="Reseñas por moderar"
             count={stats.pending_reviews}
-            href="/admin#"
-            disabled
+            href="/admin/resenas"
           />
           <PendingCard
             label="Stories reportadas"

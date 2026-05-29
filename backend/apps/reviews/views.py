@@ -42,3 +42,59 @@ class ProfileRatingView(APIView):
                 "count": agg["count"],
             }
         )
+
+
+# ─── Admin endpoints ────────────────────────────────────────────────────────
+from rest_framework import generics, permissions, serializers as drf_serializers  # noqa: E402
+
+from apps.notifications.models import Notification, notify_user  # noqa: E402
+
+
+class AdminReviewSerializer(drf_serializers.ModelSerializer):
+    stage_name = drf_serializers.CharField(source="profile.stage_name", read_only=True)
+    profile_slug = drf_serializers.CharField(source="profile.slug", read_only=True)
+    client_email = drf_serializers.CharField(source="client.email", read_only=True)
+    client_username = drf_serializers.CharField(source="client.username", read_only=True)
+
+    class Meta:
+        model = Review
+        fields = [
+            "id", "stage_name", "profile_slug", "client_email",
+            "client_username", "rating", "comment", "status", "created_at",
+        ]
+
+
+class AdminReviewQueueView(generics.ListAPIView):
+    serializer_class = AdminReviewSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        qs = Review.objects.select_related("profile", "client")
+        s = self.request.query_params.get("status", "pending")
+        if s in {"pending", "approved", "rejected"}:
+            qs = qs.filter(status=s)
+        return qs
+
+
+class AdminReviewActionView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAdminUser]
+    queryset = Review.objects.all()
+
+    def post(self, request, pk):
+        review = self.get_object()
+        action = (request.data.get("action") or "").lower()
+        if action == "approve":
+            review.status = Review.Status.APPROVED
+            review.save(update_fields=["status"])
+            notify_user(
+                review.profile.user, kind=Notification.Kind.REVIEW,
+                title=f"⭐ Nueva reseña de {review.rating}",
+                message=review.comment or "Recibiste una reseña aprobada.",
+                link=f"/perfil/{review.profile.slug}",
+            )
+        elif action == "reject":
+            review.status = Review.Status.REJECTED
+            review.save(update_fields=["status"])
+        else:
+            return Response({"detail": "action debe ser approve|reject"}, status=400)
+        return Response(AdminReviewSerializer(review).data)
