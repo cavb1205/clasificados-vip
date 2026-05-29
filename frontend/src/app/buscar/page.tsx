@@ -57,7 +57,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
           {data.results.length === 0 ? (
             <p className="text-neutral-400">Ningún perfil coincide con esa búsqueda.</p>
           ) : (
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
               {data.results.map((p) => (
                 <li key={p.slug}>
                   <ProfileCard profile={p} />

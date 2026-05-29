@@ -33,7 +33,7 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
             alt={profile.stage_name}
             width={600}
             height={400}
-            sizes="(max-width: 640px) 100vw, 33vw"
+            sizes="(max-width: 640px) 50vw, 33vw"
             className="aspect-[3/2] w-full object-cover"
           />
         ) : (
@@ -70,9 +70,11 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-3 sm:p-4">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-lg font-semibold leading-tight">{profile.stage_name}</h2>
+          <h2 className="truncate text-base font-semibold leading-tight sm:text-lg">
+            {profile.stage_name}
+          </h2>
           {profile.rating_count > 0 && profile.rating_average !== null && (
             <span className="shrink-0 text-xs">
               <Stars value={profile.rating_average} />{" "}

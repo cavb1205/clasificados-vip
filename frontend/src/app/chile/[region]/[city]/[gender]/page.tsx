@@ -290,7 +290,7 @@ export default async function CityPage({
         {data.results.length === 0 ? (
           <p className="text-neutral-400">No hay perfiles que coincidan con los filtros.</p>
         ) : (
-          <ul className="grid gap-4 sm:grid-cols-2">
+          <ul className="grid grid-cols-2 gap-3 sm:gap-4">
             {data.results.map((p) => (
               <li key={p.slug}>
                 <ProfileCard profile={p} />

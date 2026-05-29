@@ -19,7 +19,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es-CL" className={`${geistSans.variable} h-full antialiased`}>
+    <html
+      lang="es-CL"
+      className={`${geistSans.variable} h-full antialiased`}
+      style={{ colorScheme: "dark" }}
+    >
       <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100">
         <AgeGate />
         <header className="border-b border-neutral-800">

@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
+/* Sitio forzado a modo oscuro: ignoramos prefers-color-scheme.
+   color-scheme: dark hace que los controles nativos (select, scrollbars,
+   inputs date/time, autofill) también se rendericen en tema oscuro. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -10,13 +14,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
