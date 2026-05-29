@@ -86,6 +86,7 @@ class PublicPublicationListView(generics.ListAPIView):
                 status=Publication.Status.ACTIVE,
                 expires_at__gt=timezone.now(),
                 profile__verification_status=ModelProfile.VerificationStatus.VERIFIED,
+                profile__is_suspended=False,
             )
             .select_related("profile", "profile__city", "profile__city__region")
         )
@@ -215,3 +216,17 @@ class AdminStatsView(generics.GenericAPIView):
             "expiring_soon": active_pubs.filter(expires_at__lte=soon).count(),
             "revenue_month_clp": revenue_month,
         })
+
+
+class AdminExpirePublicationView(generics.GenericAPIView):
+    """POST /admin/publications/<id>/expire/ → marca como EXPIRED y la oculta."""
+
+    permission_classes = [permissions.IsAdminUser]
+    queryset = Publication.objects.all()
+
+    def post(self, request, pk):
+        pub = self.get_object()
+        pub.status = Publication.Status.EXPIRED
+        pub.expires_at = timezone.now()
+        pub.save(update_fields=["status", "expires_at"])
+        return Response({"detail": "Publicación expirada."})

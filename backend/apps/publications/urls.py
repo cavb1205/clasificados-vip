@@ -22,4 +22,9 @@ urlpatterns = [
         views.AdminPaymentActionView.as_view(),
         name="admin-payment-action",
     ),
+    path(
+        "admin/publications/<int:pk>/expire/",
+        views.AdminExpirePublicationView.as_view(),
+        name="admin-publication-expire",
+    ),
 ] + router.urls

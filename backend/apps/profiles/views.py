@@ -59,6 +59,7 @@ def _visible_profile_subquery(city_field_outer, gender=None):
     profiles = ModelProfile.objects.filter(
         city_field_outer,
         verification_status=ModelProfile.VerificationStatus.VERIFIED,
+        is_suspended=False,
     ).filter(
         Q(verified_at__gte=trial_cutoff)
         | Q(
@@ -186,7 +187,8 @@ class PublicProfileListView(generics.ListAPIView):
         # Visibilidad: verificada Y (en trial gratuito O con publicación activa).
         qs = annotate_public_profiles(
             ModelProfile.objects.filter(
-                verification_status=ModelProfile.VerificationStatus.VERIFIED
+                verification_status=ModelProfile.VerificationStatus.VERIFIED,
+                is_suspended=False,
             )
             .filter(
                 Q(verified_at__gte=trial_cutoff)
@@ -252,7 +254,8 @@ class PublicProfileDetailView(generics.RetrieveAPIView):
         trial_cutoff = now - timedelta(days=SiteConfig.get().trial_days)
         return annotate_public_profiles(
             ModelProfile.objects.filter(
-                verification_status=ModelProfile.VerificationStatus.VERIFIED
+                verification_status=ModelProfile.VerificationStatus.VERIFIED,
+                is_suspended=False,
             )
             .filter(
                 Q(verified_at__gte=trial_cutoff)
@@ -283,7 +286,9 @@ class LogProfileEventView(APIView):
         if kind not in (ProfileEvent.Kind.VIEW, ProfileEvent.Kind.CONTACT):
             return Response({"detail": "kind inválido."}, status=status.HTTP_400_BAD_REQUEST)
         profile = ModelProfile.objects.filter(
-            slug=slug, verification_status=ModelProfile.VerificationStatus.VERIFIED
+            slug=slug,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            is_suspended=False,
         ).first()
         if not profile:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -317,3 +322,77 @@ class MyProfileStatsView(APIView):
             "contacts_30d": _count_since(contacts, last30),
             "contacts_7d": _count_since(contacts, last7),
         })
+
+
+# ─── Admin: gestión de modelos y publicaciones ──────────────────────────────
+from rest_framework import serializers as drf_serializers  # noqa: E402
+
+
+class AdminModelProfileSerializer(drf_serializers.ModelSerializer):
+    email = drf_serializers.CharField(source="user.email", read_only=True)
+    username = drf_serializers.CharField(source="user.username", read_only=True)
+    city_name = drf_serializers.CharField(source="city.name", read_only=True, default=None)
+    active_publication_count = drf_serializers.SerializerMethodField()
+
+    class Meta:
+        model = ModelProfile
+        fields = [
+            "id", "stage_name", "slug", "gender", "age", "email", "username",
+            "city_name", "verification_status", "is_suspended",
+            "suspension_reason", "created_at", "active_publication_count",
+        ]
+
+    def get_active_publication_count(self, obj):
+        from apps.publications.models import Publication
+        return Publication.objects.filter(
+            profile=obj,
+            status=Publication.Status.ACTIVE,
+            expires_at__gt=timezone.now(),
+        ).count()
+
+
+class AdminModelProfileListView(generics.ListAPIView):
+    serializer_class = AdminModelProfileSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        qs = ModelProfile.objects.select_related("user", "city")
+        q = (self.request.query_params.get("q") or "").strip()
+        status_filter = self.request.query_params.get("status")
+        if q:
+            qs = qs.filter(
+                Q(stage_name__icontains=q)
+                | Q(slug__icontains=q)
+                | Q(user__email__icontains=q)
+                | Q(user__username__icontains=q)
+                | Q(city__name__icontains=q)
+            )
+        if status_filter == "pending":
+            qs = qs.filter(verification_status=ModelProfile.VerificationStatus.PENDING)
+        elif status_filter == "verified":
+            qs = qs.filter(verification_status=ModelProfile.VerificationStatus.VERIFIED)
+        elif status_filter == "rejected":
+            qs = qs.filter(verification_status=ModelProfile.VerificationStatus.REJECTED)
+        elif status_filter == "suspended":
+            qs = qs.filter(is_suspended=True)
+        return qs[:100]
+
+
+class AdminModelProfileActionView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAdminUser]
+    queryset = ModelProfile.objects.all()
+
+    def post(self, request, pk):
+        profile = self.get_object()
+        action = (request.data.get("action") or "").lower()
+        if action == "suspend":
+            profile.is_suspended = True
+            profile.suspension_reason = (request.data.get("reason") or "")[:200]
+            profile.save(update_fields=["is_suspended", "suspension_reason"])
+        elif action == "unsuspend":
+            profile.is_suspended = False
+            profile.suspension_reason = ""
+            profile.save(update_fields=["is_suspended", "suspension_reason"])
+        else:
+            return Response({"detail": "action debe ser suspend|unsuspend"}, status=400)
+        return Response(AdminModelProfileSerializer(profile).data)

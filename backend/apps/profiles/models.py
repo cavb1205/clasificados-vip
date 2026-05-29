@@ -115,6 +115,10 @@ class ModelProfile(models.Model):
     # con badge verde y puede filtrarse con ?available_now=true. Auto-expira
     # solo: cualquier query con now() lo deja afuera al pasar la fecha.
     available_until = models.DateTimeField(null=True, blank=True)
+    # Suspensión administrativa. Independiente de la verificación: una modelo
+    # puede estar verified + suspended (oculta del público hasta liberar).
+    is_suspended = models.BooleanField("suspendido", default=False)
+    suspension_reason = models.CharField(max_length=200, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -186,6 +186,27 @@ export const dashboard = {
       body: { action },
     }),
   adminKycAudit: () => apiFetch<unknown[]>("/admin/kyc/audit/"),
+  adminProfiles: (
+    q: string = "",
+    statusFilter: string = "",
+  ) =>
+    apiFetch<unknown[]>(
+      `/admin/profiles/?${new URLSearchParams({
+        q,
+        ...(statusFilter ? { status: statusFilter } : {}),
+      }).toString()}`,
+    ),
+  adminProfileAction: (
+    id: number,
+    action: "suspend" | "unsuspend",
+    reason?: string,
+  ) =>
+    apiFetch(`/admin/profiles/${id}/action/`, {
+      method: "POST",
+      body: { action, reason },
+    }),
+  adminExpirePublication: (id: number) =>
+    apiFetch(`/admin/publications/${id}/expire/`, { method: "POST" }),
   // KYC
   issueKycChallenge: () =>
     apiFetch<{ code: string; statement: string; expires_at: string }>(
