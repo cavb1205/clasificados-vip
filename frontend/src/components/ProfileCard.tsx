@@ -72,7 +72,7 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
 
       <div className="p-3 sm:p-4">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="truncate text-base font-semibold leading-tight sm:text-lg">
+          <h2 className="truncate font-display text-base font-semibold leading-tight tracking-tight sm:text-lg">
             {profile.stage_name}
           </h2>
           {profile.rating_count > 0 && profile.rating_average !== null && (

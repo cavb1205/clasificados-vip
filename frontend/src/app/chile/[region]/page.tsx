@@ -35,7 +35,9 @@ export default async function RegionPage({ params }: { params: Params }) {
         </Link>{" "}
         / {regionName}
       </p>
-      <h1 className="mt-1 text-2xl font-bold">Comunas en {regionName}</h1>
+      <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight">
+        Comunas en {regionName}
+      </h1>
       {cities.length === 0 ? (
         <p className="mt-6 text-sm text-neutral-400">
           Aún no hay anuncios activos en esta región. Vuelve pronto.

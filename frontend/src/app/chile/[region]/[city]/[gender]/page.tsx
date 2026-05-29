@@ -137,7 +137,7 @@ export default async function CityPage({
           / {cityName}
         </p>
         <div className="mt-1 flex items-baseline justify-between gap-2">
-          <h1 className="text-2xl font-bold">
+          <h1 className="font-display text-3xl font-semibold tracking-tight">
             {gender === "todos"
               ? `Anuncios en ${cityName}`
               : `${GENDER_LABEL[gender]} en ${cityName}`}

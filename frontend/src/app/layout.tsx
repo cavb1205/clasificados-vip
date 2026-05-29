@@ -1,11 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Geist } from "next/font/google";
+import { Plus_Jakarta_Sans, Fraunces } from "next/font/google";
 import "./globals.css";
 import { AgeGate } from "@/components/AgeGate";
 import { AuthNav } from "@/components/AuthNav";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+// Tipografía UI: Plus Jakarta Sans (geométrica, moderna, alta legibilidad).
+const sans = Plus_Jakarta_Sans({
+  variable: "--font-sans",
+  subsets: ["latin"],
+  display: "swap",
+});
+// Tipografía de display: Fraunces (serif con optical sizing, da el toque
+// elegante a títulos y al logo).
+const display = Fraunces({
+  variable: "--font-display",
+  subsets: ["latin"],
+  display: "swap",
+  axes: ["opsz"],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://clasificados.vip"),
@@ -21,14 +34,17 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html
       lang="es-CL"
-      className={`${geistSans.variable} h-full antialiased`}
+      className={`${sans.variable} ${display.variable} h-full antialiased`}
       style={{ colorScheme: "dark" }}
     >
       <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100">
         <AgeGate />
         <header className="border-b border-neutral-800">
           <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-4">
-            <Link href="/" className="text-lg font-semibold tracking-tight">
+            <Link
+              href="/"
+              className="font-display text-xl font-semibold tracking-tight"
+            >
               Clasificados<span className="text-pink-500">VIP</span>
             </Link>
             <form

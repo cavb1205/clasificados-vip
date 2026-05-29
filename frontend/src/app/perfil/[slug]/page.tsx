@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProfile, getProfileRating, getProfileReviews, getProfileStories } from "@/lib/api";
 import { StoriesStrip } from "@/components/StoriesStrip";
 import { ContactPanel } from "@/components/ContactPanel";
 import { ProfileTracker } from "@/components/ProfileTracker";
+import { DEFAULT_GENDER_SLUG } from "@/lib/types";
 
 type Params = Promise<{ slug: string }>;
 
@@ -54,9 +56,55 @@ export default async function ProfilePage({ params }: { params: Params }) {
       : {}),
   };
 
+  // Back / breadcrumb: si la modelo tiene comuna, ofrecemos volver al listado
+  // de esa comuna (tab Todos) para que el usuario siga explorando ahí mismo.
+  const cityHref = profile.city
+    ? `/chile/${profile.city.region.slug}/${profile.city.slug}/${DEFAULT_GENDER_SLUG}`
+    : null;
+
   return (
     <article className="pb-28 md:pb-0">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+
+      {/* Back + breadcrumb. En móvil predomina el "Volver", en desktop el rastro. */}
+      <nav className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        {cityHref ? (
+          <Link
+            href={cityHref}
+            className="inline-flex items-center gap-1 rounded-full border border-neutral-800 px-3 py-1 text-neutral-300 hover:border-pink-500 hover:text-pink-300"
+          >
+            <span aria-hidden>←</span>
+            Volver a {profile.city!.name}
+          </Link>
+        ) : (
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 rounded-full border border-neutral-800 px-3 py-1 text-neutral-300 hover:border-pink-500 hover:text-pink-300"
+          >
+            <span aria-hidden>←</span>
+            Volver al inicio
+          </Link>
+        )}
+        {profile.city && (
+          <p className="text-neutral-500">
+            <Link href="/" className="hover:text-pink-400">
+              Chile
+            </Link>{" "}
+            /{" "}
+            <Link
+              href={`/chile/${profile.city.region.slug}`}
+              className="hover:text-pink-400"
+            >
+              {profile.city.region.name}
+            </Link>{" "}
+            /{" "}
+            <Link href={cityHref!} className="hover:text-pink-400">
+              {profile.city.name}
+            </Link>{" "}
+            / <span className="text-neutral-300">{profile.stage_name}</span>
+          </p>
+        )}
+      </nav>
 
       {stories.length > 0 && (
         <div className="mb-4">
@@ -70,7 +118,9 @@ export default async function ProfilePage({ params }: { params: Params }) {
 
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold">{profile.stage_name}</h1>
+          <h1 className="font-display text-4xl font-semibold tracking-tight">
+            {profile.stage_name}
+          </h1>
           <p className="mt-1 text-neutral-400">
             {profile.age} años
             {profile.city && ` · ${profile.city.name}, ${profile.city.region.name}`}
@@ -149,7 +199,7 @@ export default async function ProfilePage({ params }: { params: Params }) {
       )}
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold">Reseñas</h2>
+        <h2 className="font-display text-xl font-semibold">Reseñas</h2>
         {reviews.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-500">Aún no hay reseñas aprobadas.</p>
         ) : (
@@ -165,6 +215,17 @@ export default async function ProfilePage({ params }: { params: Params }) {
           </ul>
         )}
       </section>
+
+      {cityHref && (
+        <div className="mt-10 flex justify-center">
+          <Link
+            href={cityHref}
+            className="rounded-full border border-neutral-700 px-5 py-2.5 text-sm text-neutral-300 hover:border-pink-500 hover:text-pink-300"
+          >
+            Ver más perfiles en {profile.city!.name} →
+          </Link>
+        </div>
+      )}
     </article>
   );
 }
