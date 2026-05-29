@@ -58,12 +58,16 @@ export interface ProfileQuery {
   min_rate?: string;
   max_rate?: string;
   page?: string;
+  available_now?: string;
 }
 
 function buildQuery(q: ProfileQuery): string {
   const params = new URLSearchParams();
   q.tag?.forEach((s) => params.append("tag", s));
-  for (const k of ["region", "city", "gender", "q", "min_age", "max_age", "min_rate", "max_rate", "page"] as const) {
+  for (const k of [
+    "region", "city", "gender", "q", "min_age", "max_age",
+    "min_rate", "max_rate", "page", "available_now",
+  ] as const) {
     if (q[k]) params.set(k, q[k] as string);
   }
   return params.toString();

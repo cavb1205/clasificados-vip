@@ -43,7 +43,7 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
         )}
 
         {/* Badges flotantes sobre la foto */}
-        <div className="absolute left-2 top-2 flex gap-1.5">
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
           <span
             title="Identidad verificada"
             className="flex items-center gap-1 rounded-full bg-sky-600/95 px-2 py-0.5 text-[11px] font-medium text-white"
@@ -53,6 +53,18 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
           {profile.is_featured && (
             <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-amber-950">
               Destacada
+            </span>
+          )}
+          {profile.is_available_now && (
+            <span
+              title="Disponible para contactar ahora"
+              className="flex items-center gap-1 rounded-full bg-emerald-500/95 px-2 py-0.5 text-[11px] font-semibold text-white"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+              </span>
+              Disponible ahora
             </span>
           )}
         </div>

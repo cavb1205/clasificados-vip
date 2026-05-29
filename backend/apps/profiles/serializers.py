@@ -69,11 +69,13 @@ class ModelProfileSerializer(serializers.ModelSerializer):
             "whatsapp", "telegram",
             "verification_status", "verified_at", "trial_ends_at",
             "pending_verification", "latest_verification",
+            "available_until",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "slug", "verification_status", "verified_at", "trial_ends_at",
             "pending_verification", "latest_verification",
+            "available_until",
             "created_at", "updated_at",
         ]
 
@@ -144,6 +146,9 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     rating_average = serializers.FloatField(read_only=True, allow_null=True)
     rating_count = serializers.IntegerField(read_only=True, default=0)
 
+    is_available_now = serializers.BooleanField(read_only=True)
+    available_until = serializers.DateTimeField(read_only=True)
+
     class Meta:
         model = ModelProfile
         fields = [
@@ -151,6 +156,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             "base_rate", "city", "photos", "cover_photo",
             "is_featured", "rating_average", "rating_count",
             "whatsapp", "telegram",
+            "is_available_now", "available_until",
         ]
 
     def _abs(self, url: str) -> str:

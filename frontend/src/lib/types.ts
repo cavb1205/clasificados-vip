@@ -64,6 +64,8 @@ export interface PublicProfile {
   rating_count: number;
   whatsapp: string;
   telegram: string;
+  is_available_now: boolean;
+  available_until: string | null;
 }
 
 export interface PublicPublication {

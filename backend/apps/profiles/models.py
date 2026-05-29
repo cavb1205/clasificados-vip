@@ -111,6 +111,10 @@ class ModelProfile(models.Model):
     # Marca la primera aprobación de KYC. Inmutable a re-aprobaciones.
     # Sirve de ancla para calcular el periodo de trial gratuito.
     verified_at = models.DateTimeField(null=True, blank=True)
+    # "Disponible ahora": cuando contiene una fecha futura, el perfil aparece
+    # con badge verde y puede filtrarse con ?available_now=true. Auto-expira
+    # solo: cualquier query con now() lo deja afuera al pasar la fecha.
+    available_until = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -123,6 +127,11 @@ class ModelProfile(models.Model):
     @property
     def is_verified(self) -> bool:
         return self.verification_status == self.VerificationStatus.VERIFIED
+
+    @property
+    def is_available_now(self) -> bool:
+        from django.utils import timezone
+        return bool(self.available_until and self.available_until > timezone.now())
 
     def save(self, *args, **kwargs):
         if not self.slug:

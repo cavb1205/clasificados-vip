@@ -3,6 +3,7 @@ from datetime import timedelta
 from django.db.models import Avg, Count, Exists, OuterRef, Q
 from django.utils import timezone
 from rest_framework import generics, permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -132,6 +133,38 @@ class MyProfileViewSet(viewsets.ModelViewSet):
             raise PermissionDenied()
         serializer.save()
 
+    @action(detail=False, methods=["post"], url_path="availability")
+    def availability(self, request):
+        """Activa o cancela 'Disponible ahora' para el perfil propio.
+
+        Body: {"minutes": 60} o {"cancel": true}
+        """
+        profile = ModelProfile.objects.filter(user=request.user).first()
+        if not profile:
+            return Response(
+                {"detail": "Primero crea tu perfil."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if request.data.get("cancel"):
+            profile.available_until = None
+        else:
+            try:
+                minutes = int(request.data.get("minutes", 0))
+            except (TypeError, ValueError):
+                minutes = 0
+            if not (15 <= minutes <= 12 * 60):
+                return Response(
+                    {"detail": "Duración inválida (15 min – 12 h)."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            from datetime import timedelta
+            profile.available_until = timezone.now() + timedelta(minutes=minutes)
+        profile.save(update_fields=["available_until"])
+        return Response({
+            "available_until": profile.available_until,
+            "is_available_now": profile.is_available_now,
+        })
+
 
 class PublicProfileListView(generics.ListAPIView):
     """Listado público por región/comuna, con filtros y paginación.
@@ -180,6 +213,10 @@ class PublicProfileListView(generics.ListAPIView):
             ModelProfile.Gender.MALE,
         ):
             qs = qs.filter(gender=gender)
+
+        # Solo perfiles "Disponibles ahora" (available_until en el futuro).
+        if params.get("available_now") == "true":
+            qs = qs.filter(available_until__gt=timezone.now())
 
         # Búsqueda libre.
         q = (params.get("q") or "").strip()

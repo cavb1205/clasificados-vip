@@ -118,6 +118,16 @@ export const dashboard = {
     apiFetch("/me/profile/", { method: "POST", body: data }),
   updateProfile: (id: number, data: Record<string, unknown>) =>
     apiFetch(`/me/profile/${id}/`, { method: "PATCH", body: data }),
+  setAvailability: (minutes: number) =>
+    apiFetch<{ available_until: string | null; is_available_now: boolean }>(
+      "/me/profile/availability/",
+      { method: "POST", body: { minutes } },
+    ),
+  cancelAvailability: () =>
+    apiFetch<{ available_until: string | null; is_available_now: boolean }>(
+      "/me/profile/availability/",
+      { method: "POST", body: { cancel: true } },
+    ),
   // Multimedia
   listMedia: () => apiFetch<unknown[]>("/me/media/"),
   uploadMedia: (form: FormData) =>

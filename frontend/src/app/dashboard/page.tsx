@@ -30,6 +30,7 @@ interface Profile {
   trial_ends_at: string | null;
   pending_verification: boolean;
   latest_verification: LatestVerification | null;
+  available_until: string | null;
   whatsapp: string;
   telegram: string;
   services: Service[];
@@ -141,6 +142,12 @@ export default function DashboardPage() {
       </div>
       {msg && <p className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-pink-400">{msg}</p>}
       <VisibilityBanner profile={profile} publications={publications} />
+      {profile && profile.verification_status === "verified" && (
+        <AvailabilityPanel
+          availableUntil={profile.available_until}
+          onChange={loadAll}
+        />
+      )}
 
       {/* Estadísticas */}
       <section>
@@ -1299,5 +1306,95 @@ function VisibilityBanner({
       Tu perfil ya no aparece en el listado público. Crea un anuncio activo en{" "}
       <strong>Mis anuncios</strong> para volver a ser visible.
     </div>
+  );
+}
+
+function AvailabilityPanel({
+  availableUntil,
+  onChange,
+}: {
+  availableUntil: string | null;
+  onChange: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [now, setNow] = useState(Date.now());
+
+  // Tick cada 30s para refrescar el countdown.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const endsAt = availableUntil ? new Date(availableUntil).getTime() : 0;
+  const active = endsAt > now;
+  const minutesLeft = active ? Math.max(1, Math.round((endsAt - now) / 60000)) : 0;
+
+  async function activate(minutes: number) {
+    setBusy(true);
+    try {
+      await dashboard.setAvailability(minutes);
+      onChange();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancel() {
+    setBusy(true);
+    try {
+      await dashboard.cancelAvailability();
+      onChange();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">Disponibilidad ahora</p>
+          {active ? (
+            <p className="mt-1 flex items-center gap-2 text-xs text-emerald-300">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              </span>
+              Vencen tu disponibilidad en <strong>~{minutesLeft} min</strong>
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-neutral-500">
+              Activa para que aparezcas en la pestaña &quot;Disponibles ahora&quot;
+              y con badge verde en tu tarjeta.
+            </p>
+          )}
+        </div>
+        {active && (
+          <button
+            disabled={busy}
+            onClick={cancel}
+            className="rounded-full border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:text-red-300"
+          >
+            Detener
+          </button>
+        )}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {[60, 120, 240, 360].map((m) => (
+          <button
+            key={m}
+            disabled={busy}
+            onClick={() => activate(m)}
+            className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
+              active
+                ? "border border-neutral-700 text-neutral-300 hover:border-emerald-500"
+                : "bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-50"
+            }`}
+          >
+            {m < 60 ? `${m}m` : `${m / 60}h`}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

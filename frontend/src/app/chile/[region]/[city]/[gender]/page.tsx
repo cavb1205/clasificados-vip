@@ -63,7 +63,9 @@ export default async function CityPage({
     min_rate: pickString(sp.min_rate),
     max_rate: pickString(sp.max_rate),
     page: pickString(sp.page),
+    available_now: pickString(sp.available_now),
   };
+  const availableNow = query.available_now === "true";
 
   const [data, services] = await Promise.all([
     getProfiles(region, city, query),
@@ -87,13 +89,14 @@ export default async function CityPage({
   // Cuántos filtros activos hay → badge en el botón "Filtros" móvil.
   const activeCount =
     (query.tag?.length ?? 0) +
-    (["min_age", "max_age", "min_rate", "max_rate"] as const).filter((k) => query[k]).length;
+    (["min_age", "max_age", "min_rate", "max_rate"] as const).filter((k) => query[k]).length +
+    (availableNow ? 1 : 0);
 
   const baseHref = `/chile/${region}/${city}/${gender}`;
   const withParams = (overrides: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
     query.tag?.forEach((s) => p.append("tag", s));
-    for (const k of ["min_age", "max_age", "min_rate", "max_rate", "page"] as const) {
+    for (const k of ["min_age", "max_age", "min_rate", "max_rate", "page", "available_now"] as const) {
       if (query[k]) p.set(k, query[k] as string);
     }
     for (const [k, v] of Object.entries(overrides)) {
@@ -122,8 +125,31 @@ export default async function CityPage({
             {data.count} resultado{data.count === 1 ? "" : "s"}
           </p>
         </div>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <GenderTabs region={region} city={city} current={gender} />
+          <Link
+            href={withParams({
+              available_now: availableNow ? undefined : "true",
+              page: undefined,
+            })}
+            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition ${
+              availableNow
+                ? "border-emerald-500 bg-emerald-600/20 text-emerald-200"
+                : "border-neutral-700 text-neutral-400 hover:border-emerald-500"
+            }`}
+          >
+            <span className="relative flex h-2 w-2">
+              {availableNow && (
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              )}
+              <span
+                className={`relative inline-flex h-2 w-2 rounded-full ${
+                  availableNow ? "bg-emerald-400" : "bg-neutral-500"
+                }`}
+              />
+            </span>
+            Disponibles ahora
+          </Link>
         </div>
       </div>
 
