@@ -20,6 +20,10 @@ export function ContactPanel({ slug, stageName, whatsapp, telegram }: Props) {
   if (!hasAny) return null;
 
   const greeting = encodeURIComponent(`Hola ${stageName}, te vi en Clasificados VIP.`);
+  // El número de WhatsApp viene en formato internacional sin "+" (ej. 56912345678).
+  // Reusamos el mismo dígito para la llamada y para la deep-link de WhatsApp.
+  const phone = whatsapp;
+  const telUrl = phone ? `tel:+${phone}` : null;
   const waUrl = whatsapp ? `https://wa.me/${whatsapp}?text=${greeting}` : null;
   const tgUrl = telegram ? `https://t.me/${telegram}` : null;
 
@@ -39,6 +43,18 @@ export function ContactPanel({ slug, stageName, whatsapp, telegram }: Props) {
 
   return (
     <div className="space-y-2">
+      {telUrl && (
+        // En móvil abre el marcador del teléfono. En desktop algunos navegadores
+        // proponen FaceTime/Skype/etc. — para no contradecir esa UX igual lo
+        // dejamos visible siempre pero etiquetado como "Llamar".
+        <a
+          href={telUrl}
+          rel="nofollow noopener"
+          className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 font-medium text-white hover:bg-indigo-500"
+        >
+          <span aria-hidden>📞</span> Llamar · +{phone}
+        </a>
+      )}
       {waUrl && (
         <a
           href={waUrl}
