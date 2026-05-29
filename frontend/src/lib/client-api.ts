@@ -156,6 +156,28 @@ export const dashboard = {
       method: "POST",
       body: { decision, reason },
     }),
+  // Admin: dashboard + colas
+  adminStats: () => apiFetch<Record<string, number>>("/admin/stats/"),
+  adminPayments: (status: "pending" | "approved" | "rejected" = "pending") =>
+    apiFetch<unknown[]>(`/admin/payments/?status=${status}`),
+  adminPaymentAction: (
+    id: number,
+    action: "approve" | "reject",
+    note?: string,
+  ) =>
+    apiFetch(`/admin/payments/${id}/action/`, {
+      method: "POST",
+      body: { action, note },
+    }),
+  adminStoryReports: () => apiFetch<unknown[]>("/admin/story-reports/"),
+  adminStoryReportAction: (
+    id: number,
+    action: "delete_story" | "dismiss",
+  ) =>
+    apiFetch(`/admin/story-reports/${id}/action/`, {
+      method: "POST",
+      body: { action },
+    }),
   // KYC
   issueKycChallenge: () =>
     apiFetch<{ code: string; statement: string; expires_at: string }>(

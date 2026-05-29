@@ -9,4 +9,14 @@ urlpatterns = [
     path("me/stories/<int:pk>/", views.MyStoryDeleteView.as_view(), name="my-delete"),
     path("profiles/<slug:slug>/stories/", views.ProfileStoriesView.as_view(), name="public-list"),
     path("stories/<int:pk>/report/", views.StoryReportView.as_view(), name="report"),
+    path(
+        "admin/story-reports/",
+        views.AdminStoryReportQueueView.as_view(),
+        name="admin-reports",
+    ),
+    path(
+        "admin/story-reports/<int:pk>/action/",
+        views.AdminStoryReportActionView.as_view(),
+        name="admin-report-action",
+    ),
 ]

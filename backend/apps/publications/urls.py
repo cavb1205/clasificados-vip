@@ -11,4 +11,15 @@ router.register("me/publications", views.MyPublicationViewSet, basename="my-publ
 urlpatterns = [
     path("plans/", views.PlanListView.as_view(), name="plans"),
     path("publications/", views.PublicPublicationListView.as_view(), name="public-list"),
+    path("admin/stats/", views.AdminStatsView.as_view(), name="admin-stats"),
+    path(
+        "admin/payments/",
+        views.AdminPaymentQueueView.as_view(),
+        name="admin-payments",
+    ),
+    path(
+        "admin/payments/<int:pk>/action/",
+        views.AdminPaymentActionView.as_view(),
+        name="admin-payment-action",
+    ),
 ] + router.urls

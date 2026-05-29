@@ -128,3 +128,70 @@ class StoryReportView(APIView):
         reason = (request.data.get("reason") or "")[:200].strip()
         StoryReport.objects.create(story=story, reason=reason)
         return Response({"detail": "Gracias por el reporte."}, status=status.HTTP_201_CREATED)
+
+
+# ─── Admin endpoints ────────────────────────────────────────────────────────
+from rest_framework import generics  # noqa: E402
+from rest_framework import serializers as drf_serializers  # noqa: E402
+
+
+class AdminStoryReportSerializer(drf_serializers.ModelSerializer):
+    story_id = drf_serializers.IntegerField(source="story.id", read_only=True)
+    kind = drf_serializers.CharField(source="story.kind", read_only=True)
+    file_url = drf_serializers.SerializerMethodField()
+    stage_name = drf_serializers.CharField(
+        source="story.profile.stage_name", read_only=True
+    )
+    profile_slug = drf_serializers.CharField(
+        source="story.profile.slug", read_only=True
+    )
+    story_expires_at = drf_serializers.DateTimeField(
+        source="story.expires_at", read_only=True
+    )
+
+    class Meta:
+        model = StoryReport
+        fields = [
+            "id", "story_id", "kind", "file_url", "stage_name",
+            "profile_slug", "reason", "created_at", "story_expires_at",
+        ]
+
+    def get_file_url(self, obj):
+        request = self.context.get("request")
+        if not obj.story.file:
+            return None
+        url = obj.story.file.url
+        return request.build_absolute_uri(url) if request else url
+
+
+class AdminStoryReportQueueView(generics.ListAPIView):
+    serializer_class = AdminStoryReportSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return StoryReport.objects.select_related(
+            "story", "story__profile"
+        ).order_by("-created_at")
+
+
+class AdminStoryReportActionView(generics.GenericAPIView):
+    """POST {action: 'delete_story' | 'dismiss'}."""
+
+    permission_classes = [permissions.IsAdminUser]
+    queryset = StoryReport.objects.all()
+
+    def post(self, request, pk):
+        report = self.get_object()
+        action_kind = (request.data.get("action") or "").lower()
+        if action_kind == "delete_story":
+            story = report.story
+            try:
+                story.file.delete(save=False)
+            except Exception:
+                pass
+            story.delete()  # cascade borra el resto de reports asociados
+            return Response({"detail": "Story eliminada."})
+        if action_kind == "dismiss":
+            report.delete()
+            return Response({"detail": "Reporte descartado."})
+        return Response({"detail": "action debe ser delete_story|dismiss"}, status=400)
