@@ -37,6 +37,8 @@ export default function AdminModelosPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
+  // Solo staff puede suspender/reactivar; moderador es solo lectura aquí.
+  const [isStaff, setIsStaff] = useState(false);
 
   const reload = useCallback(
     async (query: string, which: Tab) => {
@@ -48,7 +50,11 @@ export default function AdminModelosPage() {
   useEffect(() => {
     auth
       .me()
-      .then(() => reload("", ""))
+      .then((me) => {
+        const u = me as { is_staff?: boolean } | null;
+        setIsStaff(!!u?.is_staff);
+        return reload("", "");
+      })
       .then(() => setReady(true))
       .catch(() => router.replace("/login?next=/admin/modelos"));
   }, [router, reload]);
@@ -184,25 +190,27 @@ export default function AdminModelosPage() {
                     </p>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {p.is_suspended ? (
-                    <button
-                      disabled={busyId === p.id}
-                      onClick={() => unsuspend(p)}
-                      className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-                    >
-                      Reactivar
-                    </button>
-                  ) : (
-                    <button
-                      disabled={busyId === p.id}
-                      onClick={() => suspend(p)}
-                      className="rounded-full border border-red-500 px-3 py-1.5 text-xs text-red-300 hover:bg-red-600/20 disabled:opacity-50"
-                    >
-                      Suspender
-                    </button>
-                  )}
-                </div>
+                {isStaff && (
+                  <div className="flex flex-wrap gap-2">
+                    {p.is_suspended ? (
+                      <button
+                        disabled={busyId === p.id}
+                        onClick={() => unsuspend(p)}
+                        className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                      >
+                        Reactivar
+                      </button>
+                    ) : (
+                      <button
+                        disabled={busyId === p.id}
+                        onClick={() => suspend(p)}
+                        className="rounded-full border border-red-500 px-3 py-1.5 text-xs text-red-300 hover:bg-red-600/20 disabled:opacity-50"
+                      >
+                        Suspender
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </li>
           ))}

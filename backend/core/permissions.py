@@ -17,6 +17,21 @@ class IsClient(BasePermission):
         return bool(request.user and request.user.is_authenticated and request.user.role == "client")
 
 
+class IsModerator(BasePermission):
+    """Staff (is_staff) o usuarios con rol 'moderator'.
+
+    Para moderación de contenido (reseñas, reportes, listado de modelos).
+    Las acciones sensibles (KYC, pagos, planes, suspensión, auditoría)
+    siguen detrás de IsAdminUser.
+    """
+
+    def has_permission(self, request, view):
+        u = request.user
+        if not (u and u.is_authenticated):
+            return False
+        return bool(u.is_staff or getattr(u, "role", "") == "moderator")
+
+
 class IsOwnerOrReadOnly(BasePermission):
     """Lectura para todos; escritura solo para el dueño del objeto.
 

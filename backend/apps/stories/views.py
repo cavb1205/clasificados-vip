@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from apps.profiles.models import ModelProfile
 from apps.publications.models import Publication
 from core.image_processing import process_image
-from core.permissions import IsModel
+from core.permissions import IsModel, IsModerator
 
 from .models import MAX_STORIES_ALIVE, Story, StoryReport
 from .serializers import StorySerializer
@@ -166,7 +166,7 @@ class AdminStoryReportSerializer(drf_serializers.ModelSerializer):
 
 class AdminStoryReportQueueView(generics.ListAPIView):
     serializer_class = AdminStoryReportSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsModerator]
 
     def get_queryset(self):
         return StoryReport.objects.select_related(
@@ -177,7 +177,7 @@ class AdminStoryReportQueueView(generics.ListAPIView):
 class AdminStoryReportActionView(generics.GenericAPIView):
     """POST {action: 'delete_story' | 'dismiss'}."""
 
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsModerator]
     queryset = StoryReport.objects.all()
 
     def post(self, request, pk):

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { dashboard } from "@/lib/client-api";
+import { auth, dashboard } from "@/lib/client-api";
 
 interface Stats {
   pending_kyc?: number;
@@ -16,32 +16,42 @@ interface Item {
   href: string;
   label: string;
   badge?: keyof Stats;
+  /** Si true, solo visible para usuarios con is_staff. */
+  adminOnly?: boolean;
 }
 
 const ITEMS: Item[] = [
   { href: "/admin", label: "Resumen" },
-  { href: "/admin/kyc", label: "Verificaciones", badge: "pending_kyc" },
-  { href: "/admin/pagos", label: "Pagos", badge: "pending_payments" },
+  { href: "/admin/kyc", label: "Verificaciones", badge: "pending_kyc", adminOnly: true },
+  { href: "/admin/pagos", label: "Pagos", badge: "pending_payments", adminOnly: true },
   { href: "/admin/resenas", label: "Reseñas", badge: "pending_reviews" },
   { href: "/admin/reportes", label: "Reportes", badge: "open_reports" },
   { href: "/admin/modelos", label: "Modelos" },
-  { href: "/admin/config", label: "Configuración" },
-  { href: "/admin/auditoria", label: "Auditoría KYC" },
+  { href: "/admin/config", label: "Configuración", adminOnly: true },
+  { href: "/admin/auditoria", label: "Auditoría KYC", adminOnly: true },
 ];
 
 /**
- * Barra de navegación del panel admin.
- * - Desktop (md+): tabs horizontales con badges de pendientes.
- * - Móvil: botón hamburguesa que abre un drawer lateral.
- * Los badges se cargan en background; un fallo silencioso muestra 0.
+ * Nav del panel admin con visibilidad por rol:
+ * - is_staff (admin) ve todo.
+ * - role=moderator ve solo lo no marcado adminOnly (reseñas, reportes,
+ *   modelos en lectura, resumen).
  */
 export function AdminNav() {
   const pathname = usePathname();
   const [stats, setStats] = useState<Stats>({});
+  const [isStaff, setIsStaff] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    auth
+      .me()
+      .then((me) => {
+        const u = me as { is_staff?: boolean } | null;
+        if (alive) setIsStaff(!!u?.is_staff);
+      })
+      .catch(() => alive && setIsStaff(false));
     dashboard
       .adminStats()
       .then((s) => alive && setStats(s as Stats))
@@ -53,6 +63,8 @@ export function AdminNav() {
 
   // Cierra el drawer al cambiar de ruta.
   useEffect(() => setOpen(false), [pathname]);
+
+  const visibleItems = ITEMS.filter((i) => !i.adminOnly || isStaff);
 
   const totalPending =
     (stats.pending_kyc ?? 0) +
@@ -79,7 +91,7 @@ export function AdminNav() {
           )}
         </button>
         <p className="font-display text-sm text-neutral-400">
-          {ITEMS.find((i) => i.href === pathname)?.label ?? ""}
+          {visibleItems.find((i) => i.href === pathname)?.label ?? ""}
         </p>
       </div>
 
@@ -94,7 +106,9 @@ export function AdminNav() {
             className="absolute inset-y-0 left-0 w-72 max-w-[85vw] overflow-y-auto border-r border-neutral-800 bg-neutral-950 p-4"
           >
             <div className="mb-4 flex items-center justify-between">
-              <p className="font-display text-lg font-semibold">Admin</p>
+              <p className="font-display text-lg font-semibold">
+                {isStaff ? "Admin" : "Moderación"}
+              </p>
               <button
                 onClick={() => setOpen(false)}
                 className="rounded-full px-2 py-1 text-xl text-neutral-400 hover:text-pink-300"
@@ -104,7 +118,7 @@ export function AdminNav() {
               </button>
             </div>
             <nav className="flex flex-col gap-1">
-              {ITEMS.map((it) => (
+              {visibleItems.map((it) => (
                 <NavLink key={it.href} item={it} pathname={pathname} stats={stats} />
               ))}
             </nav>
@@ -114,7 +128,7 @@ export function AdminNav() {
 
       {/* Desktop tabs */}
       <nav className="hidden flex-wrap gap-2 md:flex">
-        {ITEMS.map((it) => (
+        {visibleItems.map((it) => (
           <NavLink key={it.href} item={it} pathname={pathname} stats={stats} />
         ))}
       </nav>

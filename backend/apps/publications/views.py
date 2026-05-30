@@ -5,7 +5,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from apps.profiles.models import ModelProfile
-from core.permissions import IsModel
+from core.permissions import IsModel, IsModerator
 from .models import PaymentReceipt, Publication, SubscriptionPlan
 from .serializers import (
     PaymentReceiptSerializer,
@@ -181,9 +181,9 @@ class AdminPaymentActionView(generics.GenericAPIView):
 
 
 class AdminStatsView(generics.GenericAPIView):
-    """KPIs agregados para el dashboard del admin."""
+    """KPIs agregados (admin y moderador)."""
 
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsModerator]
 
     def get(self, request):
         now = timezone.now()

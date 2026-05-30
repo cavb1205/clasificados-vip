@@ -8,10 +8,13 @@ class CustomUser(AbstractUser):
     class Role(models.TextChoices):
         MODEL = "model", "Modelo"
         CLIENT = "client", "Cliente"
+        # Moderador: puede revisar reseñas, reportes y ver listados, pero NO
+        # acciones sensibles (KYC, pagos, planes, suspender, auditoría).
+        MODERATOR = "moderator", "Moderador"
         ADMIN = "admin", "Administrador"
 
     email = models.EmailField("correo electrónico", unique=True)
-    role = models.CharField(max_length=10, choices=Role.choices, default=Role.CLIENT)
+    role = models.CharField(max_length=12, choices=Role.choices, default=Role.CLIENT)
     email_verified = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"

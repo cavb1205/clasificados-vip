@@ -3,7 +3,7 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.permissions import IsClient
+from core.permissions import IsClient, IsModerator
 from .models import Review
 from .serializers import PublicReviewSerializer, ReviewSerializer
 
@@ -66,7 +66,7 @@ class AdminReviewSerializer(drf_serializers.ModelSerializer):
 
 class AdminReviewQueueView(generics.ListAPIView):
     serializer_class = AdminReviewSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsModerator]
 
     def get_queryset(self):
         qs = Review.objects.select_related("profile", "client")
@@ -77,7 +77,7 @@ class AdminReviewQueueView(generics.ListAPIView):
 
 
 class AdminReviewActionView(generics.GenericAPIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsModerator]
     queryset = Review.objects.all()
 
     def post(self, request, pk):

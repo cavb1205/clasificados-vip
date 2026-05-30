@@ -352,8 +352,11 @@ class AdminModelProfileSerializer(drf_serializers.ModelSerializer):
 
 
 class AdminModelProfileListView(generics.ListAPIView):
+    """Lectura del listado de modelos (admin y moderador)."""
+
+    from core.permissions import IsModerator as _IsModerator  # noqa: N806
     serializer_class = AdminModelProfileSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [_IsModerator]
 
     def get_queryset(self):
         qs = ModelProfile.objects.select_related("user", "city")

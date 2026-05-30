@@ -23,11 +23,16 @@ export default function AdminHomePage() {
   const [ready, setReady] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [err, setErr] = useState("");
+  const [isStaff, setIsStaff] = useState(false);
 
   useEffect(() => {
     auth
       .me()
-      .then(() => dashboard.adminStats() as unknown as Promise<Stats>)
+      .then((me) => {
+        const u = me as { is_staff?: boolean } | null;
+        setIsStaff(!!u?.is_staff);
+        return dashboard.adminStats() as unknown as Promise<Stats>;
+      })
       .then((s) => {
         setStats(s);
         setReady(true);
@@ -60,16 +65,20 @@ export default function AdminHomePage() {
           Pendientes
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <PendingCard
-            label="Verificaciones (KYC)"
-            count={stats.pending_kyc}
-            href="/admin/kyc"
-          />
-          <PendingCard
-            label="Pagos por revisar"
-            count={stats.pending_payments}
-            href="/admin/pagos"
-          />
+          {isStaff && (
+            <>
+              <PendingCard
+                label="Verificaciones (KYC)"
+                count={stats.pending_kyc}
+                href="/admin/kyc"
+              />
+              <PendingCard
+                label="Pagos por revisar"
+                count={stats.pending_payments}
+                href="/admin/pagos"
+              />
+            </>
+          )}
           <PendingCard
             label="Reseñas por moderar"
             count={stats.pending_reviews}
