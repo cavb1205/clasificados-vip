@@ -207,6 +207,17 @@ export const dashboard = {
     }),
   adminExpirePublication: (id: number) =>
     apiFetch(`/admin/publications/${id}/expire/`, { method: "POST" }),
+  adminPlans: () => apiFetch<unknown[]>("/admin/plans/"),
+  adminCreatePlan: (data: Record<string, unknown>) =>
+    apiFetch("/admin/plans/", { method: "POST", body: data }),
+  adminUpdatePlan: (id: number, data: Record<string, unknown>) =>
+    apiFetch(`/admin/plans/${id}/`, { method: "PATCH", body: data }),
+  adminDeletePlan: (id: number) =>
+    apiFetch(`/admin/plans/${id}/`, { method: "DELETE" }),
+  adminSiteConfig: () =>
+    apiFetch<{ trial_days: number }>("/admin/site-config/"),
+  adminUpdateSiteConfig: (data: { trial_days: number }) =>
+    apiFetch("/admin/site-config/", { method: "PUT", body: data }),
   // KYC
   issueKycChallenge: () =>
     apiFetch<{ code: string; statement: string; expires_at: string }>(

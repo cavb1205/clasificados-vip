@@ -25,6 +25,7 @@ const ITEMS: Item[] = [
   { href: "/admin/resenas", label: "Reseñas", badge: "pending_reviews" },
   { href: "/admin/reportes", label: "Reportes", badge: "open_reports" },
   { href: "/admin/modelos", label: "Modelos" },
+  { href: "/admin/config", label: "Configuración" },
   { href: "/admin/auditoria", label: "Auditoría KYC" },
 ];
 

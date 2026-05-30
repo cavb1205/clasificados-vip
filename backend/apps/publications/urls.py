@@ -27,4 +27,15 @@ urlpatterns = [
         views.AdminExpirePublicationView.as_view(),
         name="admin-publication-expire",
     ),
+    path("admin/plans/", views.AdminPlanListCreateView.as_view(), name="admin-plans"),
+    path(
+        "admin/plans/<int:pk>/",
+        views.AdminPlanDetailView.as_view(),
+        name="admin-plan-detail",
+    ),
+    path(
+        "admin/site-config/",
+        views.AdminSiteConfigView.as_view(),
+        name="admin-site-config",
+    ),
 ] + router.urls

@@ -230,3 +230,71 @@ class AdminExpirePublicationView(generics.GenericAPIView):
         pub.expires_at = timezone.now()
         pub.save(update_fields=["status", "expires_at"])
         return Response({"detail": "Publicación expirada."})
+
+
+# ─── Admin: planes y configuración del sitio ────────────────────────────────
+class AdminPlanSerializer(drf_serializers.ModelSerializer):
+    class Meta:
+        model = SubscriptionPlan
+        fields = [
+            "id", "name", "slug", "duration_days", "price",
+            "includes_featured", "is_active", "order",
+        ]
+        read_only_fields = ["slug"]
+
+
+class AdminPlanListCreateView(generics.ListCreateAPIView):
+    """GET lista todos los planes (incl. inactivos); POST crea uno nuevo."""
+
+    serializer_class = AdminPlanSerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = SubscriptionPlan.objects.all()
+
+
+class AdminPlanDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """PATCH para editar precio/duración/etc., DELETE para borrarlo.
+
+    El delete está protegido por la FK PROTECT desde Publication: si algún
+    anuncio usa el plan, Django levantará ProtectedError → DRF responde 409.
+    """
+
+    serializer_class = AdminPlanSerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = SubscriptionPlan.objects.all()
+
+    def destroy(self, request, *args, **kwargs):
+        from django.db.models import ProtectedError
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"detail": "El plan tiene publicaciones asociadas. Desactívalo en su lugar."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+
+class AdminSiteConfigSerializer(drf_serializers.ModelSerializer):
+    class Meta:
+        from apps.profiles.models import SiteConfig
+        model = SiteConfig
+        fields = ["trial_days"]
+
+
+class AdminSiteConfigView(generics.GenericAPIView):
+    """GET / PUT singleton SiteConfig."""
+
+    permission_classes = [permissions.IsAdminUser]
+    serializer_class = AdminSiteConfigSerializer
+
+    def get_object(self):
+        from apps.profiles.models import SiteConfig
+        return SiteConfig.get()
+
+    def get(self, request):
+        return Response(self.get_serializer(self.get_object()).data)
+
+    def put(self, request):
+        s = self.get_serializer(self.get_object(), data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response(s.data)
