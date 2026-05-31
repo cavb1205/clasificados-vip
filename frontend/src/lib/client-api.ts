@@ -108,6 +108,7 @@ export const auth = {
 export function panelHrefFor(me: { role?: string; is_staff?: boolean }) {
   if (me.is_staff) return "/admin/kyc";
   if (me.role === "model") return "/dashboard";
+  if (me.role === "host") return "/anfitrion";
   return "/";
 }
 
@@ -240,3 +241,106 @@ export const dashboard = {
   unreadNotifications: () => apiFetch<{ unread: number }>("/me/notifications/unread-count/"),
   markAllRead: () => apiFetch("/me/notifications/mark-all-read/", { method: "POST" }),
 };
+
+/**
+ * Clasificado de habitaciones. Tres audiencias:
+ *  - Anfitrión (rol host): gestiona su perfil, anuncios, fotos y pagos.
+ *  - Modelo activa: navega habitaciones disponibles (`browse`).
+ *  - Admin/moderador: cola de pagos y moderación de anuncios.
+ */
+export const rooms = {
+  // Anfitrión
+  hostProfile: () => apiFetch<HostProfile>("/me/host-profile/"),
+  createHostProfile: (data: Record<string, unknown>) =>
+    apiFetch<HostProfile>("/me/host-profile/", { method: "POST", body: data }),
+  updateHostProfile: (data: Record<string, unknown>) =>
+    apiFetch<HostProfile>("/me/host-profile/", { method: "PUT", body: data }),
+  roomPlans: () => apiFetch<RoomPlan[]>("/room-plans/"),
+  myRooms: () => apiFetch<RoomListing[]>("/me/rooms/"),
+  createRoom: (data: Record<string, unknown>) =>
+    apiFetch<RoomListing>("/me/rooms/", { method: "POST", body: data }),
+  updateRoom: (id: number, data: Record<string, unknown>) =>
+    apiFetch<RoomListing>(`/me/rooms/${id}/`, { method: "PATCH", body: data }),
+  deleteRoom: (id: number) => apiFetch(`/me/rooms/${id}/`, { method: "DELETE" }),
+  uploadRoomPhoto: (form: FormData) =>
+    apiFetch("/me/room-photos/", { method: "POST", body: form, isForm: true }),
+  deleteRoomPhoto: (id: number) =>
+    apiFetch(`/me/room-photos/${id}/`, { method: "DELETE" }),
+  uploadRoomReceipt: (roomId: number, form: FormData) =>
+    apiFetch(`/me/rooms/${roomId}/receipt/`, { method: "POST", body: form, isForm: true }),
+  pauseRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/pause/`, { method: "POST" }),
+  resumeRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/resume/`, { method: "POST" }),
+  // Modelo activa
+  browse: (params: Record<string, string> = {}) =>
+    apiFetch<PublicRoom[]>(`/rooms/?${new URLSearchParams(params).toString()}`),
+  // Admin / moderador
+  adminRoomPayments: (status: "pending" | "approved" | "rejected" = "pending") =>
+    apiFetch<unknown[]>(`/admin/room-payments/?status=${status}`),
+  adminRoomPaymentAction: (id: number, action: "approve" | "reject", note?: string) =>
+    apiFetch(`/admin/room-payments/${id}/action/`, { method: "POST", body: { action, note } }),
+  adminRooms: (q = "", statusFilter = "") =>
+    apiFetch<unknown[]>(
+      `/admin/rooms/?${new URLSearchParams({
+        q,
+        ...(statusFilter ? { status: statusFilter } : {}),
+      }).toString()}`,
+    ),
+  adminRoomAction: (id: number, action: "suspend" | "unsuspend", reason?: string) =>
+    apiFetch(`/admin/rooms/${id}/action/`, { method: "POST", body: { action, reason } }),
+};
+
+export interface HostProfile {
+  id: number;
+  display_name: string;
+  phone: string;
+  whatsapp: string;
+  created_at: string;
+}
+
+export interface RoomPlan {
+  id: number;
+  name: string;
+  slug: string;
+  duration_days: number;
+  price: number;
+}
+
+export interface RoomPhoto {
+  id: number;
+  image_url: string;
+  order: number;
+}
+
+export interface RoomListing {
+  id: number;
+  title: string;
+  description: string;
+  city: string | null;
+  region: string | null;
+  sector: string;
+  price: number;
+  price_period: "daily" | "weekly" | "monthly";
+  whatsapp: string;
+  phone: string;
+  plan: RoomPlan | null;
+  status: "draft" | "pending_payment" | "active" | "expired";
+  is_paused: boolean;
+  expires_at: string | null;
+  photos: RoomPhoto[];
+  created_at: string;
+}
+
+export interface PublicRoom {
+  id: number;
+  title: string;
+  description: string;
+  city: string | null;
+  region: string | null;
+  sector: string;
+  price: number;
+  price_period: "daily" | "weekly" | "monthly";
+  whatsapp: string;
+  phone: string;
+  photos: RoomPhoto[];
+  created_at: string;
+}

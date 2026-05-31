@@ -19,8 +19,19 @@ class SubscriptionPlan(models.Model):
     sin tocar código: 1 día, 7 días, 30 días, 90 días...
     """
 
+    class Kind(models.TextChoices):
+        MODEL_PUBLICATION = "model_publication", "Publicación de modelo"
+        ROOM_LISTING = "room_listing", "Anuncio de habitación"
+
     name = models.CharField("nombre", max_length=80, unique=True)
     slug = models.SlugField(max_length=100, unique=True, blank=True)
+    kind = models.CharField(
+        "tipo de plan",
+        max_length=20,
+        choices=Kind.choices,
+        default=Kind.MODEL_PUBLICATION,
+        help_text="Para qué clasificado aplica el plan (publicación de modelo o habitación).",
+    )
     duration_days = models.PositiveIntegerField(
         "duración (días)", help_text="Días que dura la publicación activa con este plan."
     )

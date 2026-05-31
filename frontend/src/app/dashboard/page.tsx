@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
 import type { Plan, Region, City, Service, ServiceCategory } from "@/lib/types";
@@ -128,6 +129,13 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Mi panel</h1>
         <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/habitaciones"
+            className="rounded-full border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 hover:border-pink-500 hover:text-pink-300"
+            title="Habitaciones disponibles para modelos"
+          >
+            🏠 <span className="hidden md:inline">Habitaciones</span>
+          </Link>
           <NotificationBell />
           <button
             onClick={() => auth.logout().then(() => router.push("/"))}

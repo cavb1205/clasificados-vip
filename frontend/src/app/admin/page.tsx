@@ -8,6 +8,7 @@ import { auth, dashboard } from "@/lib/client-api";
 interface Stats {
   pending_kyc: number;
   pending_payments: number;
+  pending_room_payments: number;
   pending_reviews: number;
   open_reports: number;
   verified_models: number;
@@ -76,6 +77,11 @@ export default function AdminHomePage() {
                 label="Pagos por revisar"
                 count={stats.pending_payments}
                 href="/admin/pagos"
+              />
+              <PendingCard
+                label="Pagos de habitaciones"
+                count={stats.pending_room_payments}
+                href="/admin/habitaciones"
               />
             </>
           )}

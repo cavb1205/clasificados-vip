@@ -20,7 +20,9 @@ class PlanListView(generics.ListAPIView):
 
     serializer_class = SubscriptionPlanSerializer
     permission_classes = [permissions.AllowAny]
-    queryset = SubscriptionPlan.objects.filter(is_active=True)
+    queryset = SubscriptionPlan.objects.filter(
+        is_active=True, kind=SubscriptionPlan.Kind.MODEL_PUBLICATION
+    )
 
 
 class MyPublicationViewSet(viewsets.ModelViewSet):
@@ -200,12 +202,17 @@ class AdminStatsView(generics.GenericAPIView):
             (r.amount or (r.publication.plan.price if r.publication.plan_id else 0))
             for r in revenue_qs.select_related("publication__plan")
         )
+        from apps.rooms.models import RoomReceipt  # import perezoso: evita ciclo
+
         return Response({
             "pending_kyc": VerificationRequest.objects.filter(
                 status=VerificationRequest.Status.PENDING
             ).count(),
             "pending_payments": PaymentReceipt.objects.filter(
                 status=PaymentReceipt.Status.PENDING
+            ).count(),
+            "pending_room_payments": RoomReceipt.objects.filter(
+                status=RoomReceipt.Status.PENDING
             ).count(),
             "pending_reviews": Review.objects.filter(status="pending").count(),
             "open_reports": StoryReport.objects.count(),
@@ -237,7 +244,7 @@ class AdminPlanSerializer(drf_serializers.ModelSerializer):
     class Meta:
         model = SubscriptionPlan
         fields = [
-            "id", "name", "slug", "duration_days", "price",
+            "id", "name", "slug", "kind", "duration_days", "price",
             "includes_featured", "is_active", "order",
         ]
         read_only_fields = ["slug"]

@@ -8,6 +8,9 @@ class CustomUser(AbstractUser):
     class Role(models.TextChoices):
         MODEL = "model", "Modelo"
         CLIENT = "client", "Cliente"
+        # Anfitrión: dueño de casa que publica habitaciones (apps.rooms). No
+        # requiere KYC de modelo; su registro es liviano.
+        HOST = "host", "Anfitrión"
         # Moderador: puede revisar reseñas, reportes y ver listados, pero NO
         # acciones sensibles (KYC, pagos, planes, suspender, auditoría).
         MODERATOR = "moderator", "Moderador"

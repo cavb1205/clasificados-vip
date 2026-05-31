@@ -1,0 +1,33 @@
+from django.urls import path
+from rest_framework.routers import DefaultRouter
+
+from . import views
+
+app_name = "rooms"
+
+router = DefaultRouter()
+router.register("me/rooms", views.MyRoomViewSet, basename="my-rooms")
+router.register("me/room-photos", views.MyRoomPhotoViewSet, basename="my-room-photos")
+
+urlpatterns = [
+    path("room-plans/", views.RoomPlanListView.as_view(), name="room-plans"),
+    path("me/host-profile/", views.MyHostProfileView.as_view(), name="my-host-profile"),
+    # Navegación para modelos activas.
+    path("rooms/", views.PublicRoomListView.as_view(), name="public-list"),
+    path("rooms/<int:pk>/", views.PublicRoomDetailView.as_view(), name="public-detail"),
+    # Servir fotos tras el gate.
+    path(
+        "room-photos/<int:pk>/file/",
+        views.RoomPhotoFileView.as_view(),
+        name="room-photo-file",
+    ),
+    # Admin / moderación.
+    path("admin/room-payments/", views.AdminRoomPaymentQueueView.as_view(), name="admin-room-payments"),
+    path(
+        "admin/room-payments/<int:pk>/action/",
+        views.AdminRoomPaymentActionView.as_view(),
+        name="admin-room-payment-action",
+    ),
+    path("admin/rooms/", views.AdminRoomListView.as_view(), name="admin-rooms"),
+    path("admin/rooms/<int:pk>/action/", views.AdminRoomActionView.as_view(), name="admin-room-action"),
+] + router.urls

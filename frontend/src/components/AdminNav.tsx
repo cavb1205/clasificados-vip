@@ -8,6 +8,7 @@ import { auth, dashboard } from "@/lib/client-api";
 interface Stats {
   pending_kyc?: number;
   pending_payments?: number;
+  pending_room_payments?: number;
   pending_reviews?: number;
   open_reports?: number;
 }
@@ -27,6 +28,7 @@ const ITEMS: Item[] = [
   { href: "/admin/resenas", label: "Reseñas", badge: "pending_reviews" },
   { href: "/admin/reportes", label: "Reportes", badge: "open_reports" },
   { href: "/admin/modelos", label: "Modelos" },
+  { href: "/admin/habitaciones", label: "Habitaciones", badge: "pending_room_payments" },
   { href: "/admin/config", label: "Configuración", adminOnly: true },
   { href: "/admin/auditoria", label: "Auditoría KYC", adminOnly: true },
 ];
@@ -69,6 +71,7 @@ export function AdminNav() {
   const totalPending =
     (stats.pending_kyc ?? 0) +
     (stats.pending_payments ?? 0) +
+    (stats.pending_room_payments ?? 0) +
     (stats.pending_reviews ?? 0) +
     (stats.open_reports ?? 0);
 

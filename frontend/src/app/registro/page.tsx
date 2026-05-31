@@ -21,7 +21,9 @@ export default function RegisterPage() {
     try {
       await auth.register(form);
       await auth.login(form.email, form.password);
-      router.push("/dashboard");
+      router.push(
+        form.role === "host" ? "/anfitrion" : form.role === "client" ? "/" : "/dashboard",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al registrarse");
     } finally {
@@ -61,6 +63,7 @@ export default function RegisterPage() {
         className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2"
       >
         <option value="model">Soy modelo (quiero publicar)</option>
+        <option value="host">Soy anfitrión (arriendo habitaciones)</option>
         <option value="client">Soy cliente</option>
       </select>
       {error && <p className="text-sm text-red-400">{error}</p>}

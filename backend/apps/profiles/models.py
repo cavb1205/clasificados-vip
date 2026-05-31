@@ -61,8 +61,45 @@ class Service(models.Model):
         return f"{self.name} ({self.category})"
 
 
+class ModelProfileQuerySet(models.QuerySet):
+    """QuerySet con la regla de visibilidad pública centralizada.
+
+    Antes esta lógica estaba duplicada en varias vistas. Ahora vive en un solo
+    lugar y la reutilizan tanto el portal público como el gate de habitaciones
+    (`apps.rooms`): una modelo "activa" es la que puede ver las habitaciones.
+    """
+
+    def publicly_visible(self):
+        """Perfiles verificados, no suspendidos y en trial o con publicación activa.
+
+        Puede devolver duplicados por el JOIN con publications; el llamador debe
+        aplicar `.distinct()` cuando recorra los resultados (no hace falta para
+        `.exists()`).
+        """
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.publications.models import Publication
+
+        now = timezone.now()
+        trial_cutoff = now - timedelta(days=SiteConfig.get().trial_days)
+        return self.filter(
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            is_suspended=False,
+        ).filter(
+            models.Q(verified_at__gte=trial_cutoff)
+            | models.Q(
+                publications__status=Publication.Status.ACTIVE,
+                publications__expires_at__gt=now,
+            )
+        )
+
+
 class ModelProfile(models.Model):
     """Perfil público de una modelo. Nace 'pending' e invisible hasta verificación."""
+
+    objects = ModelProfileQuerySet.as_manager()
 
     class VerificationStatus(models.TextChoices):
         PENDING = "pending", "Pendiente"

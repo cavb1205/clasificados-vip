@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from apps.publications.models import Publication
 from apps.reviews.models import Review
 from core.permissions import IsModel
-from .models import City, ModelProfile, ProfileEvent, Region, Service, SiteConfig
+from .models import City, ModelProfile, ProfileEvent, Region, Service
 from .serializers import (
     CitySerializer,
     ModelProfileSerializer,
@@ -50,23 +50,10 @@ def annotate_public_profiles(qs):
 def _visible_profile_subquery(city_field_outer, gender=None):
     """Subquery Exists() de perfiles visibles para anclar a city/region.
 
-    Usa la misma regla de visibilidad pública: verified + (en trial o con
-    publicación activa no expirada). Opcionalmente restringe por género.
+    Usa la regla de visibilidad pública centralizada en
+    `ModelProfile.objects.publicly_visible()`. Opcionalmente restringe por género.
     """
-    from apps.publications.models import Publication
-    now = timezone.now()
-    trial_cutoff = now - timedelta(days=SiteConfig.get().trial_days)
-    profiles = ModelProfile.objects.filter(
-        city_field_outer,
-        verification_status=ModelProfile.VerificationStatus.VERIFIED,
-        is_suspended=False,
-    ).filter(
-        Q(verified_at__gte=trial_cutoff)
-        | Q(
-            publications__status=Publication.Status.ACTIVE,
-            publications__expires_at__gt=now,
-        )
-    )
+    profiles = ModelProfile.objects.filter(city_field_outer).publicly_visible()
     if gender:
         profiles = profiles.filter(gender=gender)
     return Exists(profiles)
@@ -182,21 +169,9 @@ class PublicProfileListView(generics.ListAPIView):
 
     def get_queryset(self):
         params = self.request.query_params
-        now = timezone.now()
-        trial_cutoff = now - timedelta(days=SiteConfig.get().trial_days)
         # Visibilidad: verificada Y (en trial gratuito O con publicación activa).
         qs = annotate_public_profiles(
-            ModelProfile.objects.filter(
-                verification_status=ModelProfile.VerificationStatus.VERIFIED,
-                is_suspended=False,
-            )
-            .filter(
-                Q(verified_at__gte=trial_cutoff)
-                | Q(
-                    publications__status=Publication.Status.ACTIVE,
-                    publications__expires_at__gt=now,
-                )
-            )
+            ModelProfile.objects.publicly_visible()
             .distinct()
             .select_related("city", "city__region")
             .prefetch_related("services", "media")
@@ -250,20 +225,8 @@ class PublicProfileDetailView(generics.RetrieveAPIView):
     lookup_field = "slug"
 
     def get_queryset(self):
-        now = timezone.now()
-        trial_cutoff = now - timedelta(days=SiteConfig.get().trial_days)
         return annotate_public_profiles(
-            ModelProfile.objects.filter(
-                verification_status=ModelProfile.VerificationStatus.VERIFIED,
-                is_suspended=False,
-            )
-            .filter(
-                Q(verified_at__gte=trial_cutoff)
-                | Q(
-                    publications__status=Publication.Status.ACTIVE,
-                    publications__expires_at__gt=now,
-                )
-            )
+            ModelProfile.objects.publicly_visible()
             .distinct()
             .select_related("city", "city__region")
             .prefetch_related("services", "media")
