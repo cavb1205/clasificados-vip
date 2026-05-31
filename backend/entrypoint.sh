@@ -27,9 +27,10 @@ python manage.py collectstatic --noinput
 
 # Seed idempotente (no daña si ya estaba cargado).
 if [[ "${SEED_ON_START:-0}" == "1" ]]; then
-  echo "→ seed_chile + seed_plans"
+  echo "→ seed_chile + seed_plans + seed_room_plans"
   python manage.py seed_chile || true
   python manage.py seed_plans || true
+  python manage.py seed_room_plans || true
 fi
 
 echo "→ arrancando: $@"
