@@ -9,10 +9,12 @@ from django.utils.text import slugify
 
 from apps.publications.models import SubscriptionPlan
 
-# (nombre, días, precio CLP, orden)
+# (nombre, días, precio CLP, habitaciones, destacado, orden)
 PLANS = [
-    ("Habitación semanal", 7, 6000, 1),
-    ("Habitación mensual", 30, 18000, 2),
+    ("1 habitación · semanal", 7, 6000, 1, False, 1),
+    ("1 habitación · mensual", 30, 18000, 1, False, 2),
+    ("Bundle 5 habitaciones · mensual", 30, 70000, 5, False, 3),
+    ("Bundle 10 habitaciones · mensual", 30, 120000, 10, True, 4),
 ]
 
 
@@ -21,7 +23,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         created = 0
-        for name, days, price, order in PLANS:
+        for name, days, price, slots, featured, order in PLANS:
             _, is_new = SubscriptionPlan.objects.get_or_create(
                 slug=slugify(name),
                 defaults={
@@ -29,6 +31,8 @@ class Command(BaseCommand):
                     "kind": SubscriptionPlan.Kind.ROOM_LISTING,
                     "duration_days": days,
                     "price": price,
+                    "max_listings": slots,
+                    "includes_featured": featured,
                     "order": order,
                 },
             )

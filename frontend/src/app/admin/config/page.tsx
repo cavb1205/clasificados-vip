@@ -9,12 +9,19 @@ interface Plan {
   id: number;
   name: string;
   slug: string;
+  kind: "model_publication" | "room_listing";
   duration_days: number;
+  max_listings: number;
   price: number;
   includes_featured: boolean;
   is_active: boolean;
   order: number;
 }
+
+const KIND_LABEL: Record<string, string> = {
+  model_publication: "Modelo",
+  room_listing: "Habitación",
+};
 
 const CLP = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
 
@@ -22,6 +29,7 @@ export default function AdminConfigPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   const [trialDays, setTrialDays] = useState(1);
+  const [maxRooms, setMaxRooms] = useState(10);
   const [savingTrial, setSavingTrial] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [creating, setCreating] = useState(false);
@@ -35,6 +43,7 @@ export default function AdminConfigPage() {
       dashboard.adminPlans() as Promise<Plan[]>,
     ]);
     setTrialDays(cfg.trial_days);
+    setMaxRooms(cfg.max_active_rooms_per_host);
     setPlans(ps);
   }, []);
 
@@ -51,7 +60,10 @@ export default function AdminConfigPage() {
     setSavingTrial(true);
     setMsg("");
     try {
-      await dashboard.adminUpdateSiteConfig({ trial_days: trialDays });
+      await dashboard.adminUpdateSiteConfig({
+        trial_days: trialDays,
+        max_active_rooms_per_host: maxRooms,
+      });
       setMsg("Configuración guardada.");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error");
@@ -66,7 +78,9 @@ export default function AdminConfigPage() {
     try {
       await dashboard.adminCreatePlan({
         name: form.get("name"),
+        kind: form.get("kind") || "model_publication",
         duration_days: Number(form.get("duration_days")),
+        max_listings: Number(form.get("max_listings") || 1),
         price: Number(form.get("price")),
         includes_featured: form.get("includes_featured") === "on",
         is_active: true,
@@ -149,6 +163,22 @@ export default function AdminConfigPage() {
               Días que un perfil recién verificado es visible sin pagar.
             </span>
           </label>
+          <label className="flex-1 text-sm">
+            <span className="block text-xs uppercase tracking-wide text-neutral-500">
+              Tope habitaciones activas / anfitrión
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={maxRooms}
+              onChange={(e) => setMaxRooms(Number(e.target.value))}
+              className="mt-1 w-full max-w-xs rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-base"
+            />
+            <span className="mt-1 block text-xs text-neutral-500">
+              Límite global de anuncios de habitación activos por anfitrión (anti-spam).
+            </span>
+          </label>
           <button
             disabled={savingTrial}
             className="rounded-full bg-pink-600 px-5 py-2 text-sm font-medium hover:bg-pink-500 disabled:opacity-50"
@@ -179,8 +209,12 @@ export default function AdminConfigPage() {
                     <span className="text-xs text-neutral-500">/{p.slug}</span>
                   </p>
                   <p className="mt-1 text-xs text-neutral-400">
+                    <span className="mr-1 rounded-full bg-neutral-800 px-2 py-0.5 text-neutral-300">
+                      {KIND_LABEL[p.kind] ?? p.kind}
+                    </span>
                     {p.duration_days} día{p.duration_days === 1 ? "" : "s"} ·{" "}
                     {CLP.format(p.price)}{" "}
+                    {p.kind === "room_listing" && `· ${p.max_listings} hab `}
                     {p.includes_featured && (
                       <span className="ml-1 rounded-full bg-amber-600/20 px-2 py-0.5 text-amber-200">
                         destacado
@@ -239,7 +273,7 @@ export default function AdminConfigPage() {
         {/* Crear plan */}
         <form
           action={createPlan}
-          className="mt-4 grid gap-3 rounded-xl border border-dashed border-neutral-800 bg-neutral-950 p-4 sm:grid-cols-[1fr_auto_auto_auto_auto]"
+          className="mt-4 grid gap-3 rounded-xl border border-dashed border-neutral-800 bg-neutral-950 p-4 sm:grid-cols-[1fr_auto_auto_auto_auto_auto]"
         >
           <input
             name="name"
@@ -247,12 +281,28 @@ export default function AdminConfigPage() {
             placeholder="Nombre (ej. Premium Mensual)"
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm sm:col-span-1"
           />
+          <select
+            name="kind"
+            defaultValue="model_publication"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+          >
+            <option value="model_publication">Modelo</option>
+            <option value="room_listing">Habitación</option>
+          </select>
           <input
             name="duration_days"
             type="number"
             min={1}
             required
             placeholder="Días"
+            className="w-24 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+          />
+          <input
+            name="max_listings"
+            type="number"
+            min={1}
+            defaultValue={1}
+            title="Habitaciones que cubre (solo planes de habitación)"
             className="w-24 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
           />
           <input

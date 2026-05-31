@@ -244,7 +244,7 @@ class AdminPlanSerializer(drf_serializers.ModelSerializer):
     class Meta:
         model = SubscriptionPlan
         fields = [
-            "id", "name", "slug", "kind", "duration_days", "price",
+            "id", "name", "slug", "kind", "duration_days", "max_listings", "price",
             "includes_featured", "is_active", "order",
         ]
         read_only_fields = ["slug"]
@@ -284,7 +284,7 @@ class AdminSiteConfigSerializer(drf_serializers.ModelSerializer):
     class Meta:
         from apps.profiles.models import SiteConfig
         model = SiteConfig
-        fields = ["trial_days"]
+        fields = ["trial_days", "max_active_rooms_per_host"]
 
 
 class AdminSiteConfigView(generics.GenericAPIView):

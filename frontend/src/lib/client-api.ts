@@ -216,8 +216,8 @@ export const dashboard = {
   adminDeletePlan: (id: number) =>
     apiFetch(`/admin/plans/${id}/`, { method: "DELETE" }),
   adminSiteConfig: () =>
-    apiFetch<{ trial_days: number }>("/admin/site-config/"),
-  adminUpdateSiteConfig: (data: { trial_days: number }) =>
+    apiFetch<{ trial_days: number; max_active_rooms_per_host: number }>("/admin/site-config/"),
+  adminUpdateSiteConfig: (data: { trial_days?: number; max_active_rooms_per_host?: number }) =>
     apiFetch("/admin/site-config/", { method: "PUT", body: data }),
   // KYC
   issueKycChallenge: () =>
@@ -256,6 +256,9 @@ export const rooms = {
   updateHostProfile: (data: Record<string, unknown>) =>
     apiFetch<HostProfile>("/me/host-profile/", { method: "PUT", body: data }),
   roomPlans: () => apiFetch<RoomPlan[]>("/room-plans/"),
+  // Contratar/renovar el plan del anfitrión (multipart: plan_id + image).
+  buyPlan: (form: FormData) =>
+    apiFetch("/me/room-subscription/", { method: "POST", body: form, isForm: true }),
   myRooms: () => apiFetch<RoomListing[]>("/me/rooms/"),
   createRoom: (data: Record<string, unknown>) =>
     apiFetch<RoomListing>("/me/rooms/", { method: "POST", body: data }),
@@ -266,8 +269,8 @@ export const rooms = {
     apiFetch("/me/room-photos/", { method: "POST", body: form, isForm: true }),
   deleteRoomPhoto: (id: number) =>
     apiFetch(`/me/room-photos/${id}/`, { method: "DELETE" }),
-  uploadRoomReceipt: (roomId: number, form: FormData) =>
-    apiFetch(`/me/rooms/${roomId}/receipt/`, { method: "POST", body: form, isForm: true }),
+  publishRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/publish/`, { method: "POST" }),
+  unpublishRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/unpublish/`, { method: "POST" }),
   pauseRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/pause/`, { method: "POST" }),
   resumeRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/resume/`, { method: "POST" }),
   // Modelo activa
@@ -295,6 +298,13 @@ export interface HostProfile {
   phone: string;
   whatsapp: string;
   created_at: string;
+  plan_name: string | null;
+  plan_slots: number;
+  plan_featured: boolean;
+  plan_expires_at: string | null;
+  subscription_active: boolean;
+  used_slots: number;
+  available_slots: number;
 }
 
 export interface RoomPlan {
@@ -303,6 +313,8 @@ export interface RoomPlan {
   slug: string;
   duration_days: number;
   price: number;
+  max_listings: number;
+  includes_featured: boolean;
 }
 
 export interface RoomPhoto {
@@ -322,8 +334,8 @@ export interface RoomListing {
   price_period: "daily" | "weekly" | "monthly";
   whatsapp: string;
   phone: string;
-  plan: RoomPlan | null;
-  status: "draft" | "pending_payment" | "active" | "expired";
+  status: "draft" | "active" | "expired";
+  is_featured: boolean;
   is_paused: boolean;
   expires_at: string | null;
   photos: RoomPhoto[];
@@ -341,6 +353,7 @@ export interface PublicRoom {
   price_period: "daily" | "weekly" | "monthly";
   whatsapp: string;
   phone: string;
+  is_featured: boolean;
   photos: RoomPhoto[];
   created_at: string;
 }

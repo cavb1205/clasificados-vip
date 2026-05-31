@@ -35,6 +35,14 @@ class SubscriptionPlan(models.Model):
     duration_days = models.PositiveIntegerField(
         "duración (días)", help_text="Días que dura la publicación activa con este plan."
     )
+    max_listings = models.PositiveIntegerField(
+        "habitaciones incluidas",
+        default=1,
+        help_text=(
+            "Solo planes de habitación: cuántos anuncios activos cubre el plan. "
+            "1 = un anuncio; >1 = bundle (varias piezas con un solo pago)."
+        ),
+    )
     price = models.PositiveIntegerField("precio (CLP)")
     includes_featured = models.BooleanField(
         "incluye destacado", default=False, help_text="Si el plan publica el anuncio como destacado."

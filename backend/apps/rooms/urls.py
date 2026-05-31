@@ -12,6 +12,11 @@ router.register("me/room-photos", views.MyRoomPhotoViewSet, basename="my-room-ph
 urlpatterns = [
     path("room-plans/", views.RoomPlanListView.as_view(), name="room-plans"),
     path("me/host-profile/", views.MyHostProfileView.as_view(), name="my-host-profile"),
+    path(
+        "me/room-subscription/",
+        views.MyRoomSubscriptionView.as_view(),
+        name="my-room-subscription",
+    ),
     # Navegación para modelos activas.
     path("rooms/", views.PublicRoomListView.as_view(), name="public-list"),
     path("rooms/<int:pk>/", views.PublicRoomDetailView.as_view(), name="public-detail"),

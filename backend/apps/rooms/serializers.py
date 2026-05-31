@@ -12,14 +12,32 @@ class RoomPlanSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SubscriptionPlan
-        fields = ["id", "name", "slug", "duration_days", "price"]
+        fields = ["id", "name", "slug", "duration_days", "price", "max_listings", "includes_featured"]
 
 
 class HostProfileSerializer(serializers.ModelSerializer):
+    plan_name = serializers.CharField(source="active_plan.name", read_only=True, default=None)
+    subscription_active = serializers.BooleanField(read_only=True)
+    used_slots = serializers.SerializerMethodField()
+    available_slots = serializers.SerializerMethodField()
+
     class Meta:
         model = HostProfile
-        fields = ["id", "display_name", "phone", "whatsapp", "created_at"]
-        read_only_fields = ["created_at"]
+        fields = [
+            "id", "display_name", "phone", "whatsapp", "created_at",
+            "plan_name", "plan_slots", "plan_featured", "plan_expires_at",
+            "subscription_active", "used_slots", "available_slots",
+        ]
+        read_only_fields = [
+            "created_at", "plan_name", "plan_slots", "plan_featured",
+            "plan_expires_at", "subscription_active", "used_slots", "available_slots",
+        ]
+
+    def get_used_slots(self, obj):
+        return obj.used_slots()
+
+    def get_available_slots(self, obj):
+        return obj.available_slots()
 
 
 class RoomPhotoSerializer(serializers.ModelSerializer):
@@ -40,18 +58,8 @@ class RoomPhotoSerializer(serializers.ModelSerializer):
 
 
 class RoomListingSerializer(serializers.ModelSerializer):
-    """Gestión por el anfitrión. Estado y expiración los controla el backend."""
+    """Gestión por el anfitrión. El estado y la vigencia los controla el backend."""
 
-    plan = RoomPlanSerializer(read_only=True)
-    plan_id = serializers.PrimaryKeyRelatedField(
-        queryset=SubscriptionPlan.objects.filter(
-            is_active=True, kind=SubscriptionPlan.Kind.ROOM_LISTING
-        ),
-        source="plan",
-        write_only=True,
-        required=False,
-        allow_null=True,
-    )
     city_id = serializers.PrimaryKeyRelatedField(
         queryset=City.objects.all(), source="city", write_only=True
     )
@@ -64,16 +72,28 @@ class RoomListingSerializer(serializers.ModelSerializer):
         fields = [
             "id", "title", "description", "city", "region", "city_id", "sector",
             "price", "price_period", "whatsapp", "phone",
-            "plan", "plan_id", "status", "is_paused", "expires_at",
+            "status", "is_featured", "is_paused", "expires_at",
             "photos", "created_at", "updated_at",
         ]
-        read_only_fields = ["status", "is_paused", "expires_at", "created_at", "updated_at"]
+        read_only_fields = [
+            "status", "is_featured", "is_paused", "expires_at", "created_at", "updated_at",
+        ]
 
 
 class RoomReceiptSerializer(serializers.ModelSerializer):
+    """El anfitrión sube un comprobante para contratar/renovar un plan."""
+
+    plan_id = serializers.PrimaryKeyRelatedField(
+        queryset=SubscriptionPlan.objects.filter(
+            is_active=True, kind=SubscriptionPlan.Kind.ROOM_LISTING
+        ),
+        source="plan",
+        write_only=True,
+    )
+
     class Meta:
         model = RoomReceipt
-        fields = ["id", "image", "amount", "status", "created_at"]
+        fields = ["id", "plan_id", "image", "amount", "status", "created_at"]
         read_only_fields = ["status", "created_at"]
 
 
@@ -88,5 +108,6 @@ class PublicRoomListingSerializer(serializers.ModelSerializer):
         model = RoomListing
         fields = [
             "id", "title", "description", "city", "region", "sector",
-            "price", "price_period", "whatsapp", "phone", "photos", "created_at",
+            "price", "price_period", "whatsapp", "phone",
+            "is_featured", "photos", "created_at",
         ]

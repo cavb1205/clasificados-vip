@@ -200,7 +200,10 @@ function RoomCard({ room }: { room: PublicRoom }) {
       )}
       <div className="space-y-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-semibold">{room.title}</p>
+          <p className="font-semibold">
+            {room.is_featured && <span className="mr-1 text-amber-300">⭐</span>}
+            {room.title}
+          </p>
           <p className="whitespace-nowrap text-sm font-medium text-pink-300">
             {CLP.format(room.price)}{" "}
             <span className="text-xs text-neutral-400">{PERIOD_LABEL[room.price_period]}</span>

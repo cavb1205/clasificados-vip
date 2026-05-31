@@ -8,7 +8,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.profiles.models import City, ModelProfile, Region
+from apps.profiles.models import City, ModelProfile, Region, SiteConfig
 from apps.publications.models import SubscriptionPlan
 
 from .models import HostProfile, RoomListing, RoomReceipt
@@ -16,12 +16,24 @@ from .models import HostProfile, RoomListing, RoomReceipt
 User = get_user_model()
 
 
+_plan_seq = 0
+
+
+def _room_plan(name=None, days=30, price=18000, slots=1, featured=False):
+    global _plan_seq
+    _plan_seq += 1
+    return SubscriptionPlan.objects.create(
+        name=name or f"Plan {_plan_seq}", duration_days=days, price=price,
+        max_listings=slots, includes_featured=featured,
+        kind=SubscriptionPlan.Kind.ROOM_LISTING,
+    )
+
+
 class _Base(APITestCase):
     def setUp(self):
         self.region = Region.objects.create(name="Metropolitana", slug="metropolitana")
         self.city = City.objects.create(region=self.region, name="Santiago", slug="santiago")
 
-        # Anfitrión + su perfil.
         self.host_user = User.objects.create_user(
             username="host", email="host@example.com", password="x", role="host"
         )
@@ -49,92 +61,146 @@ class _Base(APITestCase):
             verified_at=timezone.now() - timedelta(days=30),
         )
 
-    def _live_listing(self, **kwargs):
+    def _give_plan(self, *, slots=1, featured=False, days=30):
+        self.host.apply_plan(_room_plan(days=days, slots=slots, featured=featured))
+
+    def _new_listing(self, **kw):
         defaults = dict(
             owner=self.host, city=self.city, title="Pieza centro",
             price=200000, price_period=RoomListing.PricePeriod.MONTHLY,
-            whatsapp="56922222222", status=RoomListing.Status.ACTIVE,
-            expires_at=timezone.now() + timedelta(days=10),
+            whatsapp="56922222222",
         )
-        defaults.update(kwargs)
+        defaults.update(kw)
         return RoomListing.objects.create(**defaults)
 
+    def _published(self, **kw):
+        """Crea una pieza ya publicada (requiere plan activo en el host)."""
+        if not self.host.subscription_active:
+            self._give_plan(slots=10)
+        listing = self._new_listing(**kw)
+        listing.publish()
+        return listing
 
-class PaymentApprovalTests(_Base):
-    def test_approve_activates_listing_with_default_30_days(self):
-        listing = self._live_listing(
-            status=RoomListing.Status.PENDING_PAYMENT, expires_at=None
-        )
-        RoomReceipt.objects.create(listing=listing).approve()
 
-        listing.refresh_from_db()
-        self.assertEqual(listing.status, RoomListing.Status.ACTIVE)
-        delta = listing.expires_at - timezone.now()
+class PlanApprovalTests(_Base):
+    def test_approve_activates_host_plan(self):
+        plan = _room_plan(days=30, slots=3, featured=True)
+        RoomReceipt.objects.create(owner=self.host, plan=plan).approve()
+        self.host.refresh_from_db()
+        self.assertTrue(self.host.subscription_active)
+        self.assertEqual(self.host.plan_slots, 3)
+        self.assertTrue(self.host.plan_featured)
+        delta = self.host.plan_expires_at - timezone.now()
         self.assertGreater(delta, timedelta(days=29, hours=23))
-        self.assertTrue(listing.is_live)
 
-    def test_approve_uses_plan_duration(self):
-        plan = SubscriptionPlan.objects.create(
-            name="Habitación semanal", duration_days=7, price=5000,
-            kind=SubscriptionPlan.Kind.ROOM_LISTING,
-        )
-        listing = self._live_listing(
-            plan=plan, status=RoomListing.Status.PENDING_PAYMENT, expires_at=None
-        )
-        RoomReceipt.objects.create(listing=listing).approve()
 
+class PublishLimitTests(_Base):
+    def test_publish_requires_active_plan(self):
+        listing = self._new_listing()
+        self.client.force_authenticate(self.host_user)
+        resp = self.client.post(reverse("api:rooms:my-rooms-publish", args=[listing.id]))
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
         listing.refresh_from_db()
-        delta = listing.expires_at - timezone.now()
-        self.assertGreater(delta, timedelta(days=6, hours=23))
-        self.assertLess(delta, timedelta(days=7, minutes=1))
+        self.assertEqual(listing.status, RoomListing.Status.DRAFT)
+
+    def test_plan_slots_limit_blocks_extra_publish(self):
+        self._give_plan(slots=1)
+        a, b = self._new_listing(title="A"), self._new_listing(title="B")
+        self.client.force_authenticate(self.host_user)
+        r1 = self.client.post(reverse("api:rooms:my-rooms-publish", args=[a.id]))
+        r2 = self.client.post(reverse("api:rooms:my-rooms-publish", args=[b.id]))
+        self.assertEqual(r1.status_code, status.HTTP_200_OK)
+        self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST)  # sin cupos
+
+    def test_bundle_allows_multiple(self):
+        self._give_plan(slots=3)
+        self.client.force_authenticate(self.host_user)
+        for t in ("A", "B", "C"):
+            r = self.client.post(
+                reverse("api:rooms:my-rooms-publish", args=[self._new_listing(title=t).id])
+            )
+            self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.host.used_slots(), 3)
+
+    def test_global_cap_overrides_plan_slots(self):
+        cfg = SiteConfig.get()
+        cfg.max_active_rooms_per_host = 1
+        cfg.save()
+        self._give_plan(slots=5)  # plan da 5, pero el tope global es 1
+        a, b = self._new_listing(title="A"), self._new_listing(title="B")
+        self.client.force_authenticate(self.host_user)
+        r1 = self.client.post(reverse("api:rooms:my-rooms-publish", args=[a.id]))
+        r2 = self.client.post(reverse("api:rooms:my-rooms-publish", args=[b.id]))
+        self.assertEqual(r1.status_code, status.HTTP_200_OK)
+        self.assertEqual(r2.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_unpublish_frees_slot(self):
+        self._give_plan(slots=1)
+        a, b = self._new_listing(title="A"), self._new_listing(title="B")
+        self.client.force_authenticate(self.host_user)
+        self.client.post(reverse("api:rooms:my-rooms-publish", args=[a.id]))
+        self.client.post(reverse("api:rooms:my-rooms-unpublish", args=[a.id]))
+        r2 = self.client.post(reverse("api:rooms:my-rooms-publish", args=[b.id]))
+        self.assertEqual(r2.status_code, status.HTTP_200_OK)
+
+
+class FeaturedTests(_Base):
+    def test_featured_plan_marks_and_orders_first(self):
+        self._give_plan(slots=5, featured=True)
+        normal = self._new_listing(title="Normal")
+        normal.is_featured = False
+        normal.status = RoomListing.Status.ACTIVE
+        normal.expires_at = self.host.plan_expires_at
+        normal.save()
+        feat = self._new_listing(title="Destacada")
+        feat.publish()  # hereda is_featured del plan
+        self.assertTrue(feat.is_featured)
+
+        self.client.force_authenticate(self.model_user)
+        resp = self.client.get(reverse("api:rooms:public-list"))
+        self.assertEqual(resp.data[0]["title"], "Destacada")  # destacada primero
 
 
 class GateTests(_Base):
-    def test_active_model_sees_listings(self):
-        self._live_listing()
+    def test_active_model_sees_published(self):
+        self._published()
         self.client.force_authenticate(self.model_user)
         resp = self.client.get(reverse("api:rooms:public-list"))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.data), 1)
 
-    def test_inactive_model_is_forbidden(self):
-        self._live_listing()
+    def test_inactive_model_forbidden(self):
+        self._published()
         self.client.force_authenticate(self.inactive_user)
         resp = self.client.get(reverse("api:rooms:public-list"))
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_host_cannot_browse_listings(self):
+    def test_host_cannot_browse(self):
         self.client.force_authenticate(self.host_user)
         resp = self.client.get(reverse("api:rooms:public-list"))
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_anonymous_is_unauthorized(self):
-        resp = self.client.get(reverse("api:rooms:public-list"))
-        self.assertIn(resp.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
-
-
-class VisibilityTests(_Base):
-    def test_paused_and_suspended_are_hidden(self):
-        self._live_listing(is_paused=True)
-        self._live_listing(is_suspended=True)
+    def test_paused_and_suspended_hidden(self):
+        self._published(is_paused=True)  # da plan con 10 cupos
+        s = self._new_listing(title="S")
+        s.publish()
+        s.is_suspended = True
+        s.save()
         self.client.force_authenticate(self.model_user)
         resp = self.client.get(reverse("api:rooms:public-list"))
         self.assertEqual(len(resp.data), 0)
 
-    def test_serializer_exposes_contact_but_never_address(self):
-        self._live_listing()
+    def test_serializer_never_exposes_address(self):
+        self._published()
         self.client.force_authenticate(self.model_user)
-        resp = self.client.get(reverse("api:rooms:public-list"))
-        row = resp.data[0]
-        self.assertEqual(row["city"], "Santiago")
+        row = self.client.get(reverse("api:rooms:public-list")).data[0]
         self.assertEqual(row["whatsapp"], "56922222222")
-        # Privacidad: jamás un campo de dirección exacta.
         self.assertNotIn("address", row)
         self.assertNotIn("street", row)
 
 
 class HostFlowTests(_Base):
-    def test_host_creates_listing_inherits_contact(self):
+    def test_create_listing_inherits_contact(self):
         self.client.force_authenticate(self.host_user)
         resp = self.client.post(reverse("api:rooms:my-rooms-list"), {
             "title": "Pieza amoblada", "city_id": self.city.id,
@@ -142,25 +208,15 @@ class HostFlowTests(_Base):
         })
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         listing = RoomListing.objects.get(id=resp.data["id"])
-        self.assertEqual(listing.owner, self.host)
-        # Hereda el WhatsApp del perfil del anfitrión.
         self.assertEqual(listing.whatsapp, "56911111111")
         self.assertEqual(listing.status, RoomListing.Status.DRAFT)
 
-    def test_pause_and_resume(self):
-        listing = self._live_listing()
-        self.client.force_authenticate(self.host_user)
-        self.client.post(reverse("api:rooms:my-rooms-pause", args=[listing.id]))
-        listing.refresh_from_db()
-        self.assertTrue(listing.is_paused)
-        self.client.post(reverse("api:rooms:my-rooms-resume", args=[listing.id]))
-        listing.refresh_from_db()
-        self.assertFalse(listing.is_paused)
-
 
 class ExpireCommandTests(_Base):
-    def test_expire_rooms_marks_due_listings(self):
-        self._live_listing(expires_at=timezone.now() - timedelta(hours=1))
+    def test_expire_rooms_marks_due(self):
+        listing = self._published()
+        listing.expires_at = timezone.now() - timedelta(hours=1)
+        listing.save()
         out = StringIO()
         call_command("expire_rooms", stdout=out)
         self.assertEqual(

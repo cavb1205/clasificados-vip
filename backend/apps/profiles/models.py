@@ -220,6 +220,15 @@ class SiteConfig(models.Model):
             "una publicación active."
         ),
     )
+    max_active_rooms_per_host = models.PositiveIntegerField(
+        "tope de habitaciones activas por anfitrión",
+        default=10,
+        help_text=(
+            "Límite global de anuncios de habitación activos simultáneos por "
+            "anfitrión (anti-spam). El plan del anfitrión puede cubrir menos, "
+            "pero nunca más que este tope."
+        ),
+    )
 
     class Meta:
         verbose_name = "Configuración del sitio"

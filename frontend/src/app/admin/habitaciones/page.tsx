@@ -14,12 +14,11 @@ const CLP = new Intl.NumberFormat("es-CL", {
 
 interface RoomPayment {
   id: number;
-  listing_id: number;
-  listing_title: string;
+  host_name: string;
+  host_email: string;
   plan_name: string;
   plan_price: number | null;
-  host_name: string;
-  city_name: string | null;
+  plan_slots: number | null;
   amount: number | null;
   status: "pending" | "approved" | "rejected";
   note: string;
@@ -37,6 +36,7 @@ interface AdminRoom {
   price: number;
   price_period: string;
   status: string;
+  is_featured: boolean;
   is_paused: boolean;
   is_suspended: boolean;
   suspension_reason: string;
@@ -153,11 +153,12 @@ export default function AdminHabitacionesPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold">
-                          {p.listing_title}{" "}
-                          <span className="text-sm text-neutral-400">· {p.host_name}</span>
+                          {p.host_name}{" "}
+                          <span className="text-sm text-neutral-400">· {p.host_email}</span>
                         </p>
                         <p className="mt-1 text-xs text-neutral-500">
-                          {p.city_name ?? "—"} · Plan: {p.plan_name || "—"}
+                          Plan: {p.plan_name || "—"}
+                          {p.plan_slots !== null && ` · ${p.plan_slots} hab`}
                           {p.plan_price !== null && ` · esperado ${CLP.format(p.plan_price)}`}
                           {p.amount !== null && ` · declarado ${CLP.format(p.amount)}`}
                           {mismatch && (
@@ -233,7 +234,8 @@ export default function AdminHabitacionesPage() {
                   <p className="text-xs text-neutral-500">
                     {r.host_name} · {r.city_name ?? "—"} · {CLP.format(r.price)} ·{" "}
                     {r.status}
-                    {r.is_paused && " · pausada"} · {r.photo_count} foto(s)
+                    {r.is_paused && " · pausada"}
+                    {r.is_featured && " · ⭐"} · {r.photo_count} foto(s)
                   </p>
                   {r.suspension_reason && (
                     <p className="mt-1 text-xs text-red-300">Motivo: {r.suspension_reason}</p>

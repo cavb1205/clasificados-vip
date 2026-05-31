@@ -1,7 +1,7 @@
 from django.http import Http404, HttpResponse
 from rest_framework import generics, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -21,7 +21,7 @@ from .serializers import (
 )
 
 
-# ─── Anfitrión: perfil, anuncios, fotos, pago ───────────────────────────────
+# ─── Anfitrión: perfil, plan, anuncios, fotos ───────────────────────────────
 class RoomPlanListView(generics.ListAPIView):
     """Planes de habitación disponibles (configurados por el admin)."""
 
@@ -33,7 +33,7 @@ class RoomPlanListView(generics.ListAPIView):
 
 
 class MyHostProfileView(APIView):
-    """El anfitrión consulta/crea/edita su perfil ligero."""
+    """El anfitrión consulta/crea/edita su perfil y ve el estado de su plan."""
 
     permission_classes = [permissions.IsAuthenticated, IsHost]
 
@@ -64,26 +64,43 @@ class MyHostProfileView(APIView):
         return Response(serializer.data)
 
 
+def _require_host(user):
+    host = HostProfile.objects.filter(user=user).first()
+    if host is None:
+        raise PermissionDenied("Primero completa tu perfil de anfitrión.")
+    return host
+
+
+class MyRoomSubscriptionView(APIView):
+    """El anfitrión contrata/renueva su plan subiendo un comprobante.
+
+    POST multipart: {plan_id, image, amount?} → crea un RoomReceipt pendiente.
+    Al aprobarlo el admin, el plan queda activo y habilita los cupos.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsHost]
+
+    def post(self, request):
+        host = _require_host(request.user)
+        serializer = RoomReceiptSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(owner=host)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
 class MyRoomViewSet(viewsets.ModelViewSet):
-    """El anfitrión gestiona sus habitaciones y sube comprobantes de pago."""
+    """El anfitrión gestiona sus habitaciones (borrador → publicar contra su plan)."""
 
     serializer_class = RoomListingSerializer
     permission_classes = [permissions.IsAuthenticated, IsHost]
 
-    def _get_host(self):
-        host = HostProfile.objects.filter(user=self.request.user).first()
-        if host is None:
-            raise PermissionDenied("Primero completa tu perfil de anfitrión.")
-        return host
-
     def get_queryset(self):
-        return RoomListing.objects.filter(owner__user=self.request.user).prefetch_related(
-            "photos"
-        )
+        return RoomListing.objects.filter(
+            owner__user=self.request.user
+        ).prefetch_related("photos")
 
     def perform_create(self, serializer):
-        host = self._get_host()
-        # Prellenar contacto desde el perfil del anfitrión si no vino en el body.
+        host = _require_host(self.request.user)
         extra = {}
         if not serializer.validated_data.get("whatsapp"):
             extra["whatsapp"] = host.whatsapp
@@ -91,20 +108,35 @@ class MyRoomViewSet(viewsets.ModelViewSet):
             extra["phone"] = host.phone
         serializer.save(owner=host, **extra)
 
-    @action(detail=True, methods=["post"], serializer_class=RoomReceiptSerializer)
-    def receipt(self, request, pk=None):
-        """Sube el comprobante → el anuncio pasa a pending_payment."""
+    @action(detail=True, methods=["post"])
+    def publish(self, request, pk=None):
+        """Publica una pieza contra la suscripción del anfitrión (consume un cupo)."""
         listing = self.get_object()
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(listing=listing)
-        listing.status = RoomListing.Status.PENDING_PAYMENT
-        listing.save(update_fields=["status", "updated_at"])
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        host = listing.owner
+        if listing.status == RoomListing.Status.ACTIVE:
+            return Response({"detail": "La habitación ya está publicada."}, status=400)
+        if not host.subscription_active:
+            raise ValidationError(
+                "Necesitas un plan activo para publicar. Contrata o renueva tu plan."
+            )
+        if host.available_slots() <= 0:
+            raise ValidationError(
+                f"Alcanzaste el tope de tu plan ({host.slots_cap()} habitación(es) "
+                f"activas). Despublica otra o contrata un plan mayor."
+            )
+        listing.publish()
+        return Response(RoomListingSerializer(listing, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"])
+    def unpublish(self, request, pk=None):
+        """Vuelve la pieza a borrador y libera el cupo."""
+        listing = self.get_object()
+        listing.unpublish()
+        return Response(RoomListingSerializer(listing, context={"request": request}).data)
 
     @action(detail=True, methods=["post"])
     def pause(self, request, pk=None):
-        """Pausa un anuncio activo (pieza ocupada) sin perder la vigencia."""
+        """Pausa una pieza publicada (ocupada) sin liberar el cupo."""
         listing = self.get_object()
         listing.is_paused = True
         listing.save(update_fields=["is_paused", "updated_at"])
@@ -112,7 +144,7 @@ class MyRoomViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def resume(self, request, pk=None):
-        """Reactiva un anuncio pausado mientras siga vigente."""
+        """Reactiva una pieza pausada."""
         listing = self.get_object()
         listing.is_paused = False
         listing.save(update_fields=["is_paused", "updated_at"])
@@ -224,6 +256,7 @@ class PublicRoomListView(generics.ListAPIView):
             qs = qs.filter(city__slug=city)
         if period in RoomListing.PricePeriod.values:
             qs = qs.filter(price_period=period)
+        # Destacadas primero (el modelo ya ordena por -is_featured, -created_at).
         return qs
 
 
@@ -247,22 +280,18 @@ from rest_framework import serializers as drf_serializers  # noqa: E402
 
 
 class AdminRoomReceiptSerializer(drf_serializers.ModelSerializer):
-    listing_title = drf_serializers.CharField(source="listing.title", read_only=True)
-    listing_id = drf_serializers.IntegerField(source="listing.id", read_only=True)
-    plan_name = drf_serializers.CharField(source="listing.plan.name", read_only=True, default="")
-    plan_price = drf_serializers.IntegerField(
-        source="listing.plan.price", read_only=True, default=None
-    )
-    host_name = drf_serializers.CharField(source="listing.owner.display_name", read_only=True)
-    city_name = drf_serializers.CharField(source="listing.city.name", read_only=True, default=None)
+    host_name = drf_serializers.CharField(source="owner.display_name", read_only=True)
+    host_email = drf_serializers.CharField(source="owner.user.email", read_only=True)
+    plan_name = drf_serializers.CharField(source="plan.name", read_only=True, default="")
+    plan_price = drf_serializers.IntegerField(source="plan.price", read_only=True, default=None)
+    plan_slots = drf_serializers.IntegerField(source="plan.max_listings", read_only=True, default=None)
     image_url = drf_serializers.SerializerMethodField()
 
     class Meta:
         model = RoomReceipt
         fields = [
-            "id", "listing_id", "listing_title", "plan_name", "plan_price",
-            "host_name", "city_name", "amount", "status", "note",
-            "image_url", "created_at", "reviewed_at",
+            "id", "host_name", "host_email", "plan_name", "plan_price", "plan_slots",
+            "amount", "status", "note", "image_url", "created_at", "reviewed_at",
         ]
 
     def get_image_url(self, obj):
@@ -278,9 +307,7 @@ class AdminRoomPaymentQueueView(generics.ListAPIView):
     permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
-        qs = RoomReceipt.objects.select_related(
-            "listing", "listing__plan", "listing__owner", "listing__city"
-        )
+        qs = RoomReceipt.objects.select_related("owner", "owner__user", "plan")
         s = self.request.query_params.get("status", "pending")
         if s in {"pending", "approved", "rejected"}:
             qs = qs.filter(status=s)
@@ -316,8 +343,8 @@ class AdminRoomSerializer(drf_serializers.ModelSerializer):
         model = RoomListing
         fields = [
             "id", "title", "host_name", "host_email", "city_name", "sector",
-            "price", "price_period", "status", "is_paused", "is_suspended",
-            "suspension_reason", "expires_at", "photo_count", "created_at",
+            "price", "price_period", "status", "is_featured", "is_paused",
+            "is_suspended", "suspension_reason", "expires_at", "photo_count", "created_at",
         ]
 
 
