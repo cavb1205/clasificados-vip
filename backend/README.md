@@ -95,5 +95,19 @@ En dev el backend de email es `console` (los mensajes salen por el stdout del
 - Nace `pending`; el admin la aprueba/rechaza. Solo las aprobadas se muestran y cuentan en
   el rating agregado.
 
+## Backups (`backup.sh`)
+Respaldo diario (cron 03:00) en el VPS: dump lógico de la DB vip (`pg_dump` 17 vía contenedor
+en la red `easypanel`) + tar de los volúmenes `private_media` (KYC cifrado) y `media`.
+Rotación: últimos 14 de cada tipo en `/opt/vip/backups`. La copia operativa vive en
+`/opt/vip/backup.sh`; este archivo es la versión versionada.
+
+**Off-site pendiente:** hoy los backups quedan en el mismo droplet (protege contra borrados/
+migraciones malas, NO contra pérdida del droplet). El script ya trae el hook `rclone` (remote
+`spaces:`): falta instalar/configurar rclone con claves de DigitalOcean Spaces — o activar los
+backups semanales del droplet en DO.
+
+Restore rápido: `gunzip -c db-XXXX.sql.gz | psql -h <host> -U <user> -d <db>` y
+`tar xzf media-XXXX.tar.gz -C /destino`.
+
 ## Pendiente
-- Frontend Next.js (App Router, SSR).
+- Off-site de backups (Spaces) · dominio real + media a bucket · SMTP real (ver roadmap).
