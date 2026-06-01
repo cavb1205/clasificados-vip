@@ -1,9 +1,31 @@
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
 User = get_user_model()
+
+
+class LoginThrottleTests(APITestCase):
+    """El login se limita a 10/min por IP (anti fuerza bruta)."""
+
+    def setUp(self):
+        # Aísla el contador de throttle: limpia antes y después para no
+        # contaminar (ni ser contaminado por) otros tests del proceso.
+        cache.clear()
+        self.addCleanup(cache.clear)
+        User.objects.create_user(
+            username="brute", email="brute@example.com", password="Sup3rSecret!", role="client"
+        )
+
+    def test_login_blocked_after_10_attempts(self):
+        url = reverse("api:users:login")
+        for _ in range(10):
+            r = self.client.post(url, {"email": "brute@example.com", "password": "mala"}, format="json")
+            self.assertEqual(r.status_code, status.HTTP_401_UNAUTHORIZED)
+        r = self.client.post(url, {"email": "brute@example.com", "password": "mala"}, format="json")
+        self.assertEqual(r.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
 
 class AuthCookieTests(APITestCase):

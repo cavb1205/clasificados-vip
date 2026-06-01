@@ -182,6 +182,10 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "60/min",
         "user": "240/min",
+        # Scopes estrictos por IP para endpoints sensibles (anti fuerza bruta/abuso).
+        "login": "10/min",
+        "register": "15/hour",
+        "password_reset": "5/min",
     },
 }
 

@@ -12,6 +12,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -49,6 +50,8 @@ class CSRFView(APIView):
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "register"
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -59,6 +62,9 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    # Throttle estricto por IP contra fuerza bruta de credenciales.
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
 
     def post(self, request):
         user = authenticate(
@@ -122,6 +128,8 @@ class ForgotPasswordView(APIView):
     """
 
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_reset"
 
     def post(self, request):
         email = (request.data.get("email") or "").strip().lower()
@@ -153,6 +161,8 @@ class ResetPasswordView(APIView):
     """Recibe uid+token+password y resetea la contraseña."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_reset"
 
     def post(self, request):
         uid = request.data.get("uid", "")
