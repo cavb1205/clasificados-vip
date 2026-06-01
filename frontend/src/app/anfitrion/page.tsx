@@ -319,7 +319,7 @@ function NewRoomForm({ host, onCreated }: { host: HostProfile; onCreated: () => 
         value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
       <textarea placeholder="Descripción (servicios, condiciones…)" className={inputCls} rows={3}
         value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <select required className={inputCls} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value, city_id: "" })}>
           <option value="">Región…</option>
           {regions.map((r) => <option key={r.id} value={r.slug}>{r.name}</option>)}
@@ -331,7 +331,7 @@ function NewRoomForm({ host, onCreated }: { host: HostProfile; onCreated: () => 
       </div>
       <input placeholder="Sector (referencia general, sin dirección exacta)" className={inputCls}
         value={form.sector} onChange={(e) => setForm({ ...form, sector: e.target.value })} />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <input required type="number" placeholder="Precio (CLP)" className={inputCls}
           value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
         <select className={inputCls} value={form.price_period} onChange={(e) => setForm({ ...form, price_period: e.target.value })}>
@@ -340,7 +340,7 @@ function NewRoomForm({ host, onCreated }: { host: HostProfile; onCreated: () => 
           <option value="monthly">Mensual</option>
         </select>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <input placeholder="WhatsApp de contacto" className={inputCls}
           value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
         <input placeholder="Teléfono (opcional)" className={inputCls}
