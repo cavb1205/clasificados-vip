@@ -3,13 +3,14 @@ from rest_framework import generics, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.publications.models import SubscriptionPlan
 from core.image_processing import process_image
 from core.permissions import IsModerator
 
-from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt
+from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt, RoomReport
 from .permissions import IsActiveModel, IsHost, is_active_model
 from .serializers import (
     HostProfileSerializer,
@@ -150,6 +151,26 @@ class MyRoomViewSet(viewsets.ModelViewSet):
         listing.save(update_fields=["is_paused", "updated_at"])
         return Response(RoomListingSerializer(listing, context={"request": request}).data)
 
+    @action(detail=True, methods=["post"])
+    def availability(self, request, pk=None):
+        """Activa/cancela 'Disponible ahora'. Body: {"minutes": 60} o {"cancel": true}."""
+        from datetime import timedelta
+        from django.utils import timezone
+
+        listing = self.get_object()
+        if request.data.get("cancel"):
+            listing.available_until = None
+        else:
+            try:
+                minutes = int(request.data.get("minutes", 0))
+            except (TypeError, ValueError):
+                minutes = 0
+            if not (15 <= minutes <= 12 * 60):
+                return Response({"detail": "Duración inválida (15 min – 12 h)."}, status=400)
+            listing.available_until = timezone.now() + timedelta(minutes=minutes)
+        listing.save(update_fields=["available_until", "updated_at"])
+        return Response(RoomListingSerializer(listing, context={"request": request}).data)
+
 
 class MyRoomPhotoViewSet(
     mixins.CreateModelMixin,
@@ -256,8 +277,35 @@ class PublicRoomListView(generics.ListAPIView):
             qs = qs.filter(city__slug=city)
         if period in RoomListing.PricePeriod.values:
             qs = qs.filter(price_period=period)
-        # Destacadas primero (el modelo ya ordena por -is_featured, -created_at).
-        return qs
+        if params.get("available_now") == "true":
+            qs = qs.filter(available_until__gt=timezone.now())
+        # Orden: disponibles ahora primero, luego destacadas, luego recientes.
+        # (anotación booleana para que el orden de NULLs sea consistente entre DBs)
+        from django.db.models import BooleanField, Case, Value, When
+
+        return qs.annotate(
+            _avail=Case(
+                When(available_until__gt=timezone.now(), then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
+        ).order_by("-_avail", "-is_featured", "-created_at")
+
+
+class RoomReportView(APIView):
+    """Una modelo activa reporta una habitación por contenido inapropiado."""
+
+    permission_classes = [IsActiveModel]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "report"
+
+    def post(self, request, pk):
+        listing = RoomListing.objects.filter(pk=pk).first()
+        if not listing:
+            raise Http404
+        reason = (request.data.get("reason") or "")[:200].strip()
+        RoomReport.objects.create(listing=listing, reporter=request.user, reason=reason)
+        return Response({"detail": "Gracias por el reporte."}, status=status.HTTP_201_CREATED)
 
 
 class PublicRoomDetailView(generics.RetrieveAPIView):
@@ -397,3 +445,44 @@ class AdminRoomActionView(generics.GenericAPIView):
         else:
             return Response({"detail": "action debe ser suspend|unsuspend"}, status=400)
         return Response(AdminRoomSerializer(listing).data)
+
+
+class AdminRoomReportSerializer(drf_serializers.ModelSerializer):
+    listing_id = drf_serializers.IntegerField(source="listing.id", read_only=True)
+    listing_title = drf_serializers.CharField(source="listing.title", read_only=True)
+    is_suspended = drf_serializers.BooleanField(source="listing.is_suspended", read_only=True)
+    reporter_email = drf_serializers.CharField(source="reporter.email", read_only=True, default=None)
+
+    class Meta:
+        model = RoomReport
+        fields = ["id", "listing_id", "listing_title", "is_suspended",
+                  "reporter_email", "reason", "created_at"]
+
+
+class AdminRoomReportQueueView(generics.ListAPIView):
+    serializer_class = AdminRoomReportSerializer
+    permission_classes = [IsModerator]
+
+    def get_queryset(self):
+        return RoomReport.objects.select_related("listing", "reporter").order_by("-created_at")
+
+
+class AdminRoomReportActionView(generics.GenericAPIView):
+    """POST {action: 'suspend' | 'dismiss'}. 'suspend' oculta la habitación."""
+
+    permission_classes = [permissions.IsAdminUser]
+    queryset = RoomReport.objects.all()
+
+    def post(self, request, pk):
+        report = self.get_object()
+        action_kind = (request.data.get("action") or "").lower()
+        if action_kind == "suspend":
+            listing = report.listing
+            listing.is_suspended = True
+            listing.suspension_reason = (request.data.get("reason") or "Reportada")[:200]
+            listing.save(update_fields=["is_suspended", "suspension_reason", "updated_at"])
+            return Response({"detail": "Habitación suspendida."})
+        if action_kind == "dismiss":
+            report.delete()
+            return Response({"detail": "Reporte descartado."})
+        return Response({"detail": "action debe ser suspend|dismiss"}, status=400)

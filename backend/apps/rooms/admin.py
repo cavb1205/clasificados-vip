@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt
+from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt, RoomReport
 
 
 class RoomPhotoInline(admin.TabularInline):
@@ -28,3 +28,8 @@ class RoomListingAdmin(admin.ModelAdmin):
 class RoomReceiptAdmin(admin.ModelAdmin):
     list_display = ("__str__", "owner", "plan", "amount", "status", "created_at", "reviewed_at")
     list_filter = ("status",)
+
+
+@admin.register(RoomReport)
+class RoomReportAdmin(admin.ModelAdmin):
+    list_display = ("listing", "reporter", "reason", "created_at")

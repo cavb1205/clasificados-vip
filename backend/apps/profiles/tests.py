@@ -335,3 +335,45 @@ class CardEnrichmentTests(APITestCase):
         ana_row = next(r for r in resp.data["results"] if r["stage_name"] == "Ana")
         self.assertEqual(ana_row["rating_count"], 1)
         self.assertEqual(ana_row["rating_average"], 4.0)
+
+
+class FavoriteAndReportTests(APITestCase):
+    def setUp(self):
+        model_user = User.objects.create_user(
+            username="luna", email="luna@example.com", password="x", role="model"
+        )
+        self.profile = ModelProfile.objects.create(
+            user=model_user, stage_name="Luna", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
+        )
+        self.client_user = User.objects.create_user(
+            username="cli", email="cli@example.com", password="x", role="client",
+        )
+
+    def test_favorite_toggle_and_list(self):
+        self.client.force_authenticate(self.client_user)
+        url = reverse("api:profiles:favorite-toggle", args=[self.profile.slug])
+        r1 = self.client.post(url)
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(r1.data["favorited"])
+        # aparece en mis favoritos
+        lst = self.client.get(reverse("api:profiles:my-favorites"))
+        self.assertEqual(len(lst.data), 1)
+        # toggle de nuevo lo quita
+        r2 = self.client.post(url)
+        self.assertFalse(r2.data["favorited"])
+        self.assertEqual(len(self.client.get(reverse("api:profiles:my-favorites")).data), 0)
+
+    def test_favorite_requires_auth(self):
+        r = self.client.post(reverse("api:profiles:favorite-toggle", args=[self.profile.slug]))
+        self.assertIn(r.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_report_profile_creates_report(self):
+        from .models import ProfileReport
+        r = self.client.post(
+            reverse("api:profiles:report", args=[self.profile.slug]),
+            {"reason": "contenido falso"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(ProfileReport.objects.filter(profile=self.profile).count(), 1)

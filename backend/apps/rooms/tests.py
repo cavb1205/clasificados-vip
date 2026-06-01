@@ -222,3 +222,42 @@ class ExpireCommandTests(_Base):
         self.assertEqual(
             RoomListing.objects.filter(status=RoomListing.Status.EXPIRED).count(), 1
         )
+
+
+class AvailabilityAndReportTests(_Base):
+    def test_host_sets_available_now_and_filter(self):
+        listing = self._published()
+        self.client.force_authenticate(self.host_user)
+        r = self.client.post(
+            reverse("api:rooms:my-rooms-availability", args=[listing.id]),
+            {"minutes": 60}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertTrue(r.data["is_available_now"])
+        # La modelo activa la ve con el filtro available_now=true
+        self.client.force_authenticate(self.model_user)
+        resp = self.client.get(reverse("api:rooms:public-list") + "?available_now=true")
+        self.assertEqual(len(resp.data), 1)
+
+    def test_available_now_filter_excludes_others(self):
+        self._published()  # sin disponibilidad
+        self.client.force_authenticate(self.model_user)
+        resp = self.client.get(reverse("api:rooms:public-list") + "?available_now=true")
+        self.assertEqual(len(resp.data), 0)
+
+    def test_active_model_reports_room(self):
+        from .models import RoomReport
+        listing = self._published()
+        self.client.force_authenticate(self.model_user)
+        r = self.client.post(
+            reverse("api:rooms:report", args=[listing.id]),
+            {"reason": "spam"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(RoomReport.objects.filter(listing=listing).count(), 1)
+
+    def test_inactive_model_cannot_report(self):
+        listing = self._published()
+        self.client.force_authenticate(self.inactive_user)
+        r = self.client.post(reverse("api:rooms:report", args=[listing.id]), {}, format="json")
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)

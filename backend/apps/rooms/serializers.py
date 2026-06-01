@@ -73,10 +73,12 @@ class RoomListingSerializer(serializers.ModelSerializer):
             "id", "title", "description", "city", "region", "city_id", "sector",
             "price", "price_period", "whatsapp", "phone",
             "status", "is_featured", "is_paused", "expires_at",
+            "available_until", "is_available_now",
             "photos", "created_at", "updated_at",
         ]
         read_only_fields = [
-            "status", "is_featured", "is_paused", "expires_at", "created_at", "updated_at",
+            "status", "is_featured", "is_paused", "expires_at",
+            "available_until", "is_available_now", "created_at", "updated_at",
         ]
 
 
@@ -109,5 +111,5 @@ class PublicRoomListingSerializer(serializers.ModelSerializer):
         fields = [
             "id", "title", "description", "city", "region", "sector",
             "price", "price_period", "whatsapp", "phone",
-            "is_featured", "photos", "created_at",
+            "is_featured", "is_available_now", "photos", "created_at",
         ]

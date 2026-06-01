@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from apps.publications.models import Publication
 from apps.reviews.models import Review
 from core.permissions import IsModel
-from .models import City, ModelProfile, ProfileEvent, Region, Service
+from .models import City, Favorite, ModelProfile, ProfileEvent, ProfileReport, Region, Service
 from .serializers import (
     CitySerializer,
     ModelProfileSerializer,
@@ -362,3 +362,104 @@ class AdminModelProfileActionView(generics.GenericAPIView):
         else:
             return Response({"detail": "action debe ser suspend|unsuspend"}, status=400)
         return Response(AdminModelProfileSerializer(profile).data)
+
+
+# ─── Favoritos (clientes) ────────────────────────────────────────────────────
+from rest_framework.throttling import ScopedRateThrottle  # noqa: E402
+
+
+def _get_profile_or_404(slug):
+    profile = ModelProfile.objects.filter(slug=slug).first()
+    if not profile:
+        from django.http import Http404
+        raise Http404
+    return profile
+
+
+class FavoriteToggleView(APIView):
+    """POST: agrega/quita el perfil de favoritos del usuario. Devuelve {favorited}."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, slug):
+        profile = _get_profile_or_404(slug)
+        fav = Favorite.objects.filter(user=request.user, profile=profile).first()
+        if fav:
+            fav.delete()
+            return Response({"favorited": False})
+        Favorite.objects.create(user=request.user, profile=profile)
+        return Response({"favorited": True}, status=status.HTTP_201_CREATED)
+
+
+class MyFavoritesListView(generics.ListAPIView):
+    """Perfiles que el usuario guardó como favoritos."""
+
+    serializer_class = PublicProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        return annotate_public_profiles(
+            ModelProfile.objects.filter(favorited_by__user=self.request.user)
+            .select_related("city", "city__region")
+            .prefetch_related("services", "media")
+            .order_by("-favorited_by__created_at")
+        )
+
+
+# ─── Reportes de perfiles ────────────────────────────────────────────────────
+class ProfileReportView(APIView):
+    """Cualquiera puede reportar un perfil por contenido inapropiado."""
+
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "report"
+
+    def post(self, request, slug):
+        profile = _get_profile_or_404(slug)
+        reason = (request.data.get("reason") or "")[:200].strip()
+        reporter = request.user if request.user.is_authenticated else None
+        ProfileReport.objects.create(profile=profile, reporter=reporter, reason=reason)
+        return Response({"detail": "Gracias por el reporte."}, status=status.HTTP_201_CREATED)
+
+
+class AdminProfileReportSerializer(drf_serializers.ModelSerializer):
+    profile_slug = drf_serializers.CharField(source="profile.slug", read_only=True)
+    stage_name = drf_serializers.CharField(source="profile.stage_name", read_only=True)
+    is_suspended = drf_serializers.BooleanField(source="profile.is_suspended", read_only=True)
+    reporter_email = drf_serializers.CharField(source="reporter.email", read_only=True, default=None)
+
+    class Meta:
+        model = ProfileReport
+        fields = ["id", "profile_slug", "stage_name", "is_suspended",
+                  "reporter_email", "reason", "created_at"]
+
+
+class AdminProfileReportQueueView(generics.ListAPIView):
+    from core.permissions import IsModerator as _IsModerator  # noqa: N806
+    serializer_class = AdminProfileReportSerializer
+    permission_classes = [_IsModerator]
+
+    def get_queryset(self):
+        return ProfileReport.objects.select_related("profile", "reporter").order_by("-created_at")
+
+
+class AdminProfileReportActionView(generics.GenericAPIView):
+    """POST {action: 'suspend' | 'dismiss'}."""
+
+    permission_classes = [permissions.IsAdminUser]
+    queryset = ProfileReport.objects.all()
+
+    def post(self, request, pk):
+        report = self.get_object()
+        action = (request.data.get("action") or "").lower()
+        if action == "suspend":
+            p = report.profile
+            p.is_suspended = True
+            p.suspension_reason = (request.data.get("reason") or "Reportada")[:200]
+            p.save(update_fields=["is_suspended", "suspension_reason"])
+            return Response({"detail": "Perfil suspendido."})
+        if action == "dismiss":
+            report.delete()
+            return Response({"detail": "Reporte descartado."})
+        return Response({"detail": "action debe ser suspend|dismiss"}, status=400)

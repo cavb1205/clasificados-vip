@@ -145,6 +145,10 @@ class RoomListing(models.Model):
     is_suspended = models.BooleanField("suspendido", default=False)
     suspension_reason = models.CharField(max_length=200, blank=True)
 
+    # "Disponible ahora": fecha futura → badge verde + filtro ?available_now=true.
+    # Lo activa el anfitrión para destacar la pieza por unas horas. Auto-expira.
+    available_until = models.DateTimeField(null=True, blank=True)
+
     expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -154,6 +158,10 @@ class RoomListing(models.Model):
 
     def __str__(self) -> str:
         return f"{self.title} ({self.status})"
+
+    @property
+    def is_available_now(self) -> bool:
+        return bool(self.available_until and self.available_until > timezone.now())
 
     @property
     def is_live(self) -> bool:
@@ -276,3 +284,20 @@ class RoomReceipt(models.Model):
             self.owner.user, kind=Notification.Kind.PAYMENT,
             title=title, message=message, link="/anfitrion",
         )
+
+
+class RoomReport(models.Model):
+    """Reporte de una habitación por contenido inapropiado. Cola de revisión admin."""
+
+    listing = models.ForeignKey(
+        RoomListing, on_delete=models.CASCADE, related_name="reports"
+    )
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="room_reports",
+    )
+    reason = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]

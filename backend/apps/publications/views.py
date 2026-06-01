@@ -202,7 +202,8 @@ class AdminStatsView(generics.GenericAPIView):
             (r.amount or (r.publication.plan.price if r.publication.plan_id else 0))
             for r in revenue_qs.select_related("publication__plan")
         )
-        from apps.rooms.models import RoomReceipt  # import perezoso: evita ciclo
+        from apps.rooms.models import RoomReceipt, RoomReport  # import perezoso: evita ciclo
+        from apps.profiles.models import ProfileReport
 
         return Response({
             "pending_kyc": VerificationRequest.objects.filter(
@@ -215,7 +216,11 @@ class AdminStatsView(generics.GenericAPIView):
                 status=RoomReceipt.Status.PENDING
             ).count(),
             "pending_reviews": Review.objects.filter(status="pending").count(),
-            "open_reports": StoryReport.objects.count(),
+            "open_reports": (
+                StoryReport.objects.count()
+                + ProfileReport.objects.count()
+                + RoomReport.objects.count()
+            ),
             "verified_models": ModelProfile.objects.filter(
                 verification_status=ModelProfile.VerificationStatus.VERIFIED
             ).count(),

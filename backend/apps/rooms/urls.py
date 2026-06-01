@@ -20,6 +20,7 @@ urlpatterns = [
     # Navegación para modelos activas.
     path("rooms/", views.PublicRoomListView.as_view(), name="public-list"),
     path("rooms/<int:pk>/", views.PublicRoomDetailView.as_view(), name="public-detail"),
+    path("rooms/<int:pk>/report/", views.RoomReportView.as_view(), name="report"),
     # Servir fotos tras el gate.
     path(
         "room-photos/<int:pk>/file/",
@@ -35,4 +36,10 @@ urlpatterns = [
     ),
     path("admin/rooms/", views.AdminRoomListView.as_view(), name="admin-rooms"),
     path("admin/rooms/<int:pk>/action/", views.AdminRoomActionView.as_view(), name="admin-room-action"),
+    path("admin/room-reports/", views.AdminRoomReportQueueView.as_view(), name="admin-room-reports"),
+    path(
+        "admin/room-reports/<int:pk>/action/",
+        views.AdminRoomReportActionView.as_view(),
+        name="admin-room-report-action",
+    ),
 ] + router.urls

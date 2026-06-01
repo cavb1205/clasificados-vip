@@ -245,3 +245,44 @@ class SiteConfig(models.Model):
 
     def __str__(self) -> str:
         return "Configuración del sitio"
+
+
+class Favorite(models.Model):
+    """Perfil guardado por un usuario (cliente). Un favorito por (user, profile)."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="favorites"
+    )
+    profile = models.ForeignKey(
+        ModelProfile, on_delete=models.CASCADE, related_name="favorited_by"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "profile"], name="uniq_favorite"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user} ♥ {self.profile.stage_name}"
+
+
+class ProfileReport(models.Model):
+    """Reporte de un perfil por contenido inapropiado. Cola de revisión admin."""
+
+    profile = models.ForeignKey(
+        ModelProfile, on_delete=models.CASCADE, related_name="reports"
+    )
+    reporter = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="profile_reports",
+    )
+    reason = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"Reporte de {self.profile.stage_name}"
