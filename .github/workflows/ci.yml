@@ -1,0 +1,51 @@
+name: CI
+
+# Corre los tests del backend y el build del frontend en cada push a main y en
+# cada Pull Request, para que `main` nunca reciba código que no compila o rompe
+# tests. No despliega (el deploy a producción sigue siendo manual por ahora).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend · Django tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Run tests
+        run: python manage.py test --verbosity 1
+        env:
+          # Sin POSTGRES_DB los tests corren sobre SQLite. Claves de prueba
+          # (NO son las de producción): solo para que settings arranque.
+          DJANGO_SECRET_KEY: ci-insecure-test-key
+          KYC_ENCRYPTION_KEY: HAjBiEa8QCdkP7eiTzVTxScO7XNf_Asc7ZaHhSzMNRc=
+
+  frontend:
+    name: Frontend · Next build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Build (type-check + compile)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
