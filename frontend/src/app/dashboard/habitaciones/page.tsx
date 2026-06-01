@@ -235,11 +235,11 @@ function RoomDetailModal({ room, onClose }: { room: PublicRoom; onClose: () => v
           ) : (
             <div className="flex h-56 w-full items-center justify-center rounded-t-2xl bg-neutral-800 text-neutral-600">Sin foto</div>
           )}
-          <button onClick={onClose} className="absolute right-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-sm text-white hover:bg-black">✕</button>
+          <button aria-label="Cerrar" onClick={onClose} className="absolute right-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-sm text-white hover:bg-black">✕</button>
           {photos.length > 1 && (
             <>
-              <button onClick={() => setIdx((i) => (i - 1 + photos.length) % photos.length)} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 px-3 py-1.5 text-white hover:bg-black">‹</button>
-              <button onClick={() => setIdx((i) => (i + 1) % photos.length)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 px-3 py-1.5 text-white hover:bg-black">›</button>
+              <button aria-label="Foto anterior" onClick={() => setIdx((i) => (i - 1 + photos.length) % photos.length)} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 px-3 py-1.5 text-white hover:bg-black">‹</button>
+              <button aria-label="Foto siguiente" onClick={() => setIdx((i) => (i + 1) % photos.length)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 px-3 py-1.5 text-white hover:bg-black">›</button>
               <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 text-xs text-white">{idx + 1}/{photos.length}</span>
             </>
           )}

@@ -279,7 +279,7 @@ export default function AdminHabitacionesPage() {
                         <Image
                           key={ph.id}
                           src={ph.image_url}
-                          alt=""
+                          alt={`Foto de ${r.title}`}
                           width={240}
                           height={160}
                           unoptimized
