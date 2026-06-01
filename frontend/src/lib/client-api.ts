@@ -240,6 +240,15 @@ export const dashboard = {
   notifications: () => apiFetch<unknown[]>("/me/notifications/"),
   unreadNotifications: () => apiFetch<{ unread: number }>("/me/notifications/unread-count/"),
   markAllRead: () => apiFetch("/me/notifications/mark-all-read/", { method: "POST" }),
+  // Favoritos (clientes) y reportes de perfiles
+  myFavorites: () => apiFetch<unknown[]>("/me/favorites/"),
+  favoriteToggle: (slug: string) =>
+    apiFetch<{ favorited: boolean }>(`/profiles/${slug}/favorite/`, { method: "POST" }),
+  reportProfile: (slug: string, reason: string) =>
+    apiFetch(`/profiles/${slug}/report/`, { method: "POST", body: { reason } }),
+  adminProfileReports: () => apiFetch<unknown[]>("/admin/profile-reports/"),
+  adminProfileReportAction: (id: number, action: "suspend" | "dismiss", reason?: string) =>
+    apiFetch(`/admin/profile-reports/${id}/action/`, { method: "POST", body: { action, reason } }),
 };
 
 /**
@@ -275,9 +284,19 @@ export const rooms = {
   unpublishRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/unpublish/`, { method: "POST" }),
   pauseRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/pause/`, { method: "POST" }),
   resumeRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/resume/`, { method: "POST" }),
+  setRoomAvailability: (id: number, minutes: number) =>
+    apiFetch<RoomListing>(`/me/rooms/${id}/availability/`, { method: "POST", body: { minutes } }),
+  cancelRoomAvailability: (id: number) =>
+    apiFetch<RoomListing>(`/me/rooms/${id}/availability/`, { method: "POST", body: { cancel: true } }),
   // Modelo activa
   browse: (params: Record<string, string> = {}) =>
     apiFetch<PublicRoom[]>(`/rooms/?${new URLSearchParams(params).toString()}`),
+  report: (id: number, reason: string) =>
+    apiFetch(`/rooms/${id}/report/`, { method: "POST", body: { reason } }),
+  // Admin / moderador (reportes de habitaciones)
+  adminRoomReports: () => apiFetch<unknown[]>("/admin/room-reports/"),
+  adminRoomReportAction: (id: number, action: "suspend" | "dismiss", reason?: string) =>
+    apiFetch(`/admin/room-reports/${id}/action/`, { method: "POST", body: { action, reason } }),
   // Admin / moderador
   adminRoomPayments: (status: "pending" | "approved" | "rejected" = "pending") =>
     apiFetch<unknown[]>(`/admin/room-payments/?status=${status}`),
@@ -340,6 +359,8 @@ export interface RoomListing {
   is_featured: boolean;
   is_paused: boolean;
   expires_at: string | null;
+  available_until: string | null;
+  is_available_now: boolean;
   photos: RoomPhoto[];
   created_at: string;
 }
@@ -356,6 +377,7 @@ export interface PublicRoom {
   whatsapp: string;
   phone: string;
   is_featured: boolean;
+  is_available_now: boolean;
   photos: RoomPhoto[];
   created_at: string;
 }

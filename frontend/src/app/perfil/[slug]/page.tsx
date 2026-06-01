@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getProfile, getProfileRating, getProfileReviews, getProfileStories } from "@/lib/api";
 import { StoriesStrip } from "@/components/StoriesStrip";
 import { ContactPanel } from "@/components/ContactPanel";
+import { ProfileActions } from "@/components/ProfileActions";
 import { ProfileTracker } from "@/components/ProfileTracker";
 import { DEFAULT_GENDER_SLUG } from "@/lib/types";
 
@@ -132,6 +133,10 @@ export default async function ProfilePage({ params }: { params: Params }) {
           </p>
         )}
       </header>
+
+      <div className="mt-3">
+        <ProfileActions slug={slug} />
+      </div>
 
       {profile.description && (
         <p className="mt-5 whitespace-pre-line text-neutral-300">{profile.description}</p>

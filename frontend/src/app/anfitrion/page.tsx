@@ -430,6 +430,20 @@ function RoomCard({ room, host, onChange }: { room: RoomListing; host: HostProfi
             <button disabled={busy} onClick={() => run(() => rooms.pauseRoom(room.id))}
               className="rounded-full border border-amber-500 px-3 py-1.5 text-xs text-amber-300 hover:bg-amber-600/20 disabled:opacity-50">Pausar (ocupada)</button>
           ))}
+          {room.status === "active" && !room.is_paused && (
+            <button disabled={busy}
+              onClick={() => run(() => room.is_available_now
+                ? rooms.cancelRoomAvailability(room.id)
+                : rooms.setRoomAvailability(room.id, 120))}
+              className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${
+                room.is_available_now
+                  ? "bg-emerald-600 font-medium text-white hover:bg-emerald-500"
+                  : "border border-emerald-600/60 text-emerald-300 hover:bg-emerald-600/20"
+              }`}
+              title="Marca la pieza como disponible ahora por 2 horas">
+              {room.is_available_now ? "🟢 Disponible (quitar)" : "Marcar disponible"}
+            </button>
+          )}
           {room.status === "active" && (
             <button disabled={busy} onClick={() => run(() => rooms.unpublishRoom(room.id))}
               className="rounded-full border border-neutral-700 px-3 py-1.5 text-xs hover:border-pink-500 disabled:opacity-50">Despublicar</button>

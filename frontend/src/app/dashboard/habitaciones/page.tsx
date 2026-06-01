@@ -38,12 +38,14 @@ export default function RoomsBrowsePage() {
   const [cities, setCities] = useState<City[]>([]);
   const [region, setRegion] = useState("");
   const [city, setCity] = useState("");
+  const [availableNow, setAvailableNow] = useState(false);
   const [selected, setSelected] = useState<PublicRoom | null>(null);
 
   const load = useCallback(async () => {
     const params: Record<string, string> = {};
     if (region) params.region = region;
     if (city) params.city = city;
+    if (availableNow) params.available_now = "true";
     try {
       setItems(await rooms.browse(params));
       setGated(false);
@@ -55,7 +57,7 @@ export default function RoomsBrowsePage() {
         throw e;
       }
     }
-  }, [region, city]);
+  }, [region, city, availableNow]);
 
   useEffect(() => {
     auth
@@ -92,7 +94,7 @@ export default function RoomsBrowsePage() {
   useEffect(() => {
     if (ready) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [region, city]);
+  }, [region, city, availableNow]);
 
   if (!ready) return <p className="text-neutral-400">Cargando…</p>;
 
@@ -156,6 +158,18 @@ export default function RoomsBrowsePage() {
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={() => setAvailableNow((v) => !v)}
+              aria-pressed={availableNow}
+              className={`rounded-lg border px-3 py-2 text-sm ${
+                availableNow
+                  ? "border-emerald-500 bg-emerald-600/20 text-emerald-300"
+                  : "border-neutral-700 text-neutral-300 hover:border-pink-500"
+              }`}
+            >
+              🟢 Disponibles ahora
+            </button>
           </div>
 
           {items.length === 0 ? (
@@ -199,6 +213,11 @@ function RoomCard({ room, onOpen }: { room: PublicRoom; onOpen: () => void }) {
               {room.photos.length} fotos
             </span>
           )}
+          {room.is_available_now && (
+            <span className="absolute left-2 top-2 rounded-full bg-emerald-500/95 px-2 py-0.5 text-[11px] font-semibold text-white">
+              🟢 Disponible ahora
+            </span>
+          )}
         </div>
         <div className="space-y-2 p-4">
           <div className="flex items-start justify-between gap-2">
@@ -224,9 +243,21 @@ function RoomCard({ room, onOpen }: { room: PublicRoom; onOpen: () => void }) {
 
 function RoomDetailModal({ room, onClose }: { room: PublicRoom; onClose: () => void }) {
   const [idx, setIdx] = useState(0);
+  const [reportMsg, setReportMsg] = useState("");
   const photos = room.photos;
   const photo = photos[idx];
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  async function report() {
+    const reason = window.prompt("¿Por qué reportas esta habitación? (opcional)");
+    if (reason === null) return;
+    try {
+      await rooms.report(room.id, reason);
+      setReportMsg("Gracias, recibimos tu reporte.");
+    } catch {
+      setReportMsg("No se pudo enviar el reporte.");
+    }
+  }
 
   // Accesibilidad del diálogo (WCAG): cerrar con Esc, trap de foco, restaurar
   // el foco al cerrar y bloquear el scroll del fondo.
@@ -310,6 +341,11 @@ function RoomDetailModal({ room, onClose }: { room: PublicRoom; onClose: () => v
           <p className="text-xs text-neutral-400">
             {room.city ?? "—"}{room.region && `, ${room.region}`}{room.sector && ` · ${room.sector}`}
           </p>
+          {room.is_available_now && (
+            <span className="inline-block rounded-full bg-emerald-600/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
+              🟢 Disponible ahora
+            </span>
+          )}
           {room.description && <p className="whitespace-pre-line text-sm text-neutral-200">{room.description}</p>}
           <p className="text-xs text-neutral-500">Por privacidad solo se muestra la comuna y un sector, nunca la dirección exacta.</p>
           <div className="flex gap-2 pt-1">
@@ -321,6 +357,13 @@ function RoomDetailModal({ room, onClose }: { room: PublicRoom; onClose: () => v
               <a href={`tel:${room.phone}`} className="flex-1 rounded-full border border-neutral-700 px-3 py-2 text-center text-sm hover:border-pink-500">Llamar</a>
             )}
           </div>
+          {reportMsg ? (
+            <p className="text-xs text-emerald-400">{reportMsg}</p>
+          ) : (
+            <button onClick={report} className="text-xs text-neutral-500 hover:text-red-400">
+              Reportar esta habitación
+            </button>
+          )}
         </div>
       </div>
     </div>

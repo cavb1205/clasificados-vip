@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { auth, dashboard } from "@/lib/client-api";
+import { auth, dashboard, rooms } from "@/lib/client-api";
 
 interface Report {
   id: number;
@@ -17,24 +17,83 @@ interface Report {
   story_expires_at: string;
 }
 
+interface ProfileReportRow {
+  id: number;
+  profile_slug: string;
+  stage_name: string;
+  is_suspended: boolean;
+  reporter_email: string | null;
+  reason: string;
+  created_at: string;
+}
+
+interface RoomReportRow {
+  id: number;
+  listing_id: number;
+  listing_title: string;
+  is_suspended: boolean;
+  reporter_email: string | null;
+  reason: string;
+  created_at: string;
+}
+
 export default function AdminReportesPage() {
   const router = useRouter();
   const [items, setItems] = useState<Report[]>([]);
+  const [profileReports, setProfileReports] = useState<ProfileReportRow[]>([]);
+  const [roomReports, setRoomReports] = useState<RoomReportRow[]>([]);
+  const [isStaff, setIsStaff] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
 
   const reload = useCallback(async () => {
-    setItems((await dashboard.adminStoryReports()) as Report[]);
+    const [stories, profiles, roomsR] = await Promise.all([
+      dashboard.adminStoryReports(),
+      dashboard.adminProfileReports(),
+      rooms.adminRoomReports(),
+    ]);
+    setItems(stories as Report[]);
+    setProfileReports(profiles as ProfileReportRow[]);
+    setRoomReports(roomsR as RoomReportRow[]);
   }, []);
 
   useEffect(() => {
     auth
       .me()
-      .then(() => reload())
+      .then((me) => {
+        setIsStaff(!!(me as { is_staff?: boolean })?.is_staff);
+        return reload();
+      })
       .then(() => setReady(true))
       .catch(() => router.replace("/login?next=/admin/reportes"));
   }, [router, reload]);
+
+  async function actProfile(id: number, action: "suspend" | "dismiss") {
+    if (!confirm(action === "suspend" ? "¿Suspender este perfil?" : "¿Descartar el reporte?")) return;
+    setBusyId(id);
+    try {
+      await dashboard.adminProfileReportAction(id, action);
+      await reload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function actRoom(id: number, action: "suspend" | "dismiss") {
+    if (!confirm(action === "suspend" ? "¿Suspender esta habitación?" : "¿Descartar el reporte?")) return;
+    setBusyId(id);
+    try {
+      await rooms.adminRoomReportAction(id, action);
+      await reload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function act(id: number, action: "delete_story" | "dismiss") {
     const msg =
@@ -170,6 +229,72 @@ export default function AdminReportesPage() {
           })}
         </ul>
       )}
+
+      {/* ── Perfiles reportados ───────────────────────────────────────── */}
+      <section className="mt-10">
+        <h2 className="font-display text-2xl font-semibold tracking-tight">Perfiles reportados</h2>
+        {profileReports.length === 0 ? (
+          <p className="mt-2 text-sm text-neutral-500">Sin reportes de perfiles. 👌</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {profileReports.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+                <div className="min-w-0">
+                  <p className="font-medium">
+                    <Link href={`/perfil/${r.profile_slug}`} className="hover:text-pink-300">{r.stage_name}</Link>
+                    {r.is_suspended && <span className="ml-2 rounded-full bg-red-600/20 px-2 py-0.5 text-xs text-red-300">Suspendido</span>}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {new Date(r.created_at).toLocaleString("es-CL")} · {r.reason || "sin motivo"}
+                    {r.reporter_email && ` · por ${r.reporter_email}`}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {isStaff && !r.is_suspended && (
+                    <button disabled={busyId !== null} onClick={() => actProfile(r.id, "suspend")}
+                      className="rounded-full border border-red-500 px-3 py-1.5 text-xs text-red-300 hover:bg-red-600/20 disabled:opacity-50">Suspender</button>
+                  )}
+                  <button disabled={busyId !== null} onClick={() => actProfile(r.id, "dismiss")}
+                    className="rounded-full border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:border-emerald-500 disabled:opacity-50">Descartar</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* ── Habitaciones reportadas ───────────────────────────────────── */}
+      <section className="mt-10">
+        <h2 className="font-display text-2xl font-semibold tracking-tight">Habitaciones reportadas</h2>
+        {roomReports.length === 0 ? (
+          <p className="mt-2 text-sm text-neutral-500">Sin reportes de habitaciones. 👌</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {roomReports.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+                <div className="min-w-0">
+                  <p className="font-medium">
+                    {r.listing_title}
+                    {r.is_suspended && <span className="ml-2 rounded-full bg-red-600/20 px-2 py-0.5 text-xs text-red-300">Suspendida</span>}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {new Date(r.created_at).toLocaleString("es-CL")} · {r.reason || "sin motivo"}
+                    {r.reporter_email && ` · por ${r.reporter_email}`}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {isStaff && !r.is_suspended && (
+                    <button disabled={busyId !== null} onClick={() => actRoom(r.id, "suspend")}
+                      className="rounded-full border border-red-500 px-3 py-1.5 text-xs text-red-300 hover:bg-red-600/20 disabled:opacity-50">Suspender</button>
+                  )}
+                  <button disabled={busyId !== null} onClick={() => actRoom(r.id, "dismiss")}
+                    className="rounded-full border border-neutral-700 px-3 py-1.5 text-xs text-neutral-300 hover:border-emerald-500 disabled:opacity-50">Descartar</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

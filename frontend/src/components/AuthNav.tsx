@@ -7,7 +7,7 @@ import { auth, panelHrefFor } from "@/lib/client-api";
 interface Me {
   email: string;
   username: string;
-  role: "model" | "client" | "admin";
+  role: "model" | "client" | "host" | "moderator" | "admin";
   is_staff?: boolean;
 }
 
@@ -59,12 +59,21 @@ export function AuthNav() {
             Admin
           </Link>
         )}
-        <Link
-          href={panelHrefFor(me)}
-          className="rounded-full bg-pink-600 px-4 py-1.5 font-medium hover:bg-pink-500"
-        >
-          {me.is_staff ? "Cola KYC" : "Mi panel"}
-        </Link>
+        {me.role === "client" && !me.is_staff ? (
+          <Link
+            href="/favoritos"
+            className="rounded-full bg-pink-600 px-4 py-1.5 font-medium hover:bg-pink-500"
+          >
+            ♥ Favoritos
+          </Link>
+        ) : (
+          <Link
+            href={panelHrefFor(me)}
+            className="rounded-full bg-pink-600 px-4 py-1.5 font-medium hover:bg-pink-500"
+          >
+            {me.is_staff ? "Cola KYC" : "Mi panel"}
+          </Link>
+        )}
       </div>
     );
   }
