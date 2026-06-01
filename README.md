@@ -1,5 +1,7 @@
 # Clasificados VIP
 
+[![CI](https://github.com/cavb1205/clasificados-vip/actions/workflows/ci.yml/badge.svg)](https://github.com/cavb1205/clasificados-vip/actions/workflows/ci.yml)
+
 Portal de clasificados premium para Chile, con verificación de identidad, tarifa plana por
 publicación y planes configurables. **No** intermedia transacciones financieras.
 
