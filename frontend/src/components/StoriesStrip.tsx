@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import type { Story } from "@/lib/types";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -30,8 +31,7 @@ export function StoriesStrip({
         <span className="relative inline-block">
           <span className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 via-fuchsia-500 to-amber-400" />
           <span className="relative m-[3px] block h-16 w-16 overflow-hidden rounded-full border-2 border-neutral-950">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {coverPhoto && <img src={coverPhoto} alt="" className="h-full w-full object-cover" />}
+            {coverPhoto && <Image src={coverPhoto} alt="" width={64} height={64} unoptimized className="h-full w-full object-cover" />}
           </span>
         </span>
         <span>

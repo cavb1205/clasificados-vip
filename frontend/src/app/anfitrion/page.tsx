@@ -9,6 +9,7 @@ import {
   rooms,
   type HostProfile,
   type RoomListing,
+  type RoomPhoto,
   type RoomPlan,
 } from "@/lib/client-api";
 
@@ -440,15 +441,7 @@ function RoomCard({ room, host, onChange }: { room: RoomListing; host: HostProfi
       </div>
 
       {room.photos.length > 0 && (
-        <div className="mt-3 flex gap-2 overflow-x-auto">
-          {room.photos.map((ph) => (
-            <div key={ph.id} className="relative">
-              <Image src={ph.image_url} alt="" width={120} height={90} unoptimized className="h-20 w-28 rounded-lg object-cover" />
-              <button onClick={() => run(() => rooms.deleteRoomPhoto(ph.id))}
-                className="absolute right-1 top-1 rounded-full bg-black/70 px-1.5 text-xs text-white" aria-label="Eliminar foto">✕</button>
-            </div>
-          ))}
-        </div>
+        <RoomPhotoGrid photos={room.photos} onChange={onChange} />
       )}
 
       <div className="mt-3">
@@ -459,5 +452,131 @@ function RoomCard({ room, host, onChange }: { room: RoomListing; host: HostProfi
       </div>
       {err && <p className="mt-2 text-sm text-red-400">{err}</p>}
     </article>
+  );
+}
+
+function RoomPhotoGrid({ photos, onChange }: { photos: RoomPhoto[]; onChange: () => void }) {
+  const [items, setItems] = useState<RoomPhoto[]>(photos);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [overId, setOverId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setItems([...photos].sort((a, b) => a.order - b.order));
+  }, [photos]);
+
+  /** Mueve el elemento en `fromIdx` a `toIdx` y persiste el nuevo orden. */
+  async function reorder(fromIdx: number, toIdx: number) {
+    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || toIdx >= items.length) return;
+    const reordered = [...items];
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+    const withOrder = reordered.map((p, i) => ({ ...p, order: i * 10 }));
+    const previous = items;
+    setItems(withOrder);
+    setBusy(true);
+    try {
+      const changed = withOrder.filter(
+        (p) => p.order !== previous.find((q) => q.id === p.id)?.order,
+      );
+      await Promise.all(changed.map((p) => rooms.updateRoomPhotoOrder(p.id, p.order)));
+      onChange();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDrop(targetId: number) {
+    const srcId = draggingId;
+    setDraggingId(null);
+    setOverId(null);
+    if (srcId === null || srcId === targetId) return;
+    await reorder(
+      items.findIndex((p) => p.id === srcId),
+      items.findIndex((p) => p.id === targetId),
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {items.map((ph, idx) => {
+          const isOver = overId === ph.id && draggingId !== ph.id;
+          return (
+            <div
+              key={ph.id}
+              draggable
+              onDragStart={(e) => {
+                setDraggingId(ph.id);
+                e.dataTransfer.effectAllowed = "move";
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (overId !== ph.id) setOverId(ph.id);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                onDrop(ph.id);
+              }}
+              onDragEnd={() => {
+                setDraggingId(null);
+                setOverId(null);
+              }}
+              className={`group relative flex-shrink-0 cursor-grab overflow-hidden rounded-lg border transition active:cursor-grabbing ${
+                isOver ? "border-pink-500 ring-2 ring-pink-500/40" : "border-neutral-800"
+              } ${draggingId === ph.id ? "opacity-50" : ""}`}
+            >
+              <Image
+                src={ph.image_url}
+                alt=""
+                width={120}
+                height={90}
+                unoptimized
+                draggable={false}
+                className="h-20 w-28 object-cover"
+              />
+              <div className="absolute inset-x-1 bottom-1 flex justify-between">
+                <button
+                  type="button"
+                  disabled={idx === 0 || busy}
+                  onClick={() => reorder(idx, idx - 1)}
+                  aria-label="Mover foto a la izquierda"
+                  className="rounded-full bg-black/70 px-1.5 py-0.5 text-xs leading-none text-neutral-200 disabled:opacity-30"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  disabled={idx === items.length - 1 || busy}
+                  onClick={() => reorder(idx, idx + 1)}
+                  aria-label="Mover foto a la derecha"
+                  className="rounded-full bg-black/70 px-1.5 py-0.5 text-xs leading-none text-neutral-200 disabled:opacity-30"
+                >
+                  →
+                </button>
+              </div>
+              <button
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await rooms.deleteRoomPhoto(ph.id);
+                    onChange();
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                className="absolute right-1 top-1 rounded-full bg-black/70 px-1.5 text-xs text-red-300"
+                aria-label="Eliminar foto"
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-1 text-xs text-neutral-500">
+        La primera foto es la portada. Usa ← → o arrastra para reordenar{busy && " · guardando…"}
+      </p>
+    </div>
   );
 }

@@ -269,6 +269,8 @@ export const rooms = {
     apiFetch("/me/room-photos/", { method: "POST", body: form, isForm: true }),
   deleteRoomPhoto: (id: number) =>
     apiFetch(`/me/room-photos/${id}/`, { method: "DELETE" }),
+  updateRoomPhotoOrder: (id: number, order: number) =>
+    apiFetch(`/me/room-photos/${id}/`, { method: "PATCH", body: { order } }),
   publishRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/publish/`, { method: "POST" }),
   unpublishRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/unpublish/`, { method: "POST" }),
   pauseRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/pause/`, { method: "POST" }),

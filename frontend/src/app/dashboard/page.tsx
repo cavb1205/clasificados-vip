@@ -1496,8 +1496,7 @@ function StoriesPanel({ publications }: { publications: Publication[] }) {
             <div key={s.id} className="group relative">
               <div className="overflow-hidden rounded-lg border border-neutral-800 bg-black">
                 {s.kind === "photo" ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={s.file_url} alt="" className="h-24 w-24 object-cover" />
+                  <Image src={s.file_url} alt="" width={96} height={96} unoptimized className="h-24 w-24 object-cover" />
                 ) : (
                   <video src={s.file_url} className="h-24 w-24 object-cover" muted />
                 )}

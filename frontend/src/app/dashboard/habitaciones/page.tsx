@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -226,9 +226,62 @@ function RoomDetailModal({ room, onClose }: { room: PublicRoom; onClose: () => v
   const [idx, setIdx] = useState(0);
   const photos = room.photos;
   const photo = photos[idx];
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Accesibilidad del diálogo (WCAG): cerrar con Esc, trap de foco, restaurar
+  // el foco al cerrar y bloquear el scroll del fondo.
+  useEffect(() => {
+    const prevActive = document.activeElement as HTMLElement | null;
+    const node = dialogRef.current;
+    const focusables = () =>
+      node
+        ? Array.from(
+            node.querySelectorAll<HTMLElement>(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+            ),
+          ).filter((el) => !el.hasAttribute("disabled"))
+        : [];
+    focusables()[0]?.focus();
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key === "Tab") {
+        const f = focusables();
+        if (f.length === 0) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      prevActive?.focus?.();
+    };
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-4" onClick={onClose}>
-      <div className="my-6 w-full max-w-lg rounded-2xl border border-neutral-800 bg-neutral-950" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="room-modal-title"
+        className="my-6 w-full max-w-lg rounded-2xl border border-neutral-800 bg-neutral-950"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="relative">
           {photo ? (
             <Image src={photo.image_url} alt={room.title} width={900} height={600} unoptimized className="max-h-[55vh] w-full rounded-t-2xl object-contain bg-black" />
@@ -246,7 +299,7 @@ function RoomDetailModal({ room, onClose }: { room: PublicRoom; onClose: () => v
         </div>
         <div className="space-y-3 p-5">
           <div className="flex items-start justify-between gap-2">
-            <h2 className="text-lg font-semibold">
+            <h2 id="room-modal-title" className="text-lg font-semibold">
               {room.is_featured && <span className="mr-1 text-amber-300">⭐</span>}
               {room.title}
             </h2>
