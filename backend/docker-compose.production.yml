@@ -1,9 +1,10 @@
 # Producción · VPS DigitalOcean con Traefik existente (EasyPanel).
 #
-# Despliegue:
-#   1) `scp` este archivo + ./backend al VPS (o git clone).
-#   2) Crear /opt/vip/.env.production a partir de .env.production.example.
-#   3) `docker compose -f docker-compose.production.yml up -d --build`.
+# Despliegue (git pull): /opt/vip es un working tree de git (rama main).
+#   - Primera vez: crear /opt/vip/backend/.env.production desde .env.production.example.
+#   - Cada deploy:  ssh deploy@VPS '/opt/vip/deploy.sh'
+#     (deploy.sh hace git reset --hard origin/main + docker compose up -d --build).
+#   Flujo recomendado: push a main → CI verde → correr deploy.sh.
 
 services:
   vip-backend:
