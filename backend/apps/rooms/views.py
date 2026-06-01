@@ -338,13 +338,16 @@ class AdminRoomSerializer(drf_serializers.ModelSerializer):
     host_email = drf_serializers.CharField(source="owner.user.email", read_only=True)
     city_name = drf_serializers.CharField(source="city.name", read_only=True, default=None)
     photo_count = drf_serializers.IntegerField(source="photos.count", read_only=True)
+    # Fotos para moderación (el endpoint gateado permite staff/moderador).
+    photos = RoomPhotoSerializer(many=True, read_only=True)
 
     class Meta:
         model = RoomListing
         fields = [
-            "id", "title", "host_name", "host_email", "city_name", "sector",
+            "id", "title", "description", "host_name", "host_email", "city_name", "sector",
             "price", "price_period", "status", "is_featured", "is_paused",
-            "is_suspended", "suspension_reason", "expires_at", "photo_count", "created_at",
+            "is_suspended", "suspension_reason", "expires_at", "photo_count",
+            "photos", "created_at",
         ]
 
 
@@ -357,7 +360,7 @@ class AdminRoomListView(generics.ListAPIView):
     def get_queryset(self):
         from django.db.models import Q
 
-        qs = RoomListing.objects.select_related("owner__user", "city")
+        qs = RoomListing.objects.select_related("owner__user", "city").prefetch_related("photos")
         q = (self.request.query_params.get("q") or "").strip()
         status_filter = self.request.query_params.get("status")
         if q:

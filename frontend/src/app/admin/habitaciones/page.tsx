@@ -29,6 +29,7 @@ interface RoomPayment {
 interface AdminRoom {
   id: number;
   title: string;
+  description: string;
   host_name: string;
   host_email: string;
   city_name: string | null;
@@ -42,6 +43,7 @@ interface AdminRoom {
   suspension_reason: string;
   expires_at: string | null;
   photo_count: number;
+  photos: { id: number; image_url: string }[];
   created_at: string;
 }
 
@@ -52,6 +54,7 @@ export default function AdminHabitacionesPage() {
   const [payments, setPayments] = useState<RoomPayment[]>([]);
   const [listings, setListings] = useState<AdminRoom[]>([]);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [photosId, setPhotosId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [err, setErr] = useState("");
 
@@ -220,39 +223,71 @@ export default function AdminHabitacionesPage() {
             {listings.map((r) => (
               <li
                 key={r.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900 p-4"
+                className="rounded-xl border border-neutral-800 bg-neutral-900 p-4"
               >
-                <div>
-                  <p className="font-medium">
-                    {r.title}
-                    {r.is_suspended && (
-                      <span className="ml-2 rounded-full bg-red-600/20 px-2 py-0.5 text-xs text-red-300">
-                        Suspendida
-                      </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">
+                      {r.title}
+                      {r.is_suspended && (
+                        <span className="ml-2 rounded-full bg-red-600/20 px-2 py-0.5 text-xs text-red-300">
+                          Suspendida
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-neutral-500">
+                      {r.host_name} · {r.city_name ?? "—"} · {CLP.format(r.price)} ·{" "}
+                      {r.status}
+                      {r.is_paused && " · pausada"}
+                      {r.is_featured && " · ⭐"} · {r.photo_count} foto(s)
+                    </p>
+                    {r.suspension_reason && (
+                      <p className="mt-1 text-xs text-red-300">Motivo: {r.suspension_reason}</p>
                     )}
-                  </p>
-                  <p className="text-xs text-neutral-500">
-                    {r.host_name} · {r.city_name ?? "—"} · {CLP.format(r.price)} ·{" "}
-                    {r.status}
-                    {r.is_paused && " · pausada"}
-                    {r.is_featured && " · ⭐"} · {r.photo_count} foto(s)
-                  </p>
-                  {r.suspension_reason && (
-                    <p className="mt-1 text-xs text-red-300">Motivo: {r.suspension_reason}</p>
-                  )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {r.photo_count > 0 && (
+                      <button
+                        onClick={() => setPhotosId(photosId === r.id ? null : r.id)}
+                        className="rounded-full border border-neutral-700 px-3 py-1.5 text-xs hover:border-pink-500"
+                      >
+                        {photosId === r.id ? "Ocultar fotos" : `Ver fotos (${r.photo_count})`}
+                      </button>
+                    )}
+                    {isStaff && (
+                      <button
+                        disabled={busyId === r.id}
+                        onClick={() => moderate(r)}
+                        className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${
+                          r.is_suspended
+                            ? "bg-emerald-600 font-medium text-white hover:bg-emerald-500"
+                            : "border border-red-500 text-red-300 hover:bg-red-600/20"
+                        }`}
+                      >
+                        {r.is_suspended ? "Reactivar" : "Suspender"}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {isStaff && (
-                  <button
-                    disabled={busyId === r.id}
-                    onClick={() => moderate(r)}
-                    className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${
-                      r.is_suspended
-                        ? "bg-emerald-600 font-medium text-white hover:bg-emerald-500"
-                        : "border border-red-500 text-red-300 hover:bg-red-600/20"
-                    }`}
-                  >
-                    {r.is_suspended ? "Reactivar" : "Suspender"}
-                  </button>
+                {photosId === r.id && (
+                  <div className="mt-3">
+                    {r.description && (
+                      <p className="mb-2 whitespace-pre-line text-xs text-neutral-300">{r.description}</p>
+                    )}
+                    <div className="flex gap-2 overflow-x-auto">
+                      {r.photos.map((ph) => (
+                        <Image
+                          key={ph.id}
+                          src={ph.image_url}
+                          alt=""
+                          width={240}
+                          height={160}
+                          unoptimized
+                          className="h-36 w-52 flex-shrink-0 rounded-lg object-cover"
+                        />
+                      ))}
+                    </div>
+                  </div>
                 )}
               </li>
             ))}
