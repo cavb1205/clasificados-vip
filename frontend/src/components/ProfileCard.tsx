@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { PublicProfile } from "@/lib/types";
+import { FavoriteHeart } from "@/components/FavoriteHeart";
 
 /** Estrellas para rating 0-5, soporta media estrella. */
 function Stars({ value }: { value: number }) {
@@ -22,6 +23,8 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
     : "border-neutral-800 hover:border-pink-600";
 
   return (
+    <div className="relative">
+    <FavoriteHeart slug={profile.slug} className="absolute right-2 top-2 z-10" />
     <Link
       href={`/perfil/${profile.slug}`}
       className={`group relative block overflow-hidden rounded-2xl border bg-neutral-900 transition ${ring}`}
@@ -92,5 +95,6 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
         )}
       </div>
     </Link>
+    </div>
   );
 }
