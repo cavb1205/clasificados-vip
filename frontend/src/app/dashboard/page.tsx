@@ -612,7 +612,8 @@ function AvatarUploader({
           </button>
         )}
         <p className="mt-2 max-w-xs text-xs text-neutral-500">
-          Tu foto principal (avatar), separada del muro. Se le elimina la ubicación (EXIF) al subirla.
+          Es la foto que te representa: aparece en los <strong className="text-neutral-300">listados</strong> y como
+          portada de tu perfil. Elige tu mejor foto. Separada del muro; se le quita la ubicación (EXIF) al subirla.
         </p>
         {err && <p className="mt-1 text-xs text-red-400">{err}</p>}
       </div>
