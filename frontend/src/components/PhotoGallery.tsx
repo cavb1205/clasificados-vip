@@ -22,10 +22,10 @@ export function PhotoGallery({ photos, alt }: { photos: string[]; alt: string })
               src={url}
               alt={`${alt} foto ${i + 1}`}
               width={600}
-              height={600}
+              height={800}
               sizes="(max-width: 640px) 50vw, 33vw"
               priority={i === 0}
-              className="aspect-square w-full cursor-zoom-in object-cover transition hover:opacity-90"
+              className="aspect-[3/4] w-full cursor-zoom-in object-cover object-top transition hover:opacity-90"
             />
           </button>
         ))}
