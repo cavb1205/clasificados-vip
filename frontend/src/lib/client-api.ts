@@ -119,6 +119,10 @@ export const dashboard = {
     apiFetch("/me/profile/", { method: "POST", body: data }),
   updateProfile: (id: number, data: Record<string, unknown>) =>
     apiFetch(`/me/profile/${id}/`, { method: "PATCH", body: data }),
+  uploadAvatar: (form: FormData) =>
+    apiFetch<{ avatar: string | null }>("/me/profile/avatar/", { method: "POST", body: form, isForm: true }),
+  deleteAvatar: () =>
+    apiFetch<{ avatar: string | null }>("/me/profile/avatar/", { method: "DELETE" }),
   setAvailability: (minutes: number) =>
     apiFetch<{ available_until: string | null; is_available_now: boolean }>(
       "/me/profile/availability/",

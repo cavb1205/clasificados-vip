@@ -16,6 +16,7 @@ function makeProfile(overrides: Partial<PublicProfile> = {}): PublicProfile {
     services: [],
     base_rate: 50000,
     city: { id: 1, name: "Santiago", slug: "santiago", region: { id: 1, name: "RM", slug: "rm" } } as PublicProfile["city"],
+    avatar: null,
     photos: [],
     cover_photo: null,
     is_featured: false,

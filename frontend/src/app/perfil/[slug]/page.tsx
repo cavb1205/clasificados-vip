@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProfile, getProfileRating, getProfileReviews, getProfileStories } from "@/lib/api";
@@ -118,14 +119,26 @@ export default async function ProfilePage({ params }: { params: Params }) {
       )}
 
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-4xl font-semibold tracking-tight">
-            {profile.stage_name}
-          </h1>
-          <p className="mt-1 text-neutral-400">
-            {profile.age} años
-            {profile.city && ` · ${profile.city.name}, ${profile.city.region.name}`}
-          </p>
+        <div className="flex items-center gap-4">
+          {profile.avatar && (
+            <Image
+              src={profile.avatar}
+              alt={profile.stage_name}
+              width={88}
+              height={88}
+              unoptimized
+              className="h-20 w-20 shrink-0 rounded-full object-cover ring-2 ring-pink-600/40"
+            />
+          )}
+          <div>
+            <h1 className="font-display text-4xl font-semibold tracking-tight">
+              {profile.stage_name}
+            </h1>
+            <p className="mt-1 text-neutral-400">
+              {profile.age} años
+              {profile.city && ` · ${profile.city.name}, ${profile.city.region.name}`}
+            </p>
+          </div>
         </div>
         {rating.average !== null && (
           <p className="text-sm text-neutral-300">

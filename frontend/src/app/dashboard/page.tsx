@@ -25,6 +25,7 @@ interface Profile {
   gender: "female" | "trans" | "male";
   description: string;
   age: number;
+  avatar: string | null;
   city: City | null;
   verification_status: string;
   verified_at: string | null;
@@ -273,9 +274,15 @@ export default function DashboardPage() {
         />
       </section>
 
-      {/* Multimedia */}
+      {/* Foto de perfil (avatar) */}
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Multimedia (máx. 6 fotos, 1 video)</h2>
+        <h2 className="mb-3 text-lg font-semibold">Foto de perfil</h2>
+        <AvatarUploader avatar={profile?.avatar ?? null} onChange={loadAll} disabled={!profile} />
+      </section>
+
+      {/* Multimedia (muro de fotos) */}
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">Muro de fotos (máx. 6 fotos, 1 video)</h2>
         <MediaManager media={media} onChange={loadAll} disabled={!profile} />
       </section>
 
@@ -536,6 +543,81 @@ const VIDEO_LIMIT = 1;
 interface PendingFile {
   file: File;
   preview: string; // object URL
+}
+
+function AvatarUploader({
+  avatar,
+  onChange,
+  disabled,
+}: {
+  avatar: string | null;
+  onChange: () => void;
+  disabled: boolean;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function onSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("upload", file);
+      await dashboard.uploadAvatar(fd);
+      onChange();
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : "Error al subir");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function remove() {
+    if (!confirm("¿Quitar tu foto de perfil?")) return;
+    setBusy(true);
+    try {
+      await dashboard.deleteAvatar();
+      onChange();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border border-neutral-700 bg-neutral-900">
+        {avatar ? (
+          <Image src={avatar} alt="Foto de perfil" width={96} height={96} unoptimized className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-center text-xs text-neutral-600">Sin foto</div>
+        )}
+      </div>
+      <div>
+        <input ref={inputRef} type="file" accept="image/*" onChange={onSelect} className="hidden" id="avatar-input" disabled={disabled} />
+        <label
+          htmlFor="avatar-input"
+          className={`inline-block rounded-full px-4 py-2 text-sm font-medium ${
+            disabled || busy ? "cursor-not-allowed bg-neutral-700 text-neutral-400" : "cursor-pointer bg-pink-600 hover:bg-pink-500"
+          }`}
+        >
+          {busy ? "Subiendo…" : avatar ? "Cambiar foto" : "Subir foto"}
+        </label>
+        {avatar && (
+          <button onClick={remove} disabled={busy} className="ml-2 text-xs text-neutral-400 hover:text-red-400 disabled:opacity-50">
+            Quitar
+          </button>
+        )}
+        <p className="mt-2 max-w-xs text-xs text-neutral-500">
+          Tu foto principal (avatar), separada del muro. Se le elimina la ubicación (EXIF) al subirla.
+        </p>
+        {err && <p className="mt-1 text-xs text-red-400">{err}</p>}
+      </div>
+    </div>
+  );
 }
 
 function MediaManager({
