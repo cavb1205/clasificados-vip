@@ -44,7 +44,7 @@ export function PhotoGallery({ photos, alt }: { photos: string[]; alt: string })
   );
 }
 
-function Lightbox({
+export function Lightbox({
   photos,
   alt,
   index,

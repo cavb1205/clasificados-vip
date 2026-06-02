@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProfile, getProfileRating, getProfileReviews, getProfileStories } from "@/lib/api";
@@ -8,6 +7,7 @@ import { PhotoGallery } from "@/components/PhotoGallery";
 import { ContactPanel } from "@/components/ContactPanel";
 import { ProfileActions } from "@/components/ProfileActions";
 import { ProfileTracker } from "@/components/ProfileTracker";
+import { AvatarView } from "@/components/AvatarView";
 import { DEFAULT_GENDER_SLUG } from "@/lib/types";
 
 type Params = Promise<{ slug: string }>;
@@ -121,14 +121,7 @@ export default async function ProfilePage({ params }: { params: Params }) {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex items-center gap-4">
           {profile.avatar && (
-            <Image
-              src={profile.avatar}
-              alt={profile.stage_name}
-              width={88}
-              height={88}
-              unoptimized
-              className="h-20 w-20 shrink-0 rounded-full object-cover ring-2 ring-pink-600/40"
-            />
+            <AvatarView src={profile.avatar} alt={profile.stage_name} />
           )}
           <div>
             <h1 className="font-display text-4xl font-semibold tracking-tight">
