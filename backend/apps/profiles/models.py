@@ -120,6 +120,11 @@ class ModelProfile(models.Model):
     stage_name = models.CharField("nombre artístico", max_length=120)
     slug = models.SlugField(max_length=160, unique=True, blank=True)
     description = models.TextField(blank=True)
+    # Foto de perfil (avatar), independiente del muro de fotos (MediaContent).
+    # Pasa por el pipeline de privacidad (EXIF/GPS + marca) al subirse.
+    avatar = models.ImageField(
+        "foto de perfil", upload_to="profiles/avatars/", null=True, blank=True
+    )
     age = models.PositiveSmallIntegerField(help_text="Edad verificada (18+)")
     services = models.ManyToManyField(Service, related_name="profiles", blank=True)
     base_rate = models.PositiveIntegerField("tarifa base (CLP)", null=True, blank=True)

@@ -153,6 +153,34 @@ class MyProfileViewSet(viewsets.ModelViewSet):
             "is_available_now": profile.is_available_now,
         })
 
+    @action(detail=False, methods=["post", "delete"], url_path="avatar")
+    def avatar(self, request):
+        """Sube (POST, multipart 'upload') o quita (DELETE) la foto de perfil.
+
+        La imagen pasa por el pipeline de privacidad (EXIF/GPS + marca + JPEG).
+        """
+        from core.image_processing import process_image
+
+        profile = ModelProfile.objects.filter(user=request.user).first()
+        if not profile:
+            return Response({"detail": "Primero crea tu perfil."}, status=400)
+
+        if request.method == "DELETE":
+            if profile.avatar:
+                profile.avatar.delete(save=False)
+            profile.avatar = None
+            profile.save(update_fields=["avatar"])
+            return Response({"avatar": None})
+
+        upload = request.FILES.get("upload") or request.FILES.get("avatar")
+        if not upload:
+            return Response({"detail": "Falta el archivo."}, status=400)
+        processed = process_image(upload.read(), filename_stem="avatar")
+        if profile.avatar:
+            profile.avatar.delete(save=False)
+        profile.avatar.save(processed.name, processed, save=True)
+        return Response({"avatar": request.build_absolute_uri(profile.avatar.url)})
+
 
 class PublicProfileListView(generics.ListAPIView):
     """Listado público por región/comuna, con filtros y paginación.

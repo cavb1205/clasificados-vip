@@ -59,12 +59,13 @@ class ModelProfileSerializer(serializers.ModelSerializer):
     trial_ends_at = serializers.SerializerMethodField()
     pending_verification = serializers.SerializerMethodField()
     latest_verification = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
 
     class Meta:
         model = ModelProfile
         fields = [
             "id", "stage_name", "slug", "gender", "description", "age",
-            "services", "service_ids", "base_rate",
+            "services", "service_ids", "base_rate", "avatar",
             "city", "city_id",
             "whatsapp", "telegram",
             "verification_status", "verified_at", "trial_ends_at",
@@ -107,6 +108,13 @@ class ModelProfileSerializer(serializers.ModelSerializer):
             "rejection_reason": vr.rejection_reason,
         }
 
+    def get_avatar(self, obj):
+        if not obj.avatar:
+            return None
+        request = self.context.get("request")
+        url = obj.avatar.url
+        return request.build_absolute_uri(url) if request else url
+
     def get_trial_ends_at(self, obj):
         if not obj.verified_at:
             return None
@@ -139,6 +147,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
 
     city = CitySerializer(read_only=True)
     services = ServiceSerializer(many=True, read_only=True)
+    avatar = serializers.SerializerMethodField()
     photos = serializers.SerializerMethodField()
     cover_photo = serializers.SerializerMethodField()
     # Anotados por la vista (annotate_public_profiles); ausentes en otros contextos.
@@ -153,7 +162,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         model = ModelProfile
         fields = [
             "stage_name", "slug", "gender", "description", "age", "services",
-            "base_rate", "city", "photos", "cover_photo",
+            "base_rate", "city", "avatar", "photos", "cover_photo",
             "is_featured", "rating_average", "rating_count",
             "whatsapp", "telegram",
             "is_available_now", "available_until",
@@ -166,9 +175,15 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     def _photo_qs(self, obj):
         return obj.media.filter(media_type="photo")
 
+    def get_avatar(self, obj):
+        return self._abs(obj.avatar.url) if obj.avatar else None
+
     def get_photos(self, obj):
         return [self._abs(m.file.url) for m in self._photo_qs(obj)]
 
     def get_cover_photo(self, obj):
+        # La portada (tarjetas, og:image) prioriza el avatar; si no hay, la 1ª del muro.
+        if obj.avatar:
+            return self._abs(obj.avatar.url)
         first = self._photo_qs(obj).first()
         return self._abs(first.file.url) if first else None

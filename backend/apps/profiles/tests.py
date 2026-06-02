@@ -377,3 +377,51 @@ class FavoriteAndReportTests(APITestCase):
         )
         self.assertEqual(r.status_code, status.HTTP_201_CREATED)
         self.assertEqual(ProfileReport.objects.filter(profile=self.profile).count(), 1)
+
+
+import tempfile
+from io import BytesIO
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
+from PIL import Image as PILImage
+
+
+def _jpeg_bytes():
+    buf = BytesIO()
+    PILImage.new("RGB", (120, 120), (200, 100, 150)).save(buf, "JPEG")
+    return buf.getvalue()
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class AvatarTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="ava", email="ava@example.com", password="x", role="model"
+        )
+        self.profile = ModelProfile.objects.create(
+            user=self.user, stage_name="Ava", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
+        )
+
+    def test_upload_avatar_sets_field_and_cover_prefers_it(self):
+        self.client.force_authenticate(self.user)
+        up = SimpleUploadedFile("a.jpg", _jpeg_bytes(), content_type="image/jpeg")
+        r = self.client.post(
+            reverse("api:profiles:my-profile-avatar"), {"upload": up}, format="multipart"
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertTrue(r.data["avatar"])
+        self.profile.refresh_from_db()
+        self.assertTrue(self.profile.avatar)
+        # La portada pública prioriza el avatar.
+        pub = self.client.get(reverse("api:profiles:public-detail", args=[self.profile.slug]))
+        self.assertEqual(pub.data["cover_photo"], pub.data["avatar"])
+
+    def test_delete_avatar_clears_it(self):
+        self.profile.avatar.save("x.jpg", SimpleUploadedFile("x.jpg", _jpeg_bytes()), save=True)
+        self.client.force_authenticate(self.user)
+        r = self.client.delete(reverse("api:profiles:my-profile-avatar"))
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.profile.refresh_from_db()
+        self.assertFalse(self.profile.avatar)
