@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProfile, getProfileRating, getProfileReviews, getProfileStories } from "@/lib/api";
 import { StoriesStrip } from "@/components/StoriesStrip";
+import { PhotoGallery } from "@/components/PhotoGallery";
 import { ContactPanel } from "@/components/ContactPanel";
 import { ProfileActions } from "@/components/ProfileActions";
 import { ProfileTracker } from "@/components/ProfileTracker";
@@ -187,20 +187,7 @@ export default async function ProfilePage({ params }: { params: Params }) {
       )}
 
       {profile.photos?.length > 0 && (
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {profile.photos.map((url, i) => (
-            <Image
-              key={url}
-              src={url}
-              alt={`${profile.stage_name} foto ${i + 1}`}
-              width={600}
-              height={600}
-              sizes="(max-width: 640px) 50vw, 33vw"
-              priority={i === 0}
-              className="aspect-square w-full rounded-xl object-cover"
-            />
-          ))}
-        </div>
+        <PhotoGallery photos={profile.photos} alt={profile.stage_name} />
       )}
 
       <section className="mt-10">
