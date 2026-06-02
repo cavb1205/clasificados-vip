@@ -35,12 +35,12 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
             src={profile.cover_photo}
             alt={profile.stage_name}
             width={600}
-            height={400}
+            height={800}
             sizes="(max-width: 640px) 50vw, 33vw"
-            className="aspect-[3/2] w-full object-cover"
+            className="aspect-[3/4] w-full object-cover object-top"
           />
         ) : (
-          <div className="flex aspect-[3/2] items-center justify-center bg-neutral-800 text-neutral-600">
+          <div className="flex aspect-[3/4] items-center justify-center bg-neutral-800 text-neutral-600">
             Sin foto
           </div>
         )}
