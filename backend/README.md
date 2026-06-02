@@ -109,5 +109,9 @@ backups semanales del droplet en DO.
 Restore rápido: `gunzip -c db-XXXX.sql.gz | psql -h <host> -U <user> -d <db>` y
 `tar xzf media-XXXX.tar.gz -C /destino`.
 
+**Restore validado** (`restore-test.sh`): prueba aislada que toma un backup fresco, lo restaura
+en un Postgres efímero (NO toca producción) y compara conteos restaurado-vs-prod + el media tar.
+Verificado 2026-06-01: 0 errores, todos los conteos coinciden. Re-correr periódicamente.
+
 ## Pendiente
 - Off-site de backups (Spaces) · dominio real + media a bucket · SMTP real (ver roadmap).
