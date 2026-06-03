@@ -196,11 +196,7 @@ export default async function CityPage({
                     return (
                       <label
                         key={s.id}
-                        className={`cursor-pointer select-none rounded-full border px-3 py-1.5 text-sm transition ${
-                          checked
-                            ? "border-pink-500 bg-pink-600/20 text-pink-200"
-                            : "border-neutral-700 text-neutral-300 active:scale-95 hover:border-pink-500"
-                        }`}
+                        className="cursor-pointer select-none rounded-full border border-neutral-700 px-3 py-1.5 text-sm text-neutral-300 transition active:scale-95 hover:border-pink-500 has-[:checked]:border-pink-500 has-[:checked]:bg-pink-600/20 has-[:checked]:text-pink-200"
                       >
                         <input
                           type="checkbox"
