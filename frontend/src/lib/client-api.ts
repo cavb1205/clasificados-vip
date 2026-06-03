@@ -250,6 +250,8 @@ export const dashboard = {
     apiFetch<{ favorited: boolean }>(`/profiles/${slug}/favorite/`, { method: "POST" }),
   reportProfile: (slug: string, reason: string) =>
     apiFetch(`/profiles/${slug}/report/`, { method: "POST", body: { reason } }),
+  createReview: (data: { profile_slug: string; rating: number; comment: string }) =>
+    apiFetch("/reviews/", { method: "POST", body: data }),
   adminProfileReports: () => apiFetch<unknown[]>("/admin/profile-reports/"),
   adminProfileReportAction: (id: number, action: "suspend" | "dismiss", reason?: string) =>
     apiFetch(`/admin/profile-reports/${id}/action/`, { method: "POST", body: { action, reason } }),

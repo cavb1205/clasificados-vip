@@ -49,11 +49,13 @@ class ReviewTests(APITestCase):
         second = self._post_review(rating=1)
         self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_unverified_email_cannot_review(self):
+    def test_unverified_email_can_review_pending(self):
+        # Ya no exigimos email verificado (no hay flujo; la moderación protege).
         self.client_user.email_verified = False
         self.client_user.save()
         resp = self._post_review()
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data["status"], Review.Status.PENDING)
 
     def test_aggregate_rating_counts_only_approved(self):
         self._post_review(rating=4)

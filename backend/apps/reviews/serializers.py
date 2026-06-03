@@ -28,11 +28,10 @@ class ReviewSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        # No exigimos email verificado: no hay flujo de verificación (email
+        # diferido) y la reseña pasa igual por moderación admin antes de
+        # publicarse, que es la protección real contra abuso/spam.
         client = self.context["request"].user
-        if not client.email_verified:
-            raise serializers.ValidationError(
-                "Debes verificar tu correo antes de dejar una reseña."
-            )
         if Review.objects.filter(profile=self._profile, client=client).exists():
             raise serializers.ValidationError("Ya dejaste una reseña en este perfil.")
         return attrs

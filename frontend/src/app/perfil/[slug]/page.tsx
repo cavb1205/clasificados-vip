@@ -8,6 +8,7 @@ import { ContactPanel } from "@/components/ContactPanel";
 import { ProfileActions } from "@/components/ProfileActions";
 import { ProfileTracker } from "@/components/ProfileTracker";
 import { AvatarView } from "@/components/AvatarView";
+import { ReviewForm } from "@/components/ReviewForm";
 import { DEFAULT_GENDER_SLUG } from "@/lib/types";
 
 const GENDER_LABEL: Record<string, string> = { female: "Mujer", trans: "Trans", male: "Hombre" };
@@ -273,6 +274,7 @@ export default async function ProfilePage({ params }: { params: Params }) {
             ))}
           </ul>
         )}
+        <ReviewForm slug={slug} />
       </section>
 
       {cityHref && (
