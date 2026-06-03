@@ -31,3 +31,21 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "email", "username", "role", "email_verified", "is_staff"]
         read_only_fields = fields
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Cambio de contraseña estando logueado (requiere la actual)."""
+
+    current_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, validators=[validate_password])
+
+    def validate_current_password(self, value):
+        if not self.context["request"].user.check_password(value):
+            raise serializers.ValidationError("La contraseña actual es incorrecta.")
+        return value
+
+    def save(self):
+        user = self.context["request"].user
+        user.set_password(self.validated_data["new_password"])
+        user.save(update_fields=["password"])
+        return user

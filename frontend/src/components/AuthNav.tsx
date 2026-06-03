@@ -85,6 +85,12 @@ export function AuthNav() {
             {me.is_staff ? "Cola KYC" : "Mi panel"}
           </Link>
         )}
+        <Link
+          href="/cuenta"
+          className="rounded-full border border-neutral-700 px-3 py-1.5 text-neutral-300 hover:border-pink-500 hover:text-pink-300"
+        >
+          Cuenta
+        </Link>
         <button
           onClick={logout}
           className="rounded-full border border-neutral-700 px-3 py-1.5 text-neutral-400 hover:border-pink-500 hover:text-pink-400"

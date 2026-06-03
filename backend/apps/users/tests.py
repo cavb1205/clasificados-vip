@@ -90,3 +90,29 @@ class LogoutTests(APITestCase):
         self.assertEqual(r.cookies["access_token"]["max-age"], 0)
         # Ya no autentica.
         self.assertEqual(self.client.get(reverse("api:users:me")).status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class ChangePasswordTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="cp", email="cp@example.com", password="OldPass!23", role="client"
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_wrong_current_password_rejected(self):
+        r = self.client.post(
+            reverse("api:users:change-password"),
+            {"current_password": "incorrecta", "new_password": "NuevaClave!45"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_change_password_ok(self):
+        r = self.client.post(
+            reverse("api:users:change-password"),
+            {"current_password": "OldPass!23", "new_password": "NuevaClave!45"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("NuevaClave!45"))

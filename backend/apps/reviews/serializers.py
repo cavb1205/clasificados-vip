@@ -43,6 +43,17 @@ class ReviewSerializer(serializers.ModelSerializer):
         )
 
 
+class MyReviewSerializer(serializers.ModelSerializer):
+    """Reseñas que dejó el usuario, con su estado de moderación."""
+
+    profile_slug = serializers.CharField(source="profile.slug", read_only=True)
+    stage_name = serializers.CharField(source="profile.stage_name", read_only=True)
+
+    class Meta:
+        model = Review
+        fields = ["id", "profile_slug", "stage_name", "rating", "comment", "status", "created_at"]
+
+
 class PublicReviewSerializer(serializers.ModelSerializer):
     client_username = serializers.CharField(source="client.username", read_only=True)
 

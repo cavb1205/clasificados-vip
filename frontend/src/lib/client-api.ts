@@ -252,10 +252,23 @@ export const dashboard = {
     apiFetch(`/profiles/${slug}/report/`, { method: "POST", body: { reason } }),
   createReview: (data: { profile_slug: string; rating: number; comment: string }) =>
     apiFetch("/reviews/", { method: "POST", body: data }),
+  myReviews: () => apiFetch<MyReview[]>("/me/reviews/"),
+  changePassword: (data: { current_password: string; new_password: string }) =>
+    apiFetch("/auth/change-password/", { method: "POST", body: data }),
   adminProfileReports: () => apiFetch<unknown[]>("/admin/profile-reports/"),
   adminProfileReportAction: (id: number, action: "suspend" | "dismiss", reason?: string) =>
     apiFetch(`/admin/profile-reports/${id}/action/`, { method: "POST", body: { action, reason } }),
 };
+
+export interface MyReview {
+  id: number;
+  profile_slug: string;
+  stage_name: string;
+  rating: number;
+  comment: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+}
 
 /**
  * Clasificado de habitaciones. Tres audiencias:

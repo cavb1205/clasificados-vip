@@ -5,14 +5,29 @@ from rest_framework.views import APIView
 
 from core.permissions import IsClient, IsModerator
 from .models import Review
-from .serializers import PublicReviewSerializer, ReviewSerializer
+from .serializers import MyReviewSerializer, PublicReviewSerializer, ReviewSerializer
 
 
 class CreateReviewView(generics.CreateAPIView):
-    """Un cliente (con email verificado) deja una reseña. Queda pendiente de moderación."""
+    """Un cliente deja una reseña. Queda pendiente de moderación."""
 
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticated, IsClient]
+
+
+class MyReviewsView(generics.ListAPIView):
+    """Reseñas que dejó el usuario logueado (con su estado de moderación)."""
+
+    serializer_class = MyReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            Review.objects.filter(client=self.request.user)
+            .select_related("profile")
+            .order_by("-created_at")
+        )
 
 
 class ProfileReviewsView(generics.ListAPIView):

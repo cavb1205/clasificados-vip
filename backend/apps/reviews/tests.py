@@ -82,3 +82,13 @@ class ReviewNotificationTests(ReviewTests):
         self._post_review(rating=5)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("Reseña pendiente", mail.outbox[0].subject)
+
+
+class MyReviewsTests(ReviewTests):
+    def test_my_reviews_lists_own_with_status(self):
+        self._post_review()  # crea reseña pendiente (autentica al cliente)
+        resp = self.client.get(reverse("api:reviews:my-reviews"))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["status"], "pending")
+        self.assertEqual(resp.data[0]["profile_slug"], self.profile.slug)
