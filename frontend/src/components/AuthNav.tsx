@@ -26,9 +26,12 @@ export function AuthNav() {
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined = cargando
 
   async function logout() {
-    await auth.logout();
-    setMe(null);
-    router.push("/");
+    try {
+      await auth.logout();
+    } finally {
+      setMe(null);
+      router.push("/");
+    }
   }
 
   const refresh = useCallback(() => {

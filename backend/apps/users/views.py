@@ -108,8 +108,19 @@ class LogoutView(APIView):
 
     def post(self, request):
         response = Response(status=status.HTTP_204_NO_CONTENT)
-        response.delete_cookie(settings.JWT_ACCESS_COOKIE, path="/")
-        response.delete_cookie(settings.JWT_REFRESH_COOKIE, path="/")
+        # Sobrescribir con valor vacío y MISMAS flags (samesite/secure) con que
+        # se setearon. Si no coinciden, en contextos cross-site (SameSite=None;
+        # Secure) el navegador NO borra la cookie y la sesión "no se cierra".
+        expired = {
+            "path": "/",
+            "max_age": 0,
+            "expires": "Thu, 01 Jan 1970 00:00:00 GMT",
+            "httponly": True,
+            "secure": settings.JWT_COOKIE_SECURE,
+            "samesite": settings.JWT_COOKIE_SAMESITE,
+        }
+        response.set_cookie(settings.JWT_ACCESS_COOKIE, "", **expired)
+        response.set_cookie(settings.JWT_REFRESH_COOKIE, "", **expired)
         return response
 
 

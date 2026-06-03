@@ -70,3 +70,23 @@ class AuthCookieTests(APITestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class LogoutTests(APITestCase):
+    def test_logout_expires_cookies_and_ends_session(self):
+        User.objects.create_user(
+            username="lo", email="lo@example.com", password="Sup3rSecret!", role="client"
+        )
+        self.client.post(
+            reverse("api:users:login"),
+            {"email": "lo@example.com", "password": "Sup3rSecret!"},
+            format="json",
+        )
+        self.assertEqual(self.client.get(reverse("api:users:me")).status_code, status.HTTP_200_OK)
+        r = self.client.post(reverse("api:users:logout"))
+        self.assertEqual(r.status_code, status.HTTP_204_NO_CONTENT)
+        # La cookie de acceso quedó vacía y expirada.
+        self.assertEqual(r.cookies["access_token"].value, "")
+        self.assertEqual(r.cookies["access_token"]["max-age"], 0)
+        # Ya no autentica.
+        self.assertEqual(self.client.get(reverse("api:users:me")).status_code, status.HTTP_401_UNAUTHORIZED)
