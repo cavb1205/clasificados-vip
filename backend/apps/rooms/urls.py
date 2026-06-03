@@ -36,6 +36,8 @@ urlpatterns = [
     ),
     path("admin/rooms/", views.AdminRoomListView.as_view(), name="admin-rooms"),
     path("admin/rooms/<int:pk>/action/", views.AdminRoomActionView.as_view(), name="admin-room-action"),
+    path("admin/hosts/", views.AdminHostListView.as_view(), name="admin-hosts"),
+    path("admin/hosts/<int:pk>/action/", views.AdminHostActionView.as_view(), name="admin-host-action"),
     path("admin/room-reports/", views.AdminRoomReportQueueView.as_view(), name="admin-room-reports"),
     path(
         "admin/room-reports/<int:pk>/action/",

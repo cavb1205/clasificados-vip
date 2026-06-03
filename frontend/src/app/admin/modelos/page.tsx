@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
+import { Pager } from "@/components/Pager";
 
 interface AdminProfile {
   id: number;
@@ -34,18 +35,20 @@ export default function AdminModelosPage() {
   const [tab, setTab] = useState<Tab>("");
   const [q, setQ] = useState("");
   const [items, setItems] = useState<AdminProfile[]>([]);
+  const [page, setPage] = useState(1);
+  const [count, setCount] = useState(0);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
   // Solo staff puede suspender/reactivar; moderador es solo lectura aquí.
   const [isStaff, setIsStaff] = useState(false);
 
-  const reload = useCallback(
-    async (query: string, which: Tab) => {
-      setItems((await dashboard.adminProfiles(query, which)) as AdminProfile[]);
-    },
-    [],
-  );
+  const reload = useCallback(async (query: string, which: Tab, p = 1) => {
+    const d = await dashboard.adminProfiles(query, which, p);
+    setItems(d.results as AdminProfile[]);
+    setCount(d.count);
+    setPage(p);
+  }, []);
 
   useEffect(() => {
     auth
@@ -216,6 +219,7 @@ export default function AdminModelosPage() {
           ))}
         </ul>
       )}
+      <Pager page={page} count={count} onPage={(p) => reload(q, tab, p)} />
     </div>
   );
 }

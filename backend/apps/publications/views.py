@@ -177,6 +177,9 @@ class AdminPaymentActionView(generics.GenericAPIView):
             receipt.reject(reviewer=request.user, note=note)
         else:
             return Response({"detail": "action debe ser approve|reject"}, status=400)
+        from apps.audit.models import log_action
+        log_action(request.user, f"payment.{action_kind}",
+                   target=f"{receipt.publication.profile.stage_name} · {receipt.publication.title}", note=note)
         return Response(
             AdminPaymentReceiptSerializer(receipt, context={"request": request}).data
         )

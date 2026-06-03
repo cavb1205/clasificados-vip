@@ -9,8 +9,10 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.audit.models import log_action
 from apps.publications.models import Publication
 from apps.reviews.models import Review
+from core.pagination import AdminPagination
 from core.permissions import IsModel
 from .models import City, Favorite, ModelProfile, ProfileEvent, ProfileReport, Region, Service
 from .serializers import (
@@ -348,6 +350,7 @@ class AdminModelProfileListView(generics.ListAPIView):
     from core.permissions import IsModerator as _IsModerator  # noqa: N806
     serializer_class = AdminModelProfileSerializer
     permission_classes = [_IsModerator]
+    pagination_class = AdminPagination
 
     def get_queryset(self):
         qs = ModelProfile.objects.select_related("user", "city")
@@ -369,7 +372,7 @@ class AdminModelProfileListView(generics.ListAPIView):
             qs = qs.filter(verification_status=ModelProfile.VerificationStatus.REJECTED)
         elif status_filter == "suspended":
             qs = qs.filter(is_suspended=True)
-        return qs[:100]
+        return qs
 
 
 class AdminModelProfileActionView(generics.GenericAPIView):
@@ -389,6 +392,8 @@ class AdminModelProfileActionView(generics.GenericAPIView):
             profile.save(update_fields=["is_suspended", "suspension_reason"])
         else:
             return Response({"detail": "action debe ser suspend|unsuspend"}, status=400)
+        log_action(request.user, f"model.{action}",
+                   target=f"{profile.stage_name} (#{profile.id})", note=request.data.get("reason") or "")
         return Response(AdminModelProfileSerializer(profile).data)
 
 

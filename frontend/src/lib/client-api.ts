@@ -191,14 +191,30 @@ export const dashboard = {
       body: { action },
     }),
   adminKycAudit: () => apiFetch<unknown[]>("/admin/kyc/audit/"),
-  adminProfiles: (
-    q: string = "",
-    statusFilter: string = "",
-  ) =>
-    apiFetch<unknown[]>(
+  adminProfiles: (q: string = "", statusFilter: string = "", page = 1) =>
+    apiFetch<Paginated<unknown>>(
       `/admin/profiles/?${new URLSearchParams({
         q,
+        page: String(page),
         ...(statusFilter ? { status: statusFilter } : {}),
+      }).toString()}`,
+    ),
+  // Usuarios/clientes (solo admin)
+  adminUsers: (q = "", role = "", statusFilter = "", page = 1) =>
+    apiFetch<Paginated<unknown>>(
+      `/auth/admin/users/?${new URLSearchParams({
+        q, page: String(page),
+        ...(role ? { role } : {}),
+        ...(statusFilter ? { status: statusFilter } : {}),
+      }).toString()}`,
+    ),
+  adminUserAction: (id: number, action: "suspend" | "unsuspend", reason?: string) =>
+    apiFetch(`/auth/admin/users/${id}/action/`, { method: "POST", body: { action, reason } }),
+  // Bitácora de acciones admin (solo admin)
+  adminActionLog: (action = "", q = "", page = 1) =>
+    apiFetch<Paginated<unknown>>(
+      `/admin/action-log/?${new URLSearchParams({
+        q, page: String(page), ...(action ? { action } : {}),
       }).toString()}`,
     ),
   adminProfileAction: (
@@ -321,16 +337,33 @@ export const rooms = {
     apiFetch<unknown[]>(`/admin/room-payments/?status=${status}`),
   adminRoomPaymentAction: (id: number, action: "approve" | "reject", note?: string) =>
     apiFetch(`/admin/room-payments/${id}/action/`, { method: "POST", body: { action, note } }),
-  adminRooms: (q = "", statusFilter = "") =>
-    apiFetch<unknown[]>(
+  adminRooms: (q = "", statusFilter = "", page = 1) =>
+    apiFetch<Paginated<unknown>>(
       `/admin/rooms/?${new URLSearchParams({
-        q,
+        q, page: String(page),
         ...(statusFilter ? { status: statusFilter } : {}),
       }).toString()}`,
     ),
   adminRoomAction: (id: number, action: "suspend" | "unsuspend", reason?: string) =>
     apiFetch(`/admin/rooms/${id}/action/`, { method: "POST", body: { action, reason } }),
+  // Anfitriones (admin/moderador)
+  adminHosts: (q = "", statusFilter = "", page = 1) =>
+    apiFetch<Paginated<unknown>>(
+      `/admin/hosts/?${new URLSearchParams({
+        q, page: String(page),
+        ...(statusFilter ? { status: statusFilter } : {}),
+      }).toString()}`,
+    ),
+  adminHostAction: (id: number, action: "suspend" | "unsuspend", reason?: string) =>
+    apiFetch(`/admin/hosts/${id}/action/`, { method: "POST", body: { action, reason } }),
 };
+
+export interface Paginated<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
 
 export interface HostProfile {
   id: number;

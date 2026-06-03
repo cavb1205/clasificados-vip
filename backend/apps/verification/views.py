@@ -156,6 +156,8 @@ class AdminKYCActionView(APIView):
             vr.reviewed_at = timezone.now()
             vr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
             _sync_profile_on_decision(vr.user, ModelProfile.VerificationStatus.VERIFIED)
+            from apps.audit.models import log_action
+            log_action(request.user, "kyc.approve", target=f"{vr.user.email} (VR#{vr.id})")
             notify_user(
                 vr.user, kind=Notification.Kind.KYC,
                 title="✅ Verificación aprobada",
@@ -171,6 +173,8 @@ class AdminKYCActionView(APIView):
             vr.rejection_reason = reason
             vr.save(update_fields=["status", "reviewed_by", "reviewed_at", "rejection_reason"])
             _sync_profile_on_decision(vr.user, ModelProfile.VerificationStatus.REJECTED)
+            from apps.audit.models import log_action
+            log_action(request.user, "kyc.reject", target=f"{vr.user.email} (VR#{vr.id})", note=reason)
             notify_user(
                 vr.user, kind=Notification.Kind.KYC,
                 title="Verificación rechazada",

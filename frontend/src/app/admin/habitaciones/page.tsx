@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, rooms } from "@/lib/client-api";
+import { Pager } from "@/components/Pager";
 
 const CLP = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -53,14 +54,19 @@ export default function AdminHabitacionesPage() {
   const [isStaff, setIsStaff] = useState(false);
   const [payments, setPayments] = useState<RoomPayment[]>([]);
   const [listings, setListings] = useState<AdminRoom[]>([]);
+  const [page, setPage] = useState(1);
+  const [count, setCount] = useState(0);
   const [openId, setOpenId] = useState<number | null>(null);
   const [photosId, setPhotosId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [err, setErr] = useState("");
 
-  const reload = useCallback(async (staff: boolean) => {
+  const reload = useCallback(async (staff: boolean, p = 1) => {
     if (staff) setPayments((await rooms.adminRoomPayments("pending")) as RoomPayment[]);
-    setListings((await rooms.adminRooms()) as AdminRoom[]);
+    const d = await rooms.adminRooms("", "", p);
+    setListings(d.results as AdminRoom[]);
+    setCount(d.count);
+    setPage(p);
   }, []);
 
   useEffect(() => {
@@ -293,6 +299,7 @@ export default function AdminHabitacionesPage() {
             ))}
           </ul>
         )}
+        <Pager page={page} count={count} onPage={(p) => reload(isStaff, p)} />
       </section>
     </div>
   );

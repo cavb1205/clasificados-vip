@@ -38,6 +38,9 @@ class HostProfile(models.Model):
     display_name = models.CharField("nombre para mostrar", max_length=120)
     phone = models.CharField("teléfono", max_length=32, blank=True)
     whatsapp = models.CharField("WhatsApp", max_length=32, blank=True)
+    # Suspensión administrativa: oculta TODAS las habitaciones del anfitrión.
+    is_suspended = models.BooleanField("suspendido", default=False)
+    suspension_reason = models.CharField(max_length=200, blank=True)
 
     # Suscripción vigente (snapshot del plan al aprobarse el pago, para que editar
     # el plan después no altere retroactivamente lo contratado).

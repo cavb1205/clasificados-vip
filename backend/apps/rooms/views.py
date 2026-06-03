@@ -7,7 +7,9 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.publications.models import SubscriptionPlan
+from apps.audit.models import log_action
 from core.image_processing import process_image
+from core.pagination import AdminPagination
 from core.permissions import IsModerator
 
 from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt, RoomReport
@@ -262,6 +264,7 @@ class PublicRoomListView(generics.ListAPIView):
                 status=RoomListing.Status.ACTIVE,
                 is_paused=False,
                 is_suspended=False,
+                owner__is_suspended=False,
                 expires_at__gt=timezone.now(),
             )
             .select_related("city", "city__region")
@@ -319,6 +322,7 @@ class PublicRoomDetailView(generics.RetrieveAPIView):
             status=RoomListing.Status.ACTIVE,
             is_paused=False,
             is_suspended=False,
+            owner__is_suspended=False,
             expires_at__gt=timezone.now(),
         ).select_related("city", "city__region").prefetch_related("photos")
 
@@ -376,6 +380,8 @@ class AdminRoomPaymentActionView(generics.GenericAPIView):
             receipt.reject(reviewer=request.user, note=note)
         else:
             return Response({"detail": "action debe ser approve|reject"}, status=400)
+        log_action(request.user, f"room_payment.{action_kind}",
+                   target=f"{receipt.owner.display_name} · {receipt.plan.name}", note=note)
         return Response(
             AdminRoomReceiptSerializer(receipt, context={"request": request}).data
         )
@@ -404,6 +410,7 @@ class AdminRoomListView(generics.ListAPIView):
 
     serializer_class = AdminRoomSerializer
     permission_classes = [IsModerator]
+    pagination_class = AdminPagination
 
     def get_queryset(self):
         from django.db.models import Q
@@ -422,7 +429,7 @@ class AdminRoomListView(generics.ListAPIView):
             qs = qs.filter(status=status_filter)
         elif status_filter == "suspended":
             qs = qs.filter(is_suspended=True)
-        return qs[:100]
+        return qs
 
 
 class AdminRoomActionView(generics.GenericAPIView):
@@ -444,6 +451,8 @@ class AdminRoomActionView(generics.GenericAPIView):
             listing.save(update_fields=["is_suspended", "suspension_reason", "updated_at"])
         else:
             return Response({"detail": "action debe ser suspend|unsuspend"}, status=400)
+        log_action(request.user, f"room.{action_kind}",
+                   target=f"{listing.title} (#{listing.id})", note=request.data.get("reason") or "")
         return Response(AdminRoomSerializer(listing).data)
 
 
@@ -481,8 +490,80 @@ class AdminRoomReportActionView(generics.GenericAPIView):
             listing.is_suspended = True
             listing.suspension_reason = (request.data.get("reason") or "Reportada")[:200]
             listing.save(update_fields=["is_suspended", "suspension_reason", "updated_at"])
+            log_action(request.user, "room.suspend",
+                       target=f"{listing.title} (#{listing.id})", note="por reporte")
             return Response({"detail": "Habitación suspendida."})
         if action_kind == "dismiss":
             report.delete()
             return Response({"detail": "Reporte descartado."})
         return Response({"detail": "action debe ser suspend|dismiss"}, status=400)
+
+
+# ─── Admin: gestión de anfitriones ──────────────────────────────────────────
+class AdminHostSerializer(drf_serializers.ModelSerializer):
+    email = drf_serializers.CharField(source="user.email", read_only=True)
+    plan_name = drf_serializers.CharField(source="active_plan.name", read_only=True, default=None)
+    subscription_active = drf_serializers.BooleanField(read_only=True)
+    listings_total = drf_serializers.SerializerMethodField()
+    listings_active = drf_serializers.SerializerMethodField()
+
+    class Meta:
+        model = HostProfile
+        fields = [
+            "id", "display_name", "email", "whatsapp", "plan_name", "subscription_active",
+            "plan_expires_at", "listings_total", "listings_active",
+            "is_suspended", "suspension_reason", "created_at",
+        ]
+
+    def get_listings_total(self, obj):
+        return obj.listings.count()
+
+    def get_listings_active(self, obj):
+        return obj.listings.filter(status=RoomListing.Status.ACTIVE).count()
+
+
+class AdminHostListView(generics.ListAPIView):
+    """Listado de anfitriones para moderación (admin y moderador)."""
+
+    serializer_class = AdminHostSerializer
+    permission_classes = [IsModerator]
+    pagination_class = AdminPagination
+
+    def get_queryset(self):
+        from django.db.models import Q
+
+        qs = HostProfile.objects.select_related("user", "active_plan")
+        q = (self.request.query_params.get("q") or "").strip()
+        if q:
+            qs = qs.filter(
+                Q(display_name__icontains=q)
+                | Q(user__email__icontains=q)
+                | Q(whatsapp__icontains=q)
+            )
+        if self.request.query_params.get("status") == "suspended":
+            qs = qs.filter(is_suspended=True)
+        return qs.order_by("-created_at")
+
+
+class AdminHostActionView(generics.GenericAPIView):
+    """Suspender / reactivar un anfitrión (solo admin). Oculta TODOS sus anuncios."""
+
+    permission_classes = [permissions.IsAdminUser]
+    queryset = HostProfile.objects.all()
+
+    def post(self, request, pk):
+        host = self.get_object()
+        action_kind = (request.data.get("action") or "").lower()
+        if action_kind == "suspend":
+            host.is_suspended = True
+            host.suspension_reason = (request.data.get("reason") or "")[:200]
+            host.save(update_fields=["is_suspended", "suspension_reason", "updated_at"])
+        elif action_kind == "unsuspend":
+            host.is_suspended = False
+            host.suspension_reason = ""
+            host.save(update_fields=["is_suspended", "suspension_reason", "updated_at"])
+        else:
+            return Response({"detail": "action debe ser suspend|unsuspend"}, status=400)
+        log_action(request.user, f"host.{action_kind}",
+                   target=f"{host.display_name} (#{host.id})", note=request.data.get("reason") or "")
+        return Response(AdminHostSerializer(host).data)

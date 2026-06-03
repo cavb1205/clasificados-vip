@@ -261,3 +261,13 @@ class AvailabilityAndReportTests(_Base):
         self.client.force_authenticate(self.inactive_user)
         r = self.client.post(reverse("api:rooms:report", args=[listing.id]), {}, format="json")
         self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class HostSuspensionTests(_Base):
+    def test_suspended_host_hides_all_listings(self):
+        self._published()  # pieza activa visible
+        self.client.force_authenticate(self.model_user)
+        self.assertEqual(len(self.client.get(reverse("api:rooms:public-list")).data), 1)
+        self.host.is_suspended = True
+        self.host.save()
+        self.assertEqual(len(self.client.get(reverse("api:rooms:public-list")).data), 0)

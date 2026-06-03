@@ -28,8 +28,11 @@ const ITEMS: Item[] = [
   { href: "/admin/resenas", label: "Reseñas", badge: "pending_reviews" },
   { href: "/admin/reportes", label: "Reportes", badge: "open_reports" },
   { href: "/admin/modelos", label: "Modelos" },
+  { href: "/admin/anfitriones", label: "Anfitriones" },
   { href: "/admin/habitaciones", label: "Habitaciones", badge: "pending_room_payments" },
+  { href: "/admin/usuarios", label: "Usuarios", adminOnly: true },
   { href: "/admin/config", label: "Configuración", adminOnly: true },
+  { href: "/admin/bitacora", label: "Bitácora", adminOnly: true },
   { href: "/admin/auditoria", label: "Auditoría KYC", adminOnly: true },
 ];
 

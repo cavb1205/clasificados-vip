@@ -9,13 +9,16 @@ from django.utils.decorators import method_decorator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.csrf import ensure_csrf_cookie
-from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework import generics, serializers as drf_serializers, status
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from apps.audit.models import log_action
+from core.pagination import AdminPagination
 
 from .serializers import ChangePasswordSerializer, RegisterSerializer, UserSerializer
 
@@ -215,3 +218,55 @@ class ResetPasswordView(APIView):
         user.set_password(password)
         user.save(update_fields=["password"])
         return Response({"detail": "Contraseña actualizada."})
+
+
+# ─── Admin: gestión de usuarios/clientes ────────────────────────────────────
+class AdminUserSerializer(drf_serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "email", "username", "role", "is_active", "email_verified", "date_joined"]
+
+
+class AdminUserListView(generics.ListAPIView):
+    """Buscar/listar usuarios (solo admin). Filtros: ?q= &role= &status=suspended."""
+
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsAdminUser]
+    pagination_class = AdminPagination
+
+    def get_queryset(self):
+        from django.db.models import Q
+
+        qs = User.objects.all().order_by("-date_joined")
+        q = (self.request.query_params.get("q") or "").strip()
+        if q:
+            qs = qs.filter(Q(email__icontains=q) | Q(username__icontains=q))
+        role = self.request.query_params.get("role")
+        if role in dict(User.Role.choices):
+            qs = qs.filter(role=role)
+        if self.request.query_params.get("status") == "suspended":
+            qs = qs.filter(is_active=False)
+        return qs
+
+
+class AdminUserActionView(APIView):
+    """Suspender (is_active=False) / reactivar un usuario. No aplica a staff ni a uno mismo."""
+
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk):
+        target = User.objects.filter(pk=pk).first()
+        if not target:
+            return Response({"detail": "Usuario no encontrado."}, status=404)
+        if target.is_staff or target == request.user:
+            return Response({"detail": "No puedes suspender a staff ni a tu propia cuenta."}, status=400)
+        action = (request.data.get("action") or "").lower()
+        if action == "suspend":
+            target.is_active = False
+        elif action == "unsuspend":
+            target.is_active = True
+        else:
+            return Response({"detail": "action debe ser suspend|unsuspend"}, status=400)
+        target.save(update_fields=["is_active"])
+        log_action(request.user, f"user.{action}", target=f"{target.email} ({target.role})")
+        return Response(AdminUserSerializer(target).data)

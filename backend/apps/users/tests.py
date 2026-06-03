@@ -116,3 +116,41 @@ class ChangePasswordTests(APITestCase):
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password("NuevaClave!45"))
+
+
+class AdminUserManagementTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="ad", email="ad@example.com", password="x", role="admin", is_staff=True
+        )
+        self.client_user = User.objects.create_user(
+            username="cl", email="cl@example.com", password="x", role="client"
+        )
+
+    def test_suspend_client_sets_inactive_and_logs(self):
+        from apps.audit.models import AdminActionLog
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:users:admin-user-action", args=[self.client_user.id]),
+            {"action": "suspend"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.client_user.refresh_from_db()
+        self.assertFalse(self.client_user.is_active)
+        self.assertEqual(AdminActionLog.objects.filter(action="user.suspend").count(), 1)
+
+    def test_cannot_suspend_staff(self):
+        other = User.objects.create_user(username="s2", email="s2@example.com", password="x", is_staff=True)
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:users:admin-user-action", args=[other.id]),
+            {"action": "suspend"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_requires_admin(self):
+        self.client.force_authenticate(self.client_user)
+        self.assertEqual(
+            self.client.get(reverse("api:users:admin-users")).status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
