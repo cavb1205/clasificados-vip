@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { auth, panelHrefFor } from "@/lib/client-api";
 
@@ -21,7 +22,14 @@ interface Me {
  * confirmación es contra el backend.
  */
 export function AuthNav() {
+  const router = useRouter();
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined = cargando
+
+  async function logout() {
+    await auth.logout();
+    setMe(null);
+    router.push("/");
+  }
 
   const refresh = useCallback(() => {
     auth
@@ -74,6 +82,13 @@ export function AuthNav() {
             {me.is_staff ? "Cola KYC" : "Mi panel"}
           </Link>
         )}
+        <button
+          onClick={logout}
+          className="rounded-full border border-neutral-700 px-3 py-1.5 text-neutral-400 hover:border-pink-500 hover:text-pink-400"
+          title="Cerrar sesión"
+        >
+          Salir
+        </button>
       </div>
     );
   }
