@@ -27,6 +27,9 @@ class Review(models.Model):
     )
     comment = models.TextField(blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    reply = models.TextField("respuesta de la modelo", blank=True)
+    is_flagged = models.BooleanField("reportada por la modelo", default=False)
+    flag_reason = models.CharField(max_length=300, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

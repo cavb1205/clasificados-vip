@@ -10,6 +10,7 @@ router.register("me/publications", views.MyPublicationViewSet, basename="my-publ
 
 urlpatterns = [
     path("plans/", views.PlanListView.as_view(), name="plans"),
+    path("me/receipts/", views.MyReceiptsView.as_view(), name="my-receipts"),
     path("publications/", views.PublicPublicationListView.as_view(), name="public-list"),
     path("admin/stats/", views.AdminStatsView.as_view(), name="admin-stats"),
     path(

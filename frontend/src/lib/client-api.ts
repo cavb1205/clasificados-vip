@@ -184,9 +184,9 @@ export const dashboard = {
       method: "POST",
       body: { action },
     }),
-  adminReviews: (status: "pending" | "approved" | "rejected" = "pending") =>
+  adminReviews: (status: "pending" | "approved" | "rejected" | "flagged" = "pending") =>
     apiFetch<unknown[]>(`/admin/reviews/?status=${status}`),
-  adminReviewAction: (id: number, action: "approve" | "reject") =>
+  adminReviewAction: (id: number, action: "approve" | "reject" | "unflag") =>
     apiFetch(`/admin/reviews/${id}/action/`, {
       method: "POST",
       body: { action },
@@ -289,6 +289,20 @@ export const dashboard = {
   createReview: (data: { profile_slug: string; rating: number; comment: string }) =>
     apiFetch("/reviews/", { method: "POST", body: data }),
   myReviews: () => apiFetch<MyReview[]>("/me/reviews/"),
+  // Historial de pagos de la modelo
+  myReceipts: () =>
+    apiFetch<{ id: number; publication_title: string; amount: number | null; status: string; note: string; created_at: string; reviewed_at: string | null }[]>(
+      "/me/receipts/",
+    ),
+  // Reseñas recibidas por la modelo (responder/reportar)
+  myProfileReviews: () =>
+    apiFetch<{ id: number; client_username: string; rating: number; comment: string; reply: string; is_flagged: boolean; flag_reason: string; created_at: string }[]>(
+      "/me/profile/reviews/",
+    ),
+  replyReview: (id: number, reply: string) =>
+    apiFetch(`/me/profile/reviews/${id}/reply/`, { method: "POST", body: { reply } }),
+  reportReview: (id: number, reason: string) =>
+    apiFetch(`/me/profile/reviews/${id}/report/`, { method: "POST", body: { reason } }),
   changePassword: (data: { current_password: string; new_password: string }) =>
     apiFetch("/auth/change-password/", { method: "POST", body: data }),
   adminProfileReports: () => apiFetch<unknown[]>("/admin/profile-reports/"),

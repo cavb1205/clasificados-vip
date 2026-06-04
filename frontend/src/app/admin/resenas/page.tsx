@@ -13,11 +13,14 @@ interface Review {
   client_username: string;
   rating: number;
   comment: string;
+  reply: string;
+  is_flagged: boolean;
+  flag_reason: string;
   status: "pending" | "approved" | "rejected";
   created_at: string;
 }
 
-type Tab = "pending" | "approved" | "rejected";
+type Tab = "pending" | "approved" | "rejected" | "flagged";
 
 export default function AdminResenasPage() {
   const router = useRouter();
@@ -39,8 +42,9 @@ export default function AdminResenasPage() {
       .catch(() => router.replace("/login?next=/admin/resenas"));
   }, [router, reload]);
 
-  async function decide(id: number, action: "approve" | "reject") {
-    if (!confirm(action === "approve" ? "¿Aprobar reseña?" : "¿Rechazar reseña?")) return;
+  async function decide(id: number, action: "approve" | "reject" | "unflag") {
+    const labels = { approve: "¿Aprobar reseña?", reject: "¿Rechazar reseña?", unflag: "¿Quitar el reporte? (la reseña sigue visible)" };
+    if (!confirm(labels[action])) return;
     setBusyId(id);
     try {
       await dashboard.adminReviewAction(id, action);
@@ -69,7 +73,7 @@ export default function AdminResenasPage() {
       </header>
 
       <nav className="mb-5 flex gap-2 overflow-x-auto">
-        {(["pending", "approved", "rejected"] as const).map((t) => (
+        {(["pending", "flagged", "approved", "rejected"] as const).map((t) => (
           <button
             key={t}
             onClick={() => {
@@ -82,7 +86,7 @@ export default function AdminResenasPage() {
                 : "border-neutral-700 text-neutral-400"
             }`}
           >
-            {t === "pending" ? "Pendientes" : t === "approved" ? "Aprobadas" : "Rechazadas"}
+            {t === "pending" ? "Pendientes" : t === "flagged" ? "Reportadas" : t === "approved" ? "Aprobadas" : "Rechazadas"}
           </button>
         ))}
       </nav>
@@ -115,14 +119,24 @@ export default function AdminResenasPage() {
                     {r.client_username} · {r.client_email} ·{" "}
                     {new Date(r.created_at).toLocaleString("es-CL")}
                   </p>
+                  {r.is_flagged && (
+                    <p className="mt-1 text-xs text-amber-300">
+                      ⚠ Reportada por la modelo{r.flag_reason && `: ${r.flag_reason}`}
+                    </p>
+                  )}
                   {r.comment && (
                     <p className="mt-2 max-w-prose whitespace-pre-line text-sm text-neutral-200">
                       {r.comment}
                     </p>
                   )}
+                  {r.reply && (
+                    <p className="mt-2 rounded-lg bg-neutral-800/60 px-3 py-2 text-xs text-neutral-300">
+                      <strong>Respuesta de la modelo:</strong> {r.reply}
+                    </p>
+                  )}
                 </div>
-                {r.status === "pending" && (
-                  <div className="flex gap-2">
+                <div className="flex gap-2">
+                  {r.status === "pending" && (
                     <button
                       disabled={busyId === r.id}
                       onClick={() => decide(r.id, "approve")}
@@ -130,6 +144,17 @@ export default function AdminResenasPage() {
                     >
                       Aprobar
                     </button>
+                  )}
+                  {tab === "flagged" && (
+                    <button
+                      disabled={busyId === r.id}
+                      onClick={() => decide(r.id, "unflag")}
+                      className="rounded-full border border-neutral-600 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+                    >
+                      Quitar reporte
+                    </button>
+                  )}
+                  {(r.status === "pending" || r.is_flagged) && (
                     <button
                       disabled={busyId === r.id}
                       onClick={() => decide(r.id, "reject")}
@@ -137,8 +162,8 @@ export default function AdminResenasPage() {
                     >
                       Rechazar
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </li>
           ))}

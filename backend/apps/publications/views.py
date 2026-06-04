@@ -7,12 +7,37 @@ from rest_framework.response import Response
 from apps.profiles.models import ModelProfile
 from core.permissions import IsModel, IsModerator
 from .models import PaymentReceipt, Publication, SubscriptionPlan
+from rest_framework import serializers as drf_serializers
+
 from .serializers import (
     PaymentReceiptSerializer,
     PublicationSerializer,
     PublicPublicationSerializer,
     SubscriptionPlanSerializer,
 )
+
+
+class MyReceiptSerializer(drf_serializers.ModelSerializer):
+    publication_title = drf_serializers.CharField(source="publication.title", read_only=True)
+
+    class Meta:
+        model = PaymentReceipt
+        fields = ["id", "publication_title", "amount", "status", "note",
+                  "created_at", "reviewed_at"]
+
+
+class MyReceiptsView(generics.ListAPIView):
+    """Historial de comprobantes/pagos de la modelo logueada."""
+
+    serializer_class = MyReceiptSerializer
+    permission_classes = [permissions.IsAuthenticated, IsModel]
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            PaymentReceipt.objects.filter(publication__profile__user=self.request.user)
+            .select_related("publication").order_by("-created_at")
+        )
 
 
 class PlanListView(generics.ListAPIView):

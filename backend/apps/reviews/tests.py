@@ -92,3 +92,54 @@ class MyReviewsTests(ReviewTests):
         self.assertEqual(len(resp.data), 1)
         self.assertEqual(resp.data[0]["status"], "pending")
         self.assertEqual(resp.data[0]["profile_slug"], self.profile.slug)
+
+
+class ModelReviewReplyReportTests(APITestCase):
+    def setUp(self):
+        self.model_user = User.objects.create_user(
+            username="luna", email="luna@example.com", password="x", role="model"
+        )
+        self.profile = ModelProfile.objects.create(
+            user=self.model_user, stage_name="Luna", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+        )
+        self.client_user = User.objects.create_user(
+            username="cliente1", email="c1@example.com", password="x", role="client",
+        )
+        self.review = Review.objects.create(
+            profile=self.profile, client=self.client_user, rating=4,
+            comment="ok", status=Review.Status.APPROVED,
+        )
+
+    def test_model_can_reply_and_reply_is_public(self):
+        self.client.force_authenticate(self.model_user)
+        r = self.client.post(
+            reverse("api:reviews:my-review-reply", args=[self.review.id]),
+            {"reply": "Gracias!"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        pub = self.client.get(reverse("api:reviews:list", args=[self.profile.slug]))
+        self.assertEqual(pub.data[0]["reply"], "Gracias!")
+
+    def test_model_can_report_review(self):
+        self.client.force_authenticate(self.model_user)
+        r = self.client.post(
+            reverse("api:reviews:my-review-report", args=[self.review.id]),
+            {"reason": "falsa"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.review.refresh_from_db()
+        self.assertTrue(self.review.is_flagged)
+
+    def test_model_only_sees_own_approved_reviews(self):
+        self.client.force_authenticate(self.model_user)
+        r = self.client.get(reverse("api:reviews:my-profile-reviews"))
+        self.assertEqual(len(r.data), 1)
+
+    def test_client_cannot_reply(self):
+        self.client.force_authenticate(self.client_user)
+        r = self.client.post(
+            reverse("api:reviews:my-review-reply", args=[self.review.id]),
+            {"reply": "x"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)

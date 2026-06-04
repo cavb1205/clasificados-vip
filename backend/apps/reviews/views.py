@@ -3,9 +3,15 @@ from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.permissions import IsClient, IsModerator
+from apps.profiles.models import ModelProfile
+from core.permissions import IsClient, IsModel, IsModerator
 from .models import Review
-from .serializers import MyReviewSerializer, PublicReviewSerializer, ReviewSerializer
+from .serializers import (
+    MyProfileReviewSerializer,
+    MyReviewSerializer,
+    PublicReviewSerializer,
+    ReviewSerializer,
+)
 
 
 class CreateReviewView(generics.CreateAPIView):
@@ -59,6 +65,54 @@ class ProfileRatingView(APIView):
         )
 
 
+def _my_profile(user):
+    return ModelProfile.objects.filter(user=user).first()
+
+
+class MyProfileReviewsView(generics.ListAPIView):
+    """Reseñas APROBADAS que recibió la modelo logueada."""
+
+    serializer_class = MyProfileReviewSerializer
+    permission_classes = [permissions.IsAuthenticated, IsModel]
+    pagination_class = None
+
+    def get_queryset(self):
+        return Review.objects.filter(
+            profile__user=self.request.user, status=Review.Status.APPROVED
+        ).select_related("client").order_by("-created_at")
+
+
+class MyReviewReplyView(APIView):
+    """La modelo responde públicamente una reseña suya (aprobada)."""
+
+    permission_classes = [permissions.IsAuthenticated, IsModel]
+
+    def post(self, request, pk):
+        review = Review.objects.filter(
+            pk=pk, profile__user=request.user, status=Review.Status.APPROVED
+        ).first()
+        if not review:
+            return Response({"detail": "Reseña no encontrada."}, status=404)
+        review.reply = (request.data.get("reply") or "").strip()[:1000]
+        review.save(update_fields=["reply"])
+        return Response(MyProfileReviewSerializer(review).data)
+
+
+class MyReviewReportView(APIView):
+    """La modelo reporta una reseña como falsa/abusiva para revisión admin."""
+
+    permission_classes = [permissions.IsAuthenticated, IsModel]
+
+    def post(self, request, pk):
+        review = Review.objects.filter(pk=pk, profile__user=request.user).first()
+        if not review:
+            return Response({"detail": "Reseña no encontrada."}, status=404)
+        review.is_flagged = True
+        review.flag_reason = (request.data.get("reason") or "").strip()[:300]
+        review.save(update_fields=["is_flagged", "flag_reason"])
+        return Response({"id": review.id, "is_flagged": True})
+
+
 # ─── Admin endpoints ────────────────────────────────────────────────────────
 from rest_framework import generics, permissions, serializers as drf_serializers  # noqa: E402
 
@@ -75,7 +129,8 @@ class AdminReviewSerializer(drf_serializers.ModelSerializer):
         model = Review
         fields = [
             "id", "stage_name", "profile_slug", "client_email",
-            "client_username", "rating", "comment", "status", "created_at",
+            "client_username", "rating", "comment", "reply", "status",
+            "is_flagged", "flag_reason", "created_at",
         ]
 
 
@@ -86,6 +141,8 @@ class AdminReviewQueueView(generics.ListAPIView):
     def get_queryset(self):
         qs = Review.objects.select_related("profile", "client")
         s = self.request.query_params.get("status", "pending")
+        if s == "flagged":
+            return qs.filter(is_flagged=True)
         if s in {"pending", "approved", "rejected"}:
             qs = qs.filter(status=s)
         return qs
@@ -109,7 +166,11 @@ class AdminReviewActionView(generics.GenericAPIView):
             )
         elif action == "reject":
             review.status = Review.Status.REJECTED
-            review.save(update_fields=["status"])
+            review.is_flagged = False
+            review.save(update_fields=["status", "is_flagged"])
+        elif action == "unflag":
+            review.is_flagged = False
+            review.save(update_fields=["is_flagged"])
         else:
-            return Response({"detail": "action debe ser approve|reject"}, status=400)
+            return Response({"detail": "action debe ser approve|reject|unflag"}, status=400)
         return Response(AdminReviewSerializer(review).data)

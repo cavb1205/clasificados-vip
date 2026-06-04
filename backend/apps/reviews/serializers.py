@@ -59,4 +59,15 @@ class PublicReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = ["id", "client_username", "rating", "comment", "created_at"]
+        fields = ["id", "client_username", "rating", "comment", "reply", "created_at"]
+
+
+class MyProfileReviewSerializer(serializers.ModelSerializer):
+    """Reseñas que RECIBIÓ la modelo (para responder/reportar desde su panel)."""
+
+    client_username = serializers.CharField(source="client.username", read_only=True)
+
+    class Meta:
+        model = Review
+        fields = ["id", "client_username", "rating", "comment", "reply",
+                  "is_flagged", "flag_reason", "created_at"]

@@ -296,7 +296,134 @@ export default function DashboardPage() {
           disabled={!profile}
         />
       </section>
+
+      {/* Reseñas recibidas */}
+      {profile && profile.verification_status === "verified" && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Reseñas sobre mí</h2>
+          <ReceivedReviewsPanel />
+        </section>
+      )}
+
+      {/* Historial de pagos */}
+      {profile && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Historial de pagos</h2>
+          <BillingPanel />
+        </section>
+      )}
     </div>
+  );
+}
+
+function BillingPanel() {
+  const [items, setItems] = useState<Awaited<ReturnType<typeof dashboard.myReceipts>>>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    dashboard.myReceipts().then(setItems).catch(() => {}).finally(() => setLoaded(true));
+  }, []);
+
+  const CLP = (n: number | null) =>
+    n == null ? "—" : new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(n);
+  const STATUS: Record<string, string> = { pending: "Pendiente", approved: "Aprobado", rejected: "Rechazado" };
+
+  if (!loaded) return <p className="text-sm text-neutral-500">Cargando…</p>;
+  if (items.length === 0) return <p className="text-sm text-neutral-500">Aún no tienes pagos registrados.</p>;
+
+  return (
+    <ul className="space-y-2">
+      {items.map((r) => (
+        <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm">
+          <div>
+            <p className="font-medium">{CLP(r.amount)} · {r.publication_title}</p>
+            <p className="text-xs text-neutral-500">
+              enviado {new Date(r.created_at).toLocaleDateString("es-CL")}
+              {r.note && ` · ${r.note}`}
+            </p>
+          </div>
+          <span className={`rounded-full px-2 py-0.5 text-xs ${
+            r.status === "approved" ? "bg-emerald-600/20 text-emerald-200"
+              : r.status === "rejected" ? "bg-red-600/20 text-red-200"
+              : "bg-amber-600/20 text-amber-200"
+          }`}>
+            {STATUS[r.status] ?? r.status}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ReceivedReviewsPanel() {
+  const [items, setItems] = useState<Awaited<ReturnType<typeof dashboard.myProfileReviews>>>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [err, setErr] = useState("");
+
+  const load = useCallback(() => {
+    dashboard.myProfileReviews().then(setItems).catch(() => {}).finally(() => setLoaded(true));
+  }, []);
+  useEffect(load, [load]);
+
+  async function reply(id: number, current: string) {
+    const text = window.prompt("Tu respuesta pública a esta reseña:", current);
+    if (text === null) return;
+    setBusyId(id);
+    try {
+      await dashboard.replyReview(id, text.trim());
+      load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+  async function report(id: number) {
+    const reason = window.prompt("¿Por qué reportas esta reseña? (la revisa el equipo)");
+    if (reason === null) return;
+    setBusyId(id);
+    try {
+      await dashboard.reportReview(id, reason.trim());
+      load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (!loaded) return <p className="text-sm text-neutral-500">Cargando…</p>;
+  if (items.length === 0) return <p className="text-sm text-neutral-500">Aún no tienes reseñas aprobadas.</p>;
+
+  return (
+    <>
+      {err && <p className="mb-2 text-sm text-red-400">{err}</p>}
+      <ul className="space-y-2">
+        {items.map((r) => (
+          <li key={r.id} className="rounded-xl border border-neutral-800 bg-neutral-900 p-3 text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-medium">{"★".repeat(r.rating)}<span className="text-neutral-600">{"★".repeat(5 - r.rating)}</span> <span className="text-xs text-neutral-500">· {r.client_username}</span></p>
+              {r.is_flagged && <span className="rounded-full bg-amber-600/20 px-2 py-0.5 text-xs text-amber-200">reportada</span>}
+            </div>
+            {r.comment && <p className="mt-1 text-neutral-300">{r.comment}</p>}
+            {r.reply && <p className="mt-2 rounded-lg bg-neutral-800/60 px-3 py-2 text-xs text-neutral-300"><strong>Tu respuesta:</strong> {r.reply}</p>}
+            <div className="mt-2 flex gap-2">
+              <button disabled={busyId === r.id} onClick={() => reply(r.id, r.reply)}
+                className="rounded-full border border-neutral-700 px-3 py-1 text-xs hover:border-pink-500 disabled:opacity-50">
+                {r.reply ? "Editar respuesta" : "Responder"}
+              </button>
+              {!r.is_flagged && (
+                <button disabled={busyId === r.id} onClick={() => report(r.id)}
+                  className="rounded-full border border-amber-700 px-3 py-1 text-xs text-amber-300 hover:bg-amber-950/30 disabled:opacity-50">
+                  Reportar
+                </button>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
