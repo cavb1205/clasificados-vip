@@ -83,3 +83,47 @@ class MediaLimitTests(TestCase):
         self._make_photo()
         with self.assertRaises(ValidationError):
             self._make_photo()  # tercera supera el límite de 2
+
+
+class AdminMediaHideTests(TestCase):
+    def setUp(self):
+        from rest_framework.test import APIClient
+        from apps.profiles.models import ModelProfile
+        self.model_user = User.objects.create_user(
+            username="m", email="m@example.com", password="x", role="model"
+        )
+        self.profile = ModelProfile.objects.create(
+            user=self.model_user, stage_name="Luna", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+        )
+        self.photo = MediaContent.objects.create(
+            profile=self.profile, media_type="photo", file="profiles/media/a.jpg"
+        )
+        self.admin = User.objects.create_user(
+            username="ad", email="ad@example.com", password="x", role="admin", is_staff=True
+        )
+        self.api = APIClient()
+
+    def test_hide_excludes_from_public_photos(self):
+        from django.urls import reverse
+        self.api.force_authenticate(self.admin)
+        r = self.api.post(
+            reverse("api:media_content:admin-media-hide", args=[self.photo.id]),
+            {"action": "hide"}, format="json",
+        )
+        self.assertEqual(r.status_code, 200)
+        self.photo.refresh_from_db()
+        self.assertTrue(self.photo.is_hidden)
+        # Excluida del queryset público de fotos
+        self.assertEqual(
+            self.profile.media.filter(media_type="photo", is_hidden=False).count(), 0
+        )
+
+    def test_hide_requires_moderator(self):
+        from django.urls import reverse
+        self.api.force_authenticate(self.model_user)
+        r = self.api.post(
+            reverse("api:media_content:admin-media-hide", args=[self.photo.id]),
+            {"action": "hide"}, format="json",
+        )
+        self.assertEqual(r.status_code, 403)

@@ -173,7 +173,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(url) if request else url
 
     def _photo_qs(self, obj):
-        return obj.media.filter(media_type="photo")
+        return obj.media.filter(media_type="photo", is_hidden=False)
 
     def get_avatar(self, obj):
         return self._abs(obj.avatar.url) if obj.avatar else None

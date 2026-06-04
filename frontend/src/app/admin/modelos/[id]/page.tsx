@@ -92,6 +92,20 @@ export default function AdminModeloFichaPage() {
     }
   }
 
+  async function toggleMedia(mediaId: number, hidden: boolean) {
+    const action = hidden ? "unhide" : "hide";
+    if (action === "hide" && !confirm("¿Ocultar esta pieza del perfil público?")) return;
+    setBusy(true);
+    try {
+      await dashboard.adminMediaHide(mediaId, action);
+      await reload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function expire(pubId: number, title: string) {
     if (!confirm(`¿Expirar «${title}» ahora? Dejará de mostrarse.`)) return;
     setBusy(true);
@@ -145,6 +159,43 @@ export default function AdminModeloFichaPage() {
           </button>
         </div>
       )}
+
+      <Section title="Muro de fotos y videos">
+        {data.media.length === 0 ? (
+          <Empty>Sin multimedia.</Empty>
+        ) : (
+          <div className="flex flex-wrap gap-3">
+            {data.media.map((m) => (
+              <div key={m.id} className="w-28">
+                <div className={`relative aspect-square overflow-hidden rounded-lg border ${m.is_hidden ? "border-red-500/50 opacity-50" : "border-neutral-800"}`}>
+                  {m.media_type === "photo" && m.url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-2xl">🎬</div>
+                  )}
+                  {m.is_hidden && (
+                    <span className="absolute left-1 top-1 rounded-full bg-red-600/80 px-1.5 py-0.5 text-[10px] text-white">oculta</span>
+                  )}
+                </div>
+                {canModerate && (
+                  <button
+                    disabled={busy}
+                    onClick={() => toggleMedia(m.id, m.is_hidden)}
+                    className={`mt-1 w-full rounded-full border px-2 py-1 text-[11px] disabled:opacity-50 ${
+                      m.is_hidden
+                        ? "border-emerald-600 text-emerald-300 hover:bg-emerald-950/30"
+                        : "border-red-500 text-red-300 hover:bg-red-600/20"
+                    }`}
+                  >
+                    {m.is_hidden ? "Mostrar" : "Ocultar"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
 
       <Section title="Publicaciones">
         {data.publications.length === 0 ? (

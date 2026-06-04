@@ -240,11 +240,14 @@ export const dashboard = {
   adminProfileDetail: (profileId: number) =>
     apiFetch<{
       profile: Record<string, unknown>;
+      media: { id: number; media_type: "photo" | "video"; url: string | null; is_hidden: boolean }[];
       publications: { id: number; title: string; status: string; is_featured: boolean; is_live: boolean; expires_at: string | null; plan_name: string | null }[];
       receipts: { id: number; amount: number; status: string; publication_title: string; created_at: string; reviewed_at: string | null }[];
       reports: { id: number; reason: string; reporter_email: string | null; created_at: string }[];
       recent_actions: { action: string; actor_email: string | null; note: string; created_at: string }[];
     }>(`/admin/profiles/${profileId}/detail/`),
+  adminMediaHide: (mediaId: number, action: "hide" | "unhide") =>
+    apiFetch(`/admin/media/${mediaId}/hide/`, { method: "POST", body: { action } }),
   adminPlans: () => apiFetch<unknown[]>("/admin/plans/"),
   adminCreatePlan: (data: Record<string, unknown>) =>
     apiFetch("/admin/plans/", { method: "POST", body: data }),

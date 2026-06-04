@@ -412,6 +412,17 @@ class AdminProfileDetailView(APIView):
         from apps.audit.models import AdminActionLog
         from apps.publications.models import PaymentReceipt
 
+        def _abs(url):
+            return request.build_absolute_uri(url) if request else url
+
+        media = [
+            {
+                "id": m.id, "media_type": m.media_type,
+                "url": _abs(m.file.url) if m.file else None,
+                "is_hidden": m.is_hidden,
+            }
+            for m in profile.media.all()
+        ]
         publications = [
             {
                 "id": p.id, "title": p.title, "status": p.status,
@@ -454,6 +465,7 @@ class AdminProfileDetailView(APIView):
         ]
         return Response({
             "profile": AdminModelProfileSerializer(profile).data,
+            "media": media,
             "publications": publications,
             "receipts": receipts,
             "reports": reports,

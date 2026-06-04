@@ -18,6 +18,10 @@ class MediaContent(models.Model):
     media_type = models.CharField(max_length=5, choices=MediaType.choices)
     file = models.FileField(upload_to="profiles/media/")
     order = models.PositiveSmallIntegerField(default=0)
+    is_hidden = models.BooleanField(
+        "oculta por moderación", default=False,
+        help_text="Si está activa, la pieza no se muestra en el perfil público.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
