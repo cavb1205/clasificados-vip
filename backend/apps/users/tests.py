@@ -202,3 +202,34 @@ class AdminUserManagementTests(APITestCase):
             {"action": "set_role", "role": "client"}, format="json",
         )
         self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_notify_creates_notification_and_logs(self):
+        from apps.audit.models import AdminActionLog
+        from apps.notifications.models import Notification
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:users:admin-user-notify", args=[self.client_user.id]),
+            {"message": "Corrige tu foto de perfil, por favor."}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.assertEqual(Notification.objects.filter(recipient=self.client_user).count(), 1)
+        self.assertEqual(AdminActionLog.objects.filter(action="user.notify").count(), 1)
+
+    def test_notify_requires_message(self):
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:users:admin-user-notify", args=[self.client_user.id]),
+            {"message": "   "}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_notify_allowed_for_moderator(self):
+        mod = User.objects.create_user(
+            username="mod", email="mod@example.com", password="x", role="moderator"
+        )
+        self.client.force_authenticate(mod)
+        r = self.client.post(
+            reverse("api:users:admin-user-notify", args=[self.client_user.id]),
+            {"message": "Hola"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)

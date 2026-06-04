@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
 import { Pager } from "@/components/Pager";
+import { NotifyButton } from "@/components/NotifyButton";
 
 interface AdminProfile {
   id: number;
+  user_id: number;
   stage_name: string;
   slug: string;
   gender: "female" | "trans" | "male";
@@ -195,6 +197,7 @@ export default function AdminModelosPage() {
                 </div>
                 {canModerate && (
                   <div className="flex flex-wrap gap-2">
+                    <NotifyButton userId={p.user_id} name={p.stage_name} onError={setErr} />
                     {p.is_suspended ? (
                       <button
                         disabled={busyId === p.id}

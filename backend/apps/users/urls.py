@@ -16,4 +16,5 @@ urlpatterns = [
     path("reset-password/", views.ResetPasswordView.as_view(), name="reset-password"),
     path("admin/users/", views.AdminUserListView.as_view(), name="admin-users"),
     path("admin/users/<int:pk>/action/", views.AdminUserActionView.as_view(), name="admin-user-action"),
+    path("admin/users/<int:pk>/notify/", views.AdminUserNotifyView.as_view(), name="admin-user-notify"),
 ]

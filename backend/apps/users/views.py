@@ -18,7 +18,9 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.audit.models import log_action
+from apps.notifications.models import notify_user
 from core.pagination import AdminPagination
+from core.permissions import IsModerator
 
 from .serializers import ChangePasswordSerializer, RegisterSerializer, UserSerializer
 
@@ -292,3 +294,30 @@ class AdminUserActionView(APIView):
             return Response(AdminUserSerializer(target).data)
 
         return Response({"detail": "action debe ser suspend|unsuspend|set_role"}, status=400)
+
+
+class AdminUserNotifyView(APIView):
+    """Enviar un aviso in-app a un usuario (admin o moderador).
+
+    Aparece en la campana de notificaciones del usuario. Pensado para
+    moderación 'blanda' (pedir corregir una foto, avisar de una regla) sin
+    tener que suspender la cuenta.
+    """
+
+    permission_classes = [IsModerator]
+
+    def post(self, request, pk):
+        target = User.objects.filter(pk=pk).first()
+        if not target:
+            return Response({"detail": "Usuario no encontrado."}, status=404)
+        title = (request.data.get("title") or "").strip()
+        message = (request.data.get("message") or "").strip()
+        if not message:
+            return Response({"detail": "El mensaje es obligatorio."}, status=400)
+        notify_user(
+            target, kind="generic",
+            title=title[:140] or "Aviso del equipo",
+            message=message,
+        )
+        log_action(request.user, "user.notify", target=target.email, note=message[:120])
+        return Response({"ok": True})

@@ -322,6 +322,7 @@ from rest_framework import serializers as drf_serializers  # noqa: E402
 
 
 class AdminModelProfileSerializer(drf_serializers.ModelSerializer):
+    user_id = drf_serializers.IntegerField(source="user.id", read_only=True)
     email = drf_serializers.CharField(source="user.email", read_only=True)
     username = drf_serializers.CharField(source="user.username", read_only=True)
     city_name = drf_serializers.CharField(source="city.name", read_only=True, default=None)
@@ -330,7 +331,7 @@ class AdminModelProfileSerializer(drf_serializers.ModelSerializer):
     class Meta:
         model = ModelProfile
         fields = [
-            "id", "stage_name", "slug", "gender", "age", "email", "username",
+            "id", "user_id", "stage_name", "slug", "gender", "age", "email", "username",
             "city_name", "verification_status", "is_suspended",
             "suspension_reason", "created_at", "active_publication_count",
         ]

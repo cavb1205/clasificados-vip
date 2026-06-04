@@ -501,6 +501,7 @@ class AdminRoomReportActionView(generics.GenericAPIView):
 
 # ─── Admin: gestión de anfitriones ──────────────────────────────────────────
 class AdminHostSerializer(drf_serializers.ModelSerializer):
+    user_id = drf_serializers.IntegerField(source="user.id", read_only=True)
     email = drf_serializers.CharField(source="user.email", read_only=True)
     plan_name = drf_serializers.CharField(source="active_plan.name", read_only=True, default=None)
     subscription_active = drf_serializers.BooleanField(read_only=True)
@@ -510,7 +511,7 @@ class AdminHostSerializer(drf_serializers.ModelSerializer):
     class Meta:
         model = HostProfile
         fields = [
-            "id", "display_name", "email", "whatsapp", "plan_name", "subscription_active",
+            "id", "user_id", "display_name", "email", "whatsapp", "plan_name", "subscription_active",
             "plan_expires_at", "listings_total", "listings_active",
             "is_suspended", "suspension_reason", "created_at",
         ]

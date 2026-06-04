@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, rooms } from "@/lib/client-api";
 import { Pager } from "@/components/Pager";
+import { NotifyButton } from "@/components/NotifyButton";
 
 interface AdminHost {
   id: number;
+  user_id: number;
   display_name: string;
   email: string;
   whatsapp: string;
@@ -115,17 +117,20 @@ export default function AdminAnfitrionesPage() {
                 )}
               </div>
               {canModerate && (
-                <button
-                  disabled={busyId === h.id}
-                  onClick={() => moderate(h)}
-                  className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${
-                    h.is_suspended
-                      ? "bg-emerald-600 font-medium text-white hover:bg-emerald-500"
-                      : "border border-red-500 text-red-300 hover:bg-red-600/20"
-                  }`}
-                >
-                  {h.is_suspended ? "Reactivar" : "Suspender"}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <NotifyButton userId={h.user_id} name={h.display_name} onError={setErr} />
+                  <button
+                    disabled={busyId === h.id}
+                    onClick={() => moderate(h)}
+                    className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${
+                      h.is_suspended
+                        ? "bg-emerald-600 font-medium text-white hover:bg-emerald-500"
+                        : "border border-red-500 text-red-300 hover:bg-red-600/20"
+                    }`}
+                  >
+                    {h.is_suspended ? "Reactivar" : "Suspender"}
+                  </button>
+                </div>
               )}
             </li>
           ))}

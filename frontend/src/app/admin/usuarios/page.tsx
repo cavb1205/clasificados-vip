@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
 import { Pager } from "@/components/Pager";
+import { NotifyButton } from "@/components/NotifyButton";
 
 interface AdminUser {
   id: number;
@@ -149,6 +150,7 @@ export default function AdminUsuariosPage() {
                 </span>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
+                  <NotifyButton userId={u.id} name={u.email} onError={setErr} />
                   <select
                     value={u.role}
                     disabled={busyId === u.id}
