@@ -54,6 +54,20 @@ export const getPublications = (region: string, city: string) =>
 
 export const getServices = () => getJSON<Service[]>("/services/", 3600);
 
+export interface CityStoryGroup {
+  slug: string;
+  stage_name: string;
+  cover_photo: string | null;
+  stories: Story[];
+}
+
+/** Modelos con historias activas en una comuna (franja de la página de ciudad). */
+export const getCityStories = (region: string, city: string) =>
+  getJSON<CityStoryGroup[]>(
+    `/stories/by-city/?region=${encodeURIComponent(region)}&city=${encodeURIComponent(city)}`,
+    30,
+  );
+
 export interface ProfileQuery {
   region?: string;
   city?: string;

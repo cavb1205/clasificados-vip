@@ -112,3 +112,40 @@ class ExpireCommandTests(TestCase):
         call_command("delete_expired_stories", stdout=StringIO())
         self.assertFalse(Story.objects.filter(pk=s_old.pk).exists())
         self.assertTrue(Story.objects.filter(pk=s_new.pk).exists())
+
+
+class CityStoriesViewTests(TestCase):
+    def setUp(self):
+        from rest_framework.test import APIClient
+        from apps.profiles.models import City, Region
+        from apps.publications.models import Publication, SubscriptionPlan
+        from django.utils import timezone
+        from datetime import timedelta
+        self.api = APIClient()
+        region = Region.objects.create(name="RM", slug="rm")
+        self.city = City.objects.create(name="Santiago", slug="santiago", region=region)
+        u = User.objects.create_user(username="luna", email="l@e.com", password="x", role="model")
+        self.profile = ModelProfile.objects.create(
+            user=u, stage_name="Luna", age=25, city=self.city,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+        )
+        plan = SubscriptionPlan.objects.create(name="P", price=1000, duration_days=30, includes_featured=True)
+        Publication.objects.create(
+            profile=self.profile, plan=plan, title="A",
+            status=Publication.Status.ACTIVE, is_featured=True,
+            expires_at=timezone.now() + timedelta(days=10),
+        )
+        Story.objects.create(profile=self.profile, kind="photo", file="stories/a.jpg")
+
+    def test_city_with_active_story_returns_model(self):
+        from django.urls import reverse
+        r = self.api.get(reverse("api:stories:by-city"), {"region": "rm", "city": "santiago"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.data), 1)
+        self.assertEqual(r.data[0]["slug"], self.profile.slug)
+        self.assertEqual(len(r.data[0]["stories"]), 1)
+
+    def test_other_city_empty(self):
+        from django.urls import reverse
+        r = self.api.get(reverse("api:stories:by-city"), {"region": "rm", "city": "otra"})
+        self.assertEqual(len(r.data), 0)

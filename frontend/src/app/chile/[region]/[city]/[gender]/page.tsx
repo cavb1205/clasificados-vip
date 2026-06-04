@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
   getAllPopulatedCities,
+  getCityStories,
   getProfiles,
   getServices,
   type ProfileQuery,
 } from "@/lib/api";
 import { ProfileCard } from "@/components/ProfileCard";
+import { CityStories } from "@/components/CityStories";
 import { FiltersDrawer } from "@/components/FiltersDrawer";
 import { GenderTabs } from "@/components/GenderTabs";
 import { CityPicker } from "@/components/CityPicker";
@@ -81,10 +83,11 @@ export default async function CityPage({
   };
   const availableNow = query.available_now === "true";
 
-  const [data, services, allCities] = await Promise.all([
+  const [data, services, allCities, cityStories] = await Promise.all([
     getProfiles(region, city, query),
     getServices(),
     getAllPopulatedCities(),
+    getCityStories(region, city).catch(() => []),
   ]);
 
   const page = Number(query.page ?? "1");
@@ -180,6 +183,8 @@ export default async function CityPage({
           </Link>
         </div>
       </div>
+
+      <CityStories models={cityStories} />
 
       <div className="md:grid md:grid-cols-[18rem_1fr] md:gap-8">
         <FiltersDrawer activeCount={activeCount}>

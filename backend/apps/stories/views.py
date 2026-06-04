@@ -118,6 +118,49 @@ class ProfileStoriesView(generics.ListAPIView):
         return _live_stories(profile).order_by("created_at")
 
 
+class CityStoriesView(APIView):
+    """Historias activas de las modelos visibles de una comuna.
+
+    Para la franja de historias en la página de ciudad: una entrada por modelo
+    con historias vigentes (verificada, no suspendida, en trial o con publicación
+    activa). Público.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        now = timezone.now()
+        region = request.query_params.get("region")
+        city = request.query_params.get("city")
+        profiles = ModelProfile.objects.publicly_visible().filter(
+            stories__expires_at__gt=now
+        )
+        if city:
+            profiles = profiles.filter(city__slug=city)
+        if region:
+            profiles = profiles.filter(city__region__slug=region)
+        profiles = profiles.distinct().select_related("city")[:60]
+
+        def cover(p):
+            if getattr(p, "avatar", None):
+                return request.build_absolute_uri(p.avatar.url)
+            photo = p.media.filter(media_type="photo", is_hidden=False).first()
+            return request.build_absolute_uri(photo.file.url) if photo else None
+
+        out = []
+        for p in profiles:
+            stories = list(_live_stories(p).order_by("created_at"))
+            if not stories:
+                continue
+            out.append({
+                "slug": p.slug,
+                "stage_name": p.stage_name,
+                "cover_photo": cover(p),
+                "stories": StorySerializer(stories, many=True, context={"request": request}).data,
+            })
+        return Response(out)
+
+
 class StoryReportView(APIView):
     """Cualquiera (sin login) puede reportar una story como problemática."""
 

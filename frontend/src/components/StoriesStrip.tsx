@@ -54,20 +54,25 @@ export function StoriesStrip({
   );
 }
 
-function Viewer({
+export function Viewer({
   stories,
   startAt,
   stageName,
   onClose,
+  onComplete,
 }: {
   stories: Story[];
   startAt: number;
   stageName: string;
   onClose: () => void;
+  /** Se llama al terminar la última historia (vs onClose al cerrar a mano).
+      Sirve para encadenar a la siguiente modelo en la franja de ciudad. */
+  onComplete?: () => void;
 }) {
   const [idx, setIdx] = useState(startAt);
   const [progress, setProgress] = useState(0);
   const current = stories[idx];
+  const finish = onComplete ?? onClose;
 
   // Auto-advance: 5s para fotos. Para videos, esperamos al evento `ended`.
   useEffect(() => {
@@ -78,7 +83,7 @@ function Viewer({
         if (p >= 100) {
           clearInterval(interval);
           if (idx + 1 < stories.length) setIdx(idx + 1);
-          else onClose();
+          else finish();
           return 100;
         }
         return p + 100 / 50; // 50 ticks de 100ms = 5s
@@ -163,7 +168,7 @@ function Viewer({
         type="button"
         onClick={() => {
           if (idx + 1 < stories.length) setIdx(idx + 1);
-          else onClose();
+          else finish();
         }}
         className="absolute inset-y-0 right-0 z-0 w-1/3"
         aria-label="Siguiente"
@@ -187,7 +192,7 @@ function Viewer({
             controls={false}
             onEnded={() => {
               if (idx + 1 < stories.length) setIdx(idx + 1);
-              else onClose();
+              else finish();
             }}
             className="max-h-screen w-full"
           />
