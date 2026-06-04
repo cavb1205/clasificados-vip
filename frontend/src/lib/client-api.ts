@@ -107,6 +107,7 @@ export const auth = {
 /** Path al panel apropiado según rol/permisos. */
 export function panelHrefFor(me: { role?: string; is_staff?: boolean }) {
   if (me.is_staff) return "/admin/kyc";
+  if (me.role === "moderator") return "/admin";
   if (me.role === "model") return "/dashboard";
   if (me.role === "host") return "/anfitrion";
   return "/";

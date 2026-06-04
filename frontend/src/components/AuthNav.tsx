@@ -62,12 +62,12 @@ export function AuthNav() {
   if (me) {
     return (
       <div className="flex gap-2 text-sm">
-        {me.is_staff && (
+        {(me.is_staff || me.role === "moderator") && (
           <Link
-            href="/admin/kyc"
+            href="/admin"
             className="rounded-full border border-sky-700 px-3 py-1.5 text-sky-300 hover:bg-sky-950/30"
           >
-            Admin
+            {me.is_staff ? "Admin" : "Moderación"}
           </Link>
         )}
         {me.role === "client" && !me.is_staff ? (
