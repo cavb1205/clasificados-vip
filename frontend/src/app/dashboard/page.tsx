@@ -924,6 +924,30 @@ function MediaManager({
   );
 }
 
+const PUB_STATUS: Record<string, { label: string; cls: string }> = {
+  draft: { label: "Borrador", cls: "bg-neutral-700 text-neutral-300" },
+  pending_payment: { label: "Pendiente de pago", cls: "bg-amber-600/20 text-amber-200" },
+  active: { label: "Activa", cls: "bg-emerald-600/20 text-emerald-200" },
+  expired: { label: "Expirada", cls: "bg-red-600/20 text-red-200" },
+};
+
+/** Días enteros que faltan hasta `expires` (negativo si ya pasó). */
+function daysLeft(expires: string | null): number | null {
+  if (!expires) return null;
+  return Math.ceil((new Date(expires).getTime() - Date.now()) / 86_400_000);
+}
+
+/** Línea "Quedan N días · vence el DD-MM-YYYY" con color según urgencia. */
+function ExpiryLine({ expires }: { expires: string | null }) {
+  const d = daysLeft(expires);
+  if (d === null || !expires) return null;
+  const date = new Date(expires).toLocaleDateString("es-CL");
+  if (d < 0) return <p className="mt-1 text-xs text-red-300">Venció el {date}</p>;
+  const tone = d <= 3 ? "text-red-300" : d <= 7 ? "text-amber-300" : "text-emerald-300";
+  const txt = d === 0 ? `Vence hoy (${date})` : `Quedan ${d} día${d === 1 ? "" : "s"} · vence el ${date}`;
+  return <p className={`mt-1 text-xs font-medium ${tone}`}>{txt}</p>;
+}
+
 function PublicationManager({
   plans,
   publications,
@@ -952,20 +976,33 @@ function PublicationManager({
       <ul className="space-y-3">
         {publications.map((p) => (
           <li key={p.id} className="rounded-xl border border-neutral-800 p-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="font-medium">{p.title}</span>
-              <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-xs">{p.status}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${PUB_STATUS[p.status]?.cls ?? "bg-neutral-800"}`}>
+                {PUB_STATUS[p.status]?.label ?? p.status}
+              </span>
             </div>
+            {p.status === "active" && <ExpiryLine expires={p.expires_at} />}
+            {p.status === "pending_payment" && (
+              <p className="mt-1 text-xs text-amber-300">
+                Comprobante enviado · esperando que el equipo lo apruebe.
+              </p>
+            )}
             {(p.status === "draft" || p.status === "pending_payment") && (
               <ReceiptForm pubId={p.id} onUploaded={onChange} />
             )}
             {p.status === "expired" && (
-              <button
-                onClick={() => dashboard.renewPublication(p.id).then(onChange)}
-                className="mt-3 rounded-full bg-pink-600 px-4 py-1.5 text-sm font-medium hover:bg-pink-500"
-              >
-                Renovar anuncio
-              </button>
+              <>
+                <p className="mt-1 text-xs text-red-300">
+                  Tu anuncio ya no se muestra. Renuévalo para volver a aparecer.
+                </p>
+                <button
+                  onClick={() => dashboard.renewPublication(p.id).then(onChange)}
+                  className="mt-3 rounded-full bg-pink-600 px-4 py-1.5 text-sm font-medium hover:bg-pink-500"
+                >
+                  Renovar anuncio
+                </button>
+              </>
             )}
           </li>
         ))}
@@ -1499,14 +1536,29 @@ function VisibilityBanner({
   const now = Date.now();
   const trialEnds = profile.trial_ends_at ? new Date(profile.trial_ends_at).getTime() : 0;
   const inTrial = trialEnds > now;
-  const hasActivePub = publications.some(
+  const activePubs = publications.filter(
     (p) => p.status === "active" && p.expires_at && new Date(p.expires_at).getTime() > now,
   );
 
-  if (hasActivePub) {
+  if (activePubs.length > 0) {
+    // El que vence primero define el aviso.
+    const soonest = activePubs.reduce((a, b) =>
+      new Date(a.expires_at!).getTime() < new Date(b.expires_at!).getTime() ? a : b,
+    );
+    const d = daysLeft(soonest.expires_at)!;
+    const date = new Date(soonest.expires_at!).toLocaleDateString("es-CL");
+    if (d <= 3) {
+      return (
+        <div className="rounded-xl border border-amber-600/60 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+          ⏰ <strong>Tu anuncio vence {d === 0 ? "hoy" : `en ${d} día${d === 1 ? "" : "s"}`}</strong> ({date}).
+          Sube un nuevo comprobante en <strong>Mis anuncios</strong> para no perder visibilidad.
+        </div>
+      );
+    }
     return (
       <div className="rounded-xl border border-emerald-700/50 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
-        ✅ Tu anuncio está activo y visible en el listado público.
+        ✅ <strong>Tu anuncio está activo y visible.</strong> Quedan{" "}
+        <strong>{d} días</strong> · vence el {date}.
       </div>
     );
   }
