@@ -1653,7 +1653,7 @@ function AvailabilityPanel({
         )}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        {[60, 120, 240, 360].map((m) => (
+        {[60, 120, 240, 360, 720, 1440].map((m) => (
           <button
             key={m}
             disabled={busy}

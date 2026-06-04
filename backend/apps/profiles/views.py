@@ -142,9 +142,9 @@ class MyProfileViewSet(viewsets.ModelViewSet):
                 minutes = int(request.data.get("minutes", 0))
             except (TypeError, ValueError):
                 minutes = 0
-            if not (15 <= minutes <= 12 * 60):
+            if not (15 <= minutes <= 24 * 60):
                 return Response(
-                    {"detail": "Duración inválida (15 min – 12 h)."},
+                    {"detail": "Duración inválida (15 min – 24 h)."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             from datetime import timedelta
