@@ -141,7 +141,7 @@ class CityStoriesView(APIView):
             profiles = profiles.filter(city__region__slug=region)
         profiles = profiles.distinct().select_related("city")[:60]
 
-        def cover(p):
+        def avatar_fallback(p):
             if getattr(p, "avatar", None):
                 return request.build_absolute_uri(p.avatar.url)
             photo = p.media.filter(media_type="photo", is_hidden=False).first()
@@ -152,10 +152,20 @@ class CityStoriesView(APIView):
             stories = list(_live_stories(p).order_by("created_at"))
             if not stories:
                 continue
+            # La burbuja muestra la HISTORIA más reciente (no el avatar) para que
+            # se distinga el contenido. Si la última es video (sin frame), caemos
+            # a la foto-historia más reciente y, si no hay, al avatar.
+            latest_photo = next(
+                (s for s in reversed(stories) if s.kind == Story.Kind.PHOTO), None
+            )
+            thumb = (
+                request.build_absolute_uri(latest_photo.file.url)
+                if latest_photo else avatar_fallback(p)
+            )
             out.append({
                 "slug": p.slug,
                 "stage_name": p.stage_name,
-                "cover_photo": cover(p),
+                "cover_photo": thumb,
                 "stories": StorySerializer(stories, many=True, context={"request": request}).data,
             })
         return Response(out)
