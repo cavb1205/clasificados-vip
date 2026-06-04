@@ -224,7 +224,8 @@ class ResetPasswordView(APIView):
 class AdminUserSerializer(drf_serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "email", "username", "role", "is_active", "email_verified", "date_joined"]
+        fields = ["id", "email", "username", "role", "is_active", "is_staff",
+                  "is_superuser", "email_verified", "date_joined"]
 
 
 class AdminUserListView(generics.ListAPIView):
@@ -258,15 +259,36 @@ class AdminUserActionView(APIView):
         target = User.objects.filter(pk=pk).first()
         if not target:
             return Response({"detail": "Usuario no encontrado."}, status=404)
-        if target.is_staff or target == request.user:
-            return Response({"detail": "No puedes suspender a staff ni a tu propia cuenta."}, status=400)
+        # Protecciones transversales: nunca sobre uno mismo ni sobre superusuarios
+        # (la cuenta raíz solo se gestiona por consola).
+        if target == request.user:
+            return Response({"detail": "No puedes modificar tu propia cuenta."}, status=400)
+        if target.is_superuser:
+            return Response({"detail": "No puedes modificar una cuenta superusuario desde aquí."}, status=400)
+
         action = (request.data.get("action") or "").lower()
-        if action == "suspend":
-            target.is_active = False
-        elif action == "unsuspend":
-            target.is_active = True
-        else:
-            return Response({"detail": "action debe ser suspend|unsuspend"}, status=400)
-        target.save(update_fields=["is_active"])
-        log_action(request.user, f"user.{action}", target=f"{target.email} ({target.role})")
-        return Response(AdminUserSerializer(target).data)
+
+        if action in ("suspend", "unsuspend"):
+            if target.is_staff:
+                return Response({"detail": "No puedes suspender a un administrador."}, status=400)
+            target.is_active = action == "unsuspend"
+            target.save(update_fields=["is_active"])
+            log_action(request.user, f"user.{action}", target=f"{target.email} ({target.role})")
+            return Response(AdminUserSerializer(target).data)
+
+        if action == "set_role":
+            new_role = (request.data.get("role") or "").lower()
+            if new_role not in dict(User.Role.choices):
+                return Response({"detail": "Rol inválido."}, status=400)
+            old_role = target.role
+            target.role = new_role
+            # 'admin' requiere is_staff para acceder al panel; los demás no.
+            target.is_staff = new_role == User.Role.ADMIN
+            target.save(update_fields=["role", "is_staff"])
+            log_action(
+                request.user, "user.set_role",
+                target=target.email, note=f"{old_role} -> {new_role}",
+            )
+            return Response(AdminUserSerializer(target).data)
+
+        return Response({"detail": "action debe ser suspend|unsuspend|set_role"}, status=400)

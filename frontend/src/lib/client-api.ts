@@ -210,6 +210,8 @@ export const dashboard = {
     ),
   adminUserAction: (id: number, action: "suspend" | "unsuspend", reason?: string) =>
     apiFetch(`/auth/admin/users/${id}/action/`, { method: "POST", body: { action, reason } }),
+  adminUserSetRole: (id: number, role: string) =>
+    apiFetch(`/auth/admin/users/${id}/action/`, { method: "POST", body: { action: "set_role", role } }),
   // Bitácora de acciones admin (solo admin)
   adminActionLog: (action = "", q = "", page = 1) =>
     apiFetch<Paginated<unknown>>(

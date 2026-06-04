@@ -154,3 +154,51 @@ class AdminUserManagementTests(APITestCase):
             self.client.get(reverse("api:users:admin-users")).status_code,
             status.HTTP_403_FORBIDDEN,
         )
+
+    def test_set_role_moderator_does_not_grant_staff(self):
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:users:admin-user-action", args=[self.client_user.id]),
+            {"action": "set_role", "role": "moderator"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.client_user.refresh_from_db()
+        self.assertEqual(self.client_user.role, "moderator")
+        self.assertFalse(self.client_user.is_staff)
+
+    def test_set_role_admin_grants_staff_and_logs(self):
+        from apps.audit.models import AdminActionLog
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:users:admin-user-action", args=[self.client_user.id]),
+            {"action": "set_role", "role": "admin"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.client_user.refresh_from_db()
+        self.assertTrue(self.client_user.is_staff)
+        self.assertEqual(AdminActionLog.objects.filter(action="user.set_role").count(), 1)
+
+    def test_set_role_rejects_invalid_role(self):
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:users:admin-user-action", args=[self.client_user.id]),
+            {"action": "set_role", "role": "wizard"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cannot_modify_superuser(self):
+        root = User.objects.create_superuser(username="root", email="root@example.com", password="x")
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:users:admin-user-action", args=[root.id]),
+            {"action": "set_role", "role": "client"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cannot_modify_self(self):
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:users:admin-user-action", args=[self.admin.id]),
+            {"action": "set_role", "role": "client"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_400_BAD_REQUEST)

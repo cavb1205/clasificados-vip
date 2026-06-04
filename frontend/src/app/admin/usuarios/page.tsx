@@ -12,6 +12,8 @@ interface AdminUser {
   username: string;
   role: string;
   is_active: boolean;
+  is_staff: boolean;
+  is_superuser: boolean;
   email_verified: boolean;
   date_joined: string;
 }
@@ -19,6 +21,8 @@ interface AdminUser {
 const ROLE_LABEL: Record<string, string> = {
   client: "Cliente", model: "Modelo", host: "Anfitrión", moderator: "Moderador", admin: "Admin",
 };
+
+const ROLE_OPTIONS = ["client", "model", "host", "moderator", "admin"] as const;
 
 export default function AdminUsuariosPage() {
   const router = useRouter();
@@ -31,6 +35,7 @@ export default function AdminUsuariosPage() {
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
   const [forbidden, setForbidden] = useState(false);
+  const [meId, setMeId] = useState<number | null>(null);
 
   const reload = useCallback(async (query: string, r: string, p = 1) => {
     const d = await dashboard.adminUsers(query, r, "", p);
@@ -43,11 +48,13 @@ export default function AdminUsuariosPage() {
     auth
       .me()
       .then((me) => {
-        if (!(me as { is_staff?: boolean })?.is_staff) {
+        const u = me as { is_staff?: boolean; id?: number } | null;
+        if (!u?.is_staff) {
           setForbidden(true);
           setReady(true);
           return;
         }
+        setMeId(u.id ?? null);
         return reload("", "").then(() => setReady(true));
       })
       .catch(() => router.replace("/login?next=/admin/usuarios"));
@@ -65,6 +72,25 @@ export default function AdminUsuariosPage() {
     setBusyId(u.id);
     try {
       await dashboard.adminUserAction(u.id, action);
+      await reload(q, role, page);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function changeRole(u: AdminUser, newRole: string) {
+    if (newRole === u.role) return;
+    const promotesToAdmin = newRole === "admin";
+    const msg = promotesToAdmin
+      ? `¿Convertir a ${u.email} en ADMINISTRADOR? Tendrá acceso total al panel.`
+      : `¿Cambiar el rol de ${u.email} a ${ROLE_LABEL[newRole]}?`;
+    if (!confirm(msg)) return;
+    setBusyId(u.id);
+    setErr("");
+    try {
+      await dashboard.adminUserSetRole(u.id, newRole);
       await reload(q, role, page);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error");
@@ -109,6 +135,7 @@ export default function AdminUsuariosPage() {
               <div className="min-w-0">
                 <p className="font-medium">
                   {u.email}
+                  {u.is_superuser && <span className="ml-2 rounded-full bg-amber-600/20 px-2 py-0.5 text-xs text-amber-300">Superusuario</span>}
                   {!u.is_active && <span className="ml-2 rounded-full bg-red-600/20 px-2 py-0.5 text-xs text-red-300">Suspendido</span>}
                 </p>
                 <p className="text-xs text-neutral-500">
@@ -116,17 +143,36 @@ export default function AdminUsuariosPage() {
                   {u.email_verified ? " · email verificado" : ""} · alta {new Date(u.date_joined).toLocaleDateString("es-CL")}
                 </p>
               </div>
-              <button
-                disabled={busyId === u.id}
-                onClick={() => moderate(u)}
-                className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${
-                  u.is_active
-                    ? "border border-red-500 text-red-300 hover:bg-red-600/20"
-                    : "bg-emerald-600 font-medium text-white hover:bg-emerald-500"
-                }`}
-              >
-                {u.is_active ? "Suspender" : "Reactivar"}
-              </button>
+              {u.is_superuser || u.id === meId ? (
+                <span className="text-xs text-neutral-600">
+                  {u.id === meId ? "Tu cuenta" : "Protegido"}
+                </span>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={u.role}
+                    disabled={busyId === u.id}
+                    onChange={(e) => changeRole(u, e.target.value)}
+                    title="Cambiar rol"
+                    className="rounded-full border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs disabled:opacity-50"
+                  >
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                    ))}
+                  </select>
+                  <button
+                    disabled={busyId === u.id}
+                    onClick={() => moderate(u)}
+                    className={`rounded-full px-3 py-1.5 text-xs disabled:opacity-50 ${
+                      u.is_active
+                        ? "border border-red-500 text-red-300 hover:bg-red-600/20"
+                        : "bg-emerald-600 font-medium text-white hover:bg-emerald-500"
+                    }`}
+                  >
+                    {u.is_active ? "Suspender" : "Reactivar"}
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
