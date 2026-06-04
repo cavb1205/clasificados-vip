@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { Plus_Jakarta_Sans, Fraunces } from "next/font/google";
 import "./globals.css";
 import { AgeGate } from "@/components/AgeGate";
@@ -23,8 +24,8 @@ const display = Fraunces({
 export const metadata: Metadata = {
   metadataBase: new URL("https://clasificados.vip"),
   title: {
-    default: "Clasificados VIP — Anuncios verificados en Chile",
-    template: "%s · Clasificados VIP",
+    default: "PortalVip Chile — Anuncios verificados",
+    template: "%s · PortalVip Chile",
   },
   description:
     "Directorio de anuncios verificados por región y comuna en Chile. Perfiles con verificación de identidad.",
@@ -41,11 +42,26 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AgeGate />
         <header className="border-b border-neutral-800">
           <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-4">
-            <Link
-              href="/"
-              className="font-display text-xl font-semibold tracking-tight"
-            >
-              Clasificados<span className="text-pink-500">VIP</span>
+            <Link href="/" className="flex items-center gap-2">
+              <Image
+                src="/brand/symbol.png"
+                alt="PortalVip Chile"
+                width={40}
+                height={32}
+                priority
+                className="h-8 w-auto"
+              />
+              <span className="flex flex-col leading-none">
+                <span className="font-display text-xl font-semibold tracking-tight">
+                  Portal
+                  <span className="bg-gradient-to-br from-[#ecccb9] to-[#b97a5a] bg-clip-text text-transparent">
+                    Vip
+                  </span>
+                </span>
+                <span className="mt-0.5 text-[10px] uppercase tracking-[0.25em] text-neutral-500">
+                  Chile
+                </span>
+              </span>
             </Link>
             <form
               action="/buscar"
@@ -65,7 +81,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
         <footer className="border-t border-neutral-800 px-4 py-6 text-center text-xs text-neutral-500">
-          <p>Solo mayores de 18 años · No intermediamos transacciones · © Clasificados VIP</p>
+          <p>Solo mayores de 18 años · No intermediamos transacciones · © PortalVip Chile</p>
           <p className="mt-2 flex justify-center gap-4">
             <Link href="/terminos" className="hover:text-pink-400">
               Términos

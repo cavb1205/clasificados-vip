@@ -19,7 +19,7 @@ export function ContactPanel({ slug, stageName, whatsapp, telegram }: Props) {
   const hasAny = Boolean(whatsapp) || Boolean(telegram);
   if (!hasAny) return null;
 
-  const greeting = encodeURIComponent(`Hola ${stageName}, te vi en Clasificados VIP.`);
+  const greeting = encodeURIComponent(`Hola ${stageName}, te vi en PortalVip Chile.`);
   // El número de WhatsApp viene en formato internacional sin "+" (ej. 56912345678).
   // Reusamos el mismo dígito para la llamada y para la deep-link de WhatsApp.
   const phone = whatsapp;
@@ -76,7 +76,7 @@ export function ContactPanel({ slug, stageName, whatsapp, telegram }: Props) {
         </a>
       )}
       <p className="text-center text-xs text-neutral-500">
-        El acuerdo es directo con la modelo. Clasificados VIP no intermedia ni cobra
+        El acuerdo es directo con la modelo. PortalVip Chile no intermedia ni cobra
         por transacciones.
       </p>
     </div>

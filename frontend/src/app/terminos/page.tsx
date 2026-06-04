@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Términos y condiciones",
-  description: "Términos del servicio de Clasificados VIP.",
+  description: "Términos del servicio de PortalVip Chile.",
   alternates: { canonical: "/terminos" },
 };
 
@@ -24,7 +24,7 @@ export default function TermsPage() {
 
       <h2 id="objeto" className="mt-8 text-xl font-semibold text-neutral-100">1. Objeto</h2>
       <p>
-        Clasificados VIP (&quot;la Plataforma&quot;) es un directorio en línea de anuncios
+        PortalVip Chile (&quot;la Plataforma&quot;) es un directorio en línea de anuncios
         clasificados para adultos en Chile. La Plataforma actúa exclusivamente como
         intermediario tecnológico que aloja anuncios; <strong>NO interviene en las
         transacciones, encuentros, ni servicios</strong> que las anunciantes acuerden con
@@ -46,7 +46,7 @@ export default function TermsPage() {
         que incluye: (a) imagen de cédula de identidad chilena o pasaporte vigente,
         (b) selfie sosteniendo el documento al lado del rostro, y (c) video corto leyendo
         la frase de consentimiento que la Plataforma genera al momento de la verificación,
-        que incluye un código aleatorio único de fecha y referencia a Clasificados VIP.
+        que incluye un código aleatorio único de fecha y referencia a PortalVip Chile.
       </p>
       <p>
         La verificación tiene por objeto: (i) confirmar la mayoría de edad, (ii) prevenir

@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Política de privacidad",
-  description: "Tratamiento de datos personales en Clasificados VIP.",
+  description: "Tratamiento de datos personales en PortalVip Chile.",
   alternates: { canonical: "/privacidad" },
 };
 
@@ -25,7 +25,7 @@ export default function PrivacyPage() {
 
       <h2 id="responsable" className="mt-8 text-xl font-semibold text-neutral-100">1. Responsable del tratamiento</h2>
       <p>
-        Clasificados VIP (en adelante &quot;la Plataforma&quot;) es responsable del
+        PortalVip Chile (en adelante &quot;la Plataforma&quot;) es responsable del
         tratamiento de los datos personales descritos en esta Política, conforme a la
         Ley 19.628 sobre protección de la vida privada.
       </p>

@@ -193,7 +193,7 @@ export default function RoomsBrowsePage() {
 
 function waLink(number: string, title: string) {
   const digits = number.replace(/[^\d]/g, "");
-  const text = encodeURIComponent(`Hola, vi tu publicación "${title}" en Clasificados VIP.`);
+  const text = encodeURIComponent(`Hola, vi tu publicación "${title}" en PortalVip Chile.`);
   return `https://wa.me/${digits}?text=${text}`;
 }
 
