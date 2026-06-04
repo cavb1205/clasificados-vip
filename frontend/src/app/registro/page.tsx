@@ -21,8 +21,9 @@ export default function RegisterPage() {
     try {
       await auth.register(form);
       await auth.login(form.email, form.password);
+      // Las modelos nuevas entran al asistente guiado paso a paso.
       router.push(
-        form.role === "host" ? "/anfitrion" : form.role === "client" ? "/" : "/dashboard",
+        form.role === "host" ? "/anfitrion" : form.role === "client" ? "/" : "/dashboard/inicio",
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al registrarse");

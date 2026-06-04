@@ -150,6 +150,15 @@ export default function DashboardPage() {
         </div>
       </div>
       {msg && <p className="rounded-lg bg-neutral-900 px-4 py-2 text-sm text-pink-400">{msg}</p>}
+      {(!profile || profile.verification_status !== "verified" || publications.length === 0) && (
+        <Link
+          href="/dashboard/inicio"
+          className="flex items-center justify-between gap-3 rounded-xl border border-pink-500/40 bg-pink-600/10 px-4 py-3 text-sm text-pink-200 hover:border-pink-500"
+        >
+          <span>✨ <strong>¿Recién empiezas?</strong> Te guiamos paso a paso para dejar tu perfil listo y visible.</span>
+          <span className="shrink-0 font-medium">Abrir guía →</span>
+        </Link>
+      )}
       <VisibilityBanner profile={profile} publications={publications} />
       {profile && profile.verification_status === "verified" && (
         <AvailabilityPanel
