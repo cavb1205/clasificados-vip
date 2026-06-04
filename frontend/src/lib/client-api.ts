@@ -233,6 +233,18 @@ export const dashboard = {
     }),
   adminExpirePublication: (id: number) =>
     apiFetch(`/admin/publications/${id}/expire/`, { method: "POST" }),
+  adminGrantDays: (publicationId: number, days: number, note = "") =>
+    apiFetch(`/admin/publications/${publicationId}/grant/`, {
+      method: "POST", body: { days, note },
+    }),
+  adminProfileDetail: (profileId: number) =>
+    apiFetch<{
+      profile: Record<string, unknown>;
+      publications: { id: number; title: string; status: string; is_featured: boolean; is_live: boolean; expires_at: string | null; plan_name: string | null }[];
+      receipts: { id: number; amount: number; status: string; publication_title: string; created_at: string; reviewed_at: string | null }[];
+      reports: { id: number; reason: string; reporter_email: string | null; created_at: string }[];
+      recent_actions: { action: string; actor_email: string | null; note: string; created_at: string }[];
+    }>(`/admin/profiles/${profileId}/detail/`),
   adminPlans: () => apiFetch<unknown[]>("/admin/plans/"),
   adminCreatePlan: (data: Record<string, unknown>) =>
     apiFetch("/admin/plans/", { method: "POST", body: data }),

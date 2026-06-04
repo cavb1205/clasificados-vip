@@ -170,3 +170,48 @@ class PaymentNotificationTests(_Base):
         PaymentReceipt.objects.create(publication=pub, amount=12000)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("comprobante pendiente", mail.outbox[0].subject.lower())
+
+
+class AdminGrantAndDetailTests(_Base):
+    def setUp(self):
+        super().setUp()
+        from rest_framework.test import APIClient
+        self.admin = User.objects.create_user(
+            username="ad", email="ad@example.com", password="x", role="admin", is_staff=True
+        )
+        self.api = APIClient()
+        self.api.force_authenticate(self.admin)
+
+    def test_grant_extends_and_activates_draft(self):
+        from django.urls import reverse
+        pub = Publication.objects.create(
+            profile=self.profile, title="A", status=Publication.Status.DRAFT
+        )
+        r = self.api.post(
+            reverse("api:publications:admin-publication-grant", args=[pub.id]),
+            {"days": 10}, format="json",
+        )
+        self.assertEqual(r.status_code, 200)
+        pub.refresh_from_db()
+        self.assertEqual(pub.status, Publication.Status.ACTIVE)
+        self.assertTrue(pub.is_live)
+
+    def test_grant_rejects_out_of_range(self):
+        from django.urls import reverse
+        pub = Publication.objects.create(profile=self.profile, title="A")
+        r = self.api.post(
+            reverse("api:publications:admin-publication-grant", args=[pub.id]),
+            {"days": 999}, format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_profile_detail_returns_sections(self):
+        from django.urls import reverse
+        pub = Publication.objects.create(profile=self.profile, title="A")
+        PaymentReceipt.objects.create(publication=pub, amount=12000)
+        r = self.api.get(
+            reverse("api:profiles:admin-profile-detail", args=[self.profile.id])
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.data["publications"]), 1)
+        self.assertEqual(len(r.data["receipts"]), 1)

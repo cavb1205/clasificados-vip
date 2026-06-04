@@ -31,4 +31,9 @@ urlpatterns = [
         views.AdminModelProfileActionView.as_view(),
         name="admin-profile-action",
     ),
+    path(
+        "admin/profiles/<int:pk>/detail/",
+        views.AdminProfileDetailView.as_view(),
+        name="admin-profile-detail",
+    ),
 ] + router.urls

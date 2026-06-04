@@ -399,6 +399,68 @@ class AdminModelProfileActionView(generics.GenericAPIView):
         return Response(AdminModelProfileSerializer(profile).data)
 
 
+class AdminProfileDetailView(APIView):
+    """Ficha unificada de una modelo para moderación (admin y moderador):
+    publicaciones, pagos, reportes y acciones recientes en un solo lugar."""
+
+    permission_classes = [IsModerator]
+
+    def get(self, request, pk):
+        profile = ModelProfile.objects.select_related("user", "city").filter(pk=pk).first()
+        if not profile:
+            return Response({"detail": "No encontrado."}, status=404)
+        from apps.audit.models import AdminActionLog
+        from apps.publications.models import PaymentReceipt
+
+        publications = [
+            {
+                "id": p.id, "title": p.title, "status": p.status,
+                "is_featured": p.is_featured, "is_live": p.is_live,
+                "expires_at": p.expires_at,
+                "plan_name": p.plan.name if p.plan else None,
+            }
+            for p in profile.publications.select_related("plan").all()
+        ]
+        receipts = [
+            {
+                "id": r.id, "amount": r.amount, "status": r.status,
+                "publication_title": r.publication.title,
+                "created_at": r.created_at, "reviewed_at": r.reviewed_at,
+            }
+            for r in (
+                PaymentReceipt.objects.filter(publication__profile=profile)
+                .select_related("publication").order_by("-created_at")[:15]
+            )
+        ]
+        reports = [
+            {
+                "id": rp.id, "reason": rp.reason,
+                "reporter_email": getattr(rp.reporter, "email", None),
+                "created_at": rp.created_at,
+            }
+            for rp in profile.reports.select_related("reporter").order_by("-created_at")[:15]
+        ]
+        actions = [
+            {
+                "action": a.action, "actor_email": getattr(a.actor, "email", None),
+                "note": a.note, "created_at": a.created_at,
+            }
+            for a in (
+                AdminActionLog.objects.filter(
+                    Q(target__icontains=profile.user.email)
+                    | Q(target__icontains=profile.stage_name)
+                ).select_related("actor").order_by("-created_at")[:15]
+            )
+        ]
+        return Response({
+            "profile": AdminModelProfileSerializer(profile).data,
+            "publications": publications,
+            "receipts": receipts,
+            "reports": reports,
+            "recent_actions": actions,
+        })
+
+
 # ─── Favoritos (clientes) ────────────────────────────────────────────────────
 from rest_framework.throttling import ScopedRateThrottle  # noqa: E402
 

@@ -27,6 +27,11 @@ urlpatterns = [
         views.AdminExpirePublicationView.as_view(),
         name="admin-publication-expire",
     ),
+    path(
+        "admin/publications/<int:pk>/grant/",
+        views.AdminPublicationGrantView.as_view(),
+        name="admin-publication-grant",
+    ),
     path("admin/plans/", views.AdminPlanListCreateView.as_view(), name="admin-plans"),
     path(
         "admin/plans/<int:pk>/",

@@ -119,6 +119,17 @@ class Publication(models.Model):
             self.is_featured = True
         self.save(update_fields=["status", "expires_at", "is_featured", "updated_at"])
 
+    def extend(self, *, days: int):
+        """Suma días de cortesía/extensión (admin).
+
+        Si la publicación sigue viva, parte de su expiración actual; si está
+        vencida o nunca activada, parte de ahora. Deja el anuncio activo.
+        """
+        base = self.expires_at if (self.is_live and self.expires_at) else timezone.now()
+        self.status = self.Status.ACTIVE
+        self.expires_at = base + timedelta(days=days)
+        self.save(update_fields=["status", "expires_at", "updated_at"])
+
 
 class PaymentReceipt(models.Model):
     """Comprobante de transferencia que la modelo sube para una publicación."""

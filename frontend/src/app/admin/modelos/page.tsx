@@ -166,10 +166,16 @@ export default function AdminModelosPage() {
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">
                     <Link
-                      href={`/perfil/${p.slug}`}
+                      href={`/admin/modelos/${p.id}`}
                       className="hover:text-pink-300"
                     >
                       {p.stage_name}
+                    </Link>{" "}
+                    <Link
+                      href={`/perfil/${p.slug}`}
+                      className="text-xs font-normal text-sky-400 hover:underline"
+                    >
+                      ↗
                     </Link>{" "}
                     <span className="text-xs text-neutral-500">
                       · {GENDER_LABEL[p.gender]} · {p.age} años

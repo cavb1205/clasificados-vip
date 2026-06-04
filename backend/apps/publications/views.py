@@ -185,6 +185,45 @@ class AdminPaymentActionView(generics.GenericAPIView):
         )
 
 
+class AdminPublicationGrantView(generics.GenericAPIView):
+    """POST /admin/publications/<id>/grant/ con {days, note?}.
+
+    Cortesía/extensión: suma días al anuncio (activándolo si hace falta). Solo
+    admin (decisión de negocio). Avisa a la modelo y queda en la bitácora.
+    """
+
+    permission_classes = [permissions.IsAdminUser]
+    queryset = Publication.objects.all()
+
+    def post(self, request, pk):
+        pub = self.get_object()
+        try:
+            days = int(request.data.get("days"))
+        except (TypeError, ValueError):
+            return Response({"detail": "days debe ser un entero."}, status=400)
+        if not (1 <= days <= 365):
+            return Response({"detail": "days fuera de rango (1-365)."}, status=400)
+        note = (request.data.get("note") or "").strip()
+        pub.extend(days=days)
+        from apps.audit.models import log_action
+        from apps.notifications.models import notify_user
+        log_action(
+            request.user, "publication.grant_days",
+            target=f"{pub.profile.stage_name} · {pub.title}",
+            note=f"+{days}d {note}".strip(),
+        )
+        notify_user(
+            pub.profile.user, kind="publication",
+            title="Días de cortesía aplicados",
+            message=(
+                f"Tu anuncio «{pub.title}» fue extendido {days} día(s); "
+                f"vence el {pub.expires_at:%d-%m-%Y}."
+                + (f" Nota: {note}" if note else "")
+            ),
+        )
+        return Response({"id": pub.id, "status": pub.status, "expires_at": pub.expires_at})
+
+
 class AdminStatsView(generics.GenericAPIView):
     """KPIs agregados (admin y moderador)."""
 
