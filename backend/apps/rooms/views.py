@@ -250,6 +250,41 @@ class RoomPhotoFileView(APIView):
 
 
 # ─── Modelo activa: navegar habitaciones ────────────────────────────────────
+def _live_rooms_qs():
+    """Anuncios de habitación realmente visibles (vigentes, no pausados/suspendidos)."""
+    from django.utils import timezone
+    return RoomListing.objects.filter(
+        status=RoomListing.Status.ACTIVE,
+        is_paused=False,
+        is_suspended=False,
+        owner__is_suspended=False,
+        expires_at__gt=timezone.now(),
+    )
+
+
+class RoomCitiesView(APIView):
+    """Comunas con al menos un anuncio de habitación vigente.
+
+    Para el filtro del browse: solo se listan las comunas que tienen anuncios
+    activos. Mismo gate que el listado (modelos activas).
+    """
+
+    permission_classes = [IsActiveModel]
+
+    def get(self, request):
+        from apps.profiles.models import City
+
+        cities = (
+            City.objects.filter(id__in=_live_rooms_qs().values("city_id"))
+            .select_related("region")
+            .order_by("name")
+        )
+        return Response([
+            {"id": c.id, "name": c.name, "region_name": c.region.name}
+            for c in cities
+        ])
+
+
 class PublicRoomListView(generics.ListAPIView):
     """Habitaciones vigentes en todas las ciudades. Solo para modelos activas."""
 
@@ -273,7 +308,10 @@ class PublicRoomListView(generics.ListAPIView):
         params = self.request.query_params
         region = params.get("region")
         city = params.get("city")
+        city_id = params.get("city_id")
         period = params.get("price_period")
+        if city_id:
+            qs = qs.filter(city_id=city_id)
         if region:
             qs = qs.filter(city__region__slug=region)
         if city:

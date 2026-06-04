@@ -284,3 +284,21 @@ class HostSuspensionTests(_Base):
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.host.refresh_from_db()
         self.assertTrue(self.host.is_suspended)
+
+
+class RoomCitiesTests(_Base):
+    def test_lists_only_cities_with_live_rooms(self):
+        from django.urls import reverse
+        self._published()
+        self.client.force_authenticate(self.model_user)
+        r = self.client.get(reverse("api:rooms:room-cities"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.data), 1)
+        self.assertEqual(r.data[0]["id"], self.city.id)
+        self.assertIn("region_name", r.data[0])
+
+    def test_empty_without_live_rooms(self):
+        from django.urls import reverse
+        self.client.force_authenticate(self.model_user)
+        r = self.client.get(reverse("api:rooms:room-cities"))
+        self.assertEqual(len(r.data), 0)

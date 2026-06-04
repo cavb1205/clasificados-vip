@@ -18,6 +18,7 @@ urlpatterns = [
         name="my-room-subscription",
     ),
     # Navegación para modelos activas.
+    path("room-cities/", views.RoomCitiesView.as_view(), name="room-cities"),
     path("rooms/", views.PublicRoomListView.as_view(), name="public-list"),
     path("rooms/<int:pk>/", views.PublicRoomDetailView.as_view(), name="public-detail"),
     path("rooms/<int:pk>/report/", views.RoomReportView.as_view(), name="report"),

@@ -360,6 +360,9 @@ export const rooms = {
   // Modelo activa
   browse: (params: Record<string, string> = {}) =>
     apiFetch<PublicRoom[]>(`/rooms/?${new URLSearchParams(params).toString()}`),
+  // Comunas con anuncios activos (para el filtro del browse)
+  cities: () =>
+    apiFetch<{ id: number; name: string; region_name: string }[]>("/room-cities/"),
   report: (id: number, reason: string) =>
     apiFetch(`/rooms/${id}/report/`, { method: "POST", body: { reason } }),
   // Admin / moderador (reportes de habitaciones)

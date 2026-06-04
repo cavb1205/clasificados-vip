@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { auth, dashboard, rooms, type PublicRoom } from "@/lib/client-api";
+import { auth, rooms, type PublicRoom } from "@/lib/client-api";
 
 const CLP = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -18,15 +18,10 @@ const PERIOD_LABEL: Record<string, string> = {
   monthly: "/ mes",
 };
 
-interface Region {
+interface RoomCity {
   id: number;
   name: string;
-  slug: string;
-}
-interface City {
-  id: number;
-  name: string;
-  slug: string;
+  region_name: string;
 }
 
 export default function RoomsBrowsePage() {
@@ -34,17 +29,14 @@ export default function RoomsBrowsePage() {
   const [ready, setReady] = useState(false);
   const [gated, setGated] = useState(false);
   const [items, setItems] = useState<PublicRoom[]>([]);
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [cities, setCities] = useState<City[]>([]);
-  const [region, setRegion] = useState("");
-  const [city, setCity] = useState("");
+  const [roomCities, setRoomCities] = useState<RoomCity[]>([]);
+  const [cityId, setCityId] = useState("");
   const [availableNow, setAvailableNow] = useState(false);
   const [selected, setSelected] = useState<PublicRoom | null>(null);
 
   const load = useCallback(async () => {
     const params: Record<string, string> = {};
-    if (region) params.region = region;
-    if (city) params.city = city;
+    if (cityId) params.city_id = cityId;
     if (availableNow) params.available_now = "true";
     try {
       setItems(await rooms.browse(params));
@@ -57,7 +49,7 @@ export default function RoomsBrowsePage() {
         throw e;
       }
     }
-  }, [region, city, availableNow]);
+  }, [cityId, availableNow]);
 
   useEffect(() => {
     auth
@@ -68,10 +60,12 @@ export default function RoomsBrowsePage() {
           router.replace("/");
           return Promise.reject(new Error("redirect"));
         }
-        return dashboard.regions();
+        // Solo comunas con anuncios activos. Si el perfil no está activo, el
+        // backend devuelve 403 → lo tratamos como lista vacía + estado gated.
+        return rooms.cities().catch(() => [] as RoomCity[]);
       })
-      .then((r) => {
-        setRegions(r as Region[]);
+      .then((c) => {
+        setRoomCities(c as RoomCity[]);
         return load();
       })
       .then(() => setReady(true))
@@ -83,18 +77,9 @@ export default function RoomsBrowsePage() {
   }, [router]);
 
   useEffect(() => {
-    if (region) {
-      dashboard.cities(region).then((c) => setCities(c as City[]));
-    } else {
-      setCities([]);
-    }
-    setCity("");
-  }, [region]);
-
-  useEffect(() => {
     if (ready) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [region, city, availableNow]);
+  }, [cityId, availableNow]);
 
   if (!ready) return <p className="text-neutral-400">Cargando…</p>;
 
@@ -135,26 +120,17 @@ export default function RoomsBrowsePage() {
           <div className="flex flex-wrap gap-3">
             <select
               className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
+              value={cityId}
+              onChange={(e) => setCityId(e.target.value)}
             >
-              <option value="">Toda región</option>
-              {regions.map((r) => (
-                <option key={r.id} value={r.slug}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm disabled:opacity-50"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              disabled={!region}
-            >
-              <option value="">Toda comuna</option>
-              {cities.map((c) => (
-                <option key={c.id} value={c.slug}>
-                  {c.name}
+              <option value="">
+                {roomCities.length === 0
+                  ? "Sin comunas con anuncios"
+                  : "Todas las comunas"}
+              </option>
+              {roomCities.map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.name} · {c.region_name}
                 </option>
               ))}
             </select>
