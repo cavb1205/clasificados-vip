@@ -27,7 +27,7 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
     <FavoriteHeart slug={profile.slug} className="absolute right-2 top-2 z-10" />
     <Link
       href={`/perfil/${profile.slug}`}
-      className={`group relative block overflow-hidden rounded-2xl border bg-neutral-900 transition ${ring}`}
+      className={`card-gold group relative block overflow-hidden rounded-2xl border bg-neutral-900 transition ${ring}`}
     >
       <div className="relative">
         {profile.cover_photo ? (

@@ -49,7 +49,7 @@ export default function LoginPage() {
       {error && <p className="text-sm text-red-400">{error}</p>}
       <button
         disabled={loading}
-        className="w-full rounded-full bg-pink-600 py-2 font-medium hover:bg-pink-500 disabled:opacity-50"
+        className="w-full rounded-full btn-gold py-2 font-medium disabled:opacity-50"
       >
         {loading ? "Ingresando…" : "Ingresar"}
       </button>

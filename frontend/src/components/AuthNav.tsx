@@ -73,14 +73,14 @@ export function AuthNav() {
         {me.role === "client" && !me.is_staff ? (
           <Link
             href="/favoritos"
-            className="rounded-full bg-pink-600 px-4 py-1.5 font-medium hover:bg-pink-500"
+            className="rounded-full btn-gold px-4 py-1.5 font-medium"
           >
             ♥ Favoritos
           </Link>
         ) : (
           <Link
             href={panelHrefFor(me)}
-            className="rounded-full bg-pink-600 px-4 py-1.5 font-medium hover:bg-pink-500"
+            className="rounded-full btn-gold px-4 py-1.5 font-medium"
           >
             {me.is_staff ? "Cola KYC" : "Mi panel"}
           </Link>

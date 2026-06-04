@@ -34,7 +34,7 @@ export function ContactPanel({ slug, stageName, whatsapp, telegram }: Props) {
           logContactClick(slug);
           setRevealed(true);
         }}
-        className="w-full rounded-2xl bg-pink-600 px-5 py-4 text-base font-semibold text-white shadow-lg shadow-pink-600/20 hover:bg-pink-500"
+        className="w-full rounded-2xl btn-gold px-5 py-4 text-base font-semibold"
       >
         Contactar a {stageName}
       </button>

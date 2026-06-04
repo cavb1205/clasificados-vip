@@ -21,11 +21,16 @@ export default async function HomePage() {
 
   return (
     <div>
-      <section className="mb-8">
-        <h1 className="font-display text-4xl font-semibold tracking-tight">
-          Anuncios verificados en Chile
+      <section className="mb-10">
+        <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+          <span className="mr-2 align-middle text-pink-400" aria-hidden>✦</span>
+          Anuncios{" "}
+          <span className="bg-gradient-to-br from-[#ecccb9] to-[#b97a5a] bg-clip-text text-transparent">
+            verificados
+          </span>{" "}
+          en Chile
         </h1>
-        <p className="mt-2 max-w-2xl text-neutral-400">
+        <p className="mt-3 max-w-2xl text-lg text-neutral-400">
           Elige tu comuna y explora perfiles con identidad verificada.
         </p>
       </section>

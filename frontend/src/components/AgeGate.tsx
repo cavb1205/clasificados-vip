@@ -28,7 +28,7 @@ export function AgeGate() {
               localStorage.setItem(KEY, "1");
               setConfirmed(true);
             }}
-            className="flex-1 rounded-full bg-pink-600 px-4 py-2 font-medium hover:bg-pink-500"
+            className="flex-1 rounded-full btn-gold px-4 py-2 font-medium"
           >
             Soy mayor de 18
           </button>
