@@ -29,7 +29,7 @@ export function StoriesStrip({
         aria-label={`Ver historias de ${stageName}`}
       >
         <span className="relative inline-block">
-          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 via-fuchsia-500 to-amber-400" />
+          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-[#ecccb9] via-[#c68b6a] to-[#9f6242]" />
           <span className="relative m-[3px] block h-16 w-16 overflow-hidden rounded-full border-2 border-neutral-950">
             {coverPhoto && <Image src={coverPhoto} alt="" width={64} height={64} unoptimized className="h-full w-full object-cover" />}
           </span>

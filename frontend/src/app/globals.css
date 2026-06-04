@@ -9,6 +9,31 @@
   --foreground: #ededed;
 }
 
+/* Paleta de marca PortalVip (rosa-dorado / cobre del logo).
+   Remapeamos la escala `pink-*` de Tailwind a tonos cobre para unificar todo
+   el sitio con el logo SIN tocar las clases (botones, bordes, enlaces, badges).
+   Afinada para contraste: 600 es cobre profundo (texto blanco legible);
+   400-500 son rosa-dorado claro para bordes/enlaces sobre fondo oscuro.
+   NOTA: las clases siguen llamándose `pink-*` por compatibilidad; renderizan cobre. */
+@theme {
+  --color-pink-50: #faf0e9;
+  --color-pink-100: #f3dccd;
+  --color-pink-200: #e9c6ae;
+  --color-pink-300: #dcab8a;
+  --color-pink-400: #cd9068;
+  --color-pink-500: #b87a52;
+  --color-pink-600: #9f6242;
+  --color-pink-700: #824f37;
+  --color-pink-800: #693f2d;
+  --color-pink-900: #553527;
+  --color-pink-950: #2e1b13;
+}
+
+::selection {
+  background: #9f6242;
+  color: #fff;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
