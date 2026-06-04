@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getProfile, getProfileRating, getProfileReviews, getProfileStories } from "@/lib/api";
 import { StoriesStrip } from "@/components/StoriesStrip";
 import { PhotoGallery } from "@/components/PhotoGallery";
+import { ProfileVideo } from "@/components/ProfileVideo";
 import { ContactPanel } from "@/components/ContactPanel";
 import { ProfileActions } from "@/components/ProfileActions";
 import { ProfileTracker } from "@/components/ProfileTracker";
@@ -247,12 +248,19 @@ export default async function ProfilePage({ params }: { params: Params }) {
           </div>
         </div>
 
-        {/* Columna de galería (muro de fotos) */}
+        {/* Columna de galería (muro de fotos + video) */}
         <div className="mt-2 lg:col-span-3 lg:mt-0">
           {profile.photos?.length > 0 ? (
             <PhotoGallery photos={profile.photos} alt={profile.stage_name} />
           ) : (
             <p className="mt-6 text-sm text-neutral-500">Esta modelo aún no subió fotos a su muro.</p>
+          )}
+          {profile.videos?.length > 0 && (
+            <div className="mt-4 space-y-4">
+              {profile.videos.map((v) => (
+                <ProfileVideo key={v} src={v} />
+              ))}
+            </div>
           )}
         </div>
       </div>

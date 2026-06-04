@@ -70,6 +70,7 @@ export interface PublicProfile {
   city: City | null;
   avatar: string | null;
   photos: string[];
+  videos: string[];
   cover_photo: string | null;
   is_featured: boolean;
   rating_average: number | null;

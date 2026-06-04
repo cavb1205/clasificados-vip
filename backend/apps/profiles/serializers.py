@@ -149,6 +149,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     services = ServiceSerializer(many=True, read_only=True)
     avatar = serializers.SerializerMethodField()
     photos = serializers.SerializerMethodField()
+    videos = serializers.SerializerMethodField()
     cover_photo = serializers.SerializerMethodField()
     # Anotados por la vista (annotate_public_profiles); ausentes en otros contextos.
     is_featured = serializers.BooleanField(read_only=True, default=False)
@@ -162,7 +163,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         model = ModelProfile
         fields = [
             "stage_name", "slug", "gender", "description", "age", "services",
-            "base_rate", "city", "avatar", "photos", "cover_photo",
+            "base_rate", "city", "avatar", "photos", "videos", "cover_photo",
             "is_featured", "rating_average", "rating_count",
             "whatsapp", "telegram",
             "is_available_now", "available_until",
@@ -180,6 +181,13 @@ class PublicProfileSerializer(serializers.ModelSerializer):
 
     def get_photos(self, obj):
         return [self._abs(m.file.url) for m in self._photo_qs(obj)]
+
+    def get_videos(self, obj):
+        # Videos del muro no ocultados por moderación.
+        return [
+            self._abs(m.file.url)
+            for m in obj.media.filter(media_type="video", is_hidden=False)
+        ]
 
     def get_cover_photo(self, obj):
         # La portada (tarjetas, og:image) prioriza el avatar; si no hay, la 1ª del muro.

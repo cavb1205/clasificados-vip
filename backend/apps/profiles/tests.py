@@ -425,3 +425,33 @@ class AvatarTests(APITestCase):
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.profile.refresh_from_db()
         self.assertFalse(self.profile.avatar)
+
+
+class WallVideoPublicTests(APITestCase):
+    """El video del muro se expone en el perfil público y respeta is_hidden."""
+
+    def setUp(self):
+        from apps.media_content.models import MediaContent
+        self.MediaContent = MediaContent
+        u = _make_user("vid@example.com")
+        self.profile = ModelProfile.objects.create(
+            user=u, stage_name="Vid", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
+        )
+
+    def test_video_appears_in_public_detail(self):
+        self.MediaContent.objects.create(
+            profile=self.profile, media_type="video", file="profiles/media/v.mp4"
+        )
+        resp = self.client.get(reverse("api:profiles:public-detail", args=[self.profile.slug]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data["videos"]), 1)
+
+    def test_hidden_video_excluded(self):
+        self.MediaContent.objects.create(
+            profile=self.profile, media_type="video", file="profiles/media/v.mp4",
+            is_hidden=True,
+        )
+        resp = self.client.get(reverse("api:profiles:public-detail", args=[self.profile.slug]))
+        self.assertEqual(len(resp.data["videos"]), 0)
