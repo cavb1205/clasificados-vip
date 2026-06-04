@@ -546,9 +546,9 @@ class AdminHostListView(generics.ListAPIView):
 
 
 class AdminHostActionView(generics.GenericAPIView):
-    """Suspender / reactivar un anfitrión (solo admin). Oculta TODOS sus anuncios."""
+    """Suspender / reactivar un anfitrión (admin o moderador). Oculta TODOS sus anuncios."""
 
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsModerator]
     queryset = HostProfile.objects.all()
 
     def post(self, request, pk):

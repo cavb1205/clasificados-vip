@@ -40,8 +40,8 @@ export default function AdminModelosPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
-  // Solo staff puede suspender/reactivar; moderador es solo lectura aquí.
-  const [isStaff, setIsStaff] = useState(false);
+  // Admin o moderador pueden suspender/reactivar.
+  const [canModerate, setCanModerate] = useState(false);
 
   const reload = useCallback(async (query: string, which: Tab, p = 1) => {
     const d = await dashboard.adminProfiles(query, which, p);
@@ -54,8 +54,8 @@ export default function AdminModelosPage() {
     auth
       .me()
       .then((me) => {
-        const u = me as { is_staff?: boolean } | null;
-        setIsStaff(!!u?.is_staff);
+        const u = me as { is_staff?: boolean; role?: string } | null;
+        setCanModerate(!!u?.is_staff || u?.role === "moderator");
         return reload("", "");
       })
       .then(() => setReady(true))
@@ -193,7 +193,7 @@ export default function AdminModelosPage() {
                     </p>
                   )}
                 </div>
-                {isStaff && (
+                {canModerate && (
                   <div className="flex flex-wrap gap-2">
                     {p.is_suspended ? (
                       <button

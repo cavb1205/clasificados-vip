@@ -13,7 +13,7 @@ from apps.audit.models import log_action
 from apps.publications.models import Publication
 from apps.reviews.models import Review
 from core.pagination import AdminPagination
-from core.permissions import IsModel
+from core.permissions import IsModel, IsModerator
 from .models import City, Favorite, ModelProfile, ProfileEvent, ProfileReport, Region, Service
 from .serializers import (
     CitySerializer,
@@ -376,7 +376,8 @@ class AdminModelProfileListView(generics.ListAPIView):
 
 
 class AdminModelProfileActionView(generics.GenericAPIView):
-    permission_classes = [permissions.IsAdminUser]
+    # Suspender/reactivar lo puede hacer admin o moderador.
+    permission_classes = [IsModerator]
     queryset = ModelProfile.objects.all()
 
     def post(self, request, pk):

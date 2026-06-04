@@ -271,3 +271,16 @@ class HostSuspensionTests(_Base):
         self.host.is_suspended = True
         self.host.save()
         self.assertEqual(len(self.client.get(reverse("api:rooms:public-list")).data), 0)
+
+    def test_moderator_can_suspend_host(self):
+        mod = User.objects.create_user(
+            username="mod", email="mod@example.com", password="x", role="moderator"
+        )
+        self.client.force_authenticate(mod)
+        r = self.client.post(
+            reverse("api:rooms:admin-host-action", args=[self.host.id]),
+            {"action": "suspend", "reason": "spam"}, format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        self.host.refresh_from_db()
+        self.assertTrue(self.host.is_suspended)

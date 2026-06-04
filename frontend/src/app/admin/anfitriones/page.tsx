@@ -27,7 +27,7 @@ export default function AdminAnfitrionesPage() {
   const [items, setItems] = useState<AdminHost[]>([]);
   const [page, setPage] = useState(1);
   const [count, setCount] = useState(0);
-  const [isStaff, setIsStaff] = useState(false);
+  const [canModerate, setCanModerate] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [err, setErr] = useState("");
   const [ready, setReady] = useState(false);
@@ -43,7 +43,8 @@ export default function AdminAnfitrionesPage() {
     auth
       .me()
       .then((me) => {
-        setIsStaff(!!(me as { is_staff?: boolean })?.is_staff);
+        const u = me as { is_staff?: boolean; role?: string } | null;
+        setCanModerate(!!u?.is_staff || u?.role === "moderator");
         return reload("");
       })
       .then(() => setReady(true))
@@ -113,7 +114,7 @@ export default function AdminAnfitrionesPage() {
                   <p className="mt-1 text-xs text-red-300">Motivo: {h.suspension_reason}</p>
                 )}
               </div>
-              {isStaff && (
+              {canModerate && (
                 <button
                   disabled={busyId === h.id}
                   onClick={() => moderate(h)}
