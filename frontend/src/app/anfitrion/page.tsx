@@ -12,6 +12,7 @@ import {
   type RoomPhoto,
   type RoomPlan,
 } from "@/lib/client-api";
+import { toast } from "@/components/Toaster";
 
 const CLP = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -198,25 +199,26 @@ function HostProfileCard({ host, onUpdated }: { host: HostProfile; onUpdated: (h
 function PlanPanel({ host, plans, onChange }: { host: HostProfile; plans: RoomPlan[]; onChange: () => void }) {
   const [planId, setPlanId] = useState("");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
+  const [payInfo, setPayInfo] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    dashboard.paymentInfo().then((d) => setPayInfo(d.payment_instructions)).catch(() => {});
+  }, []);
 
   async function onReceipt(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !planId) return;
     setBusy(true);
-    setErr("");
-    setMsg("");
     try {
       const fd = new FormData();
       fd.append("plan_id", planId);
       fd.append("image", file);
       await rooms.buyPlan(fd);
-      setMsg("Comprobante enviado. Tu plan se activará al aprobarlo el administrador.");
+      toast("Comprobante enviado · tu plan se activa al aprobarlo el equipo");
       onChange();
     } catch (e2) {
-      setErr(e2 instanceof Error ? e2.message : "Error");
+      toast(e2 instanceof Error ? e2.message : "Error al enviar el comprobante", "error");
     } finally {
       setBusy(false);
       if (fileInput.current) fileInput.current.value = "";
@@ -252,15 +254,21 @@ function PlanPanel({ host, plans, onChange }: { host: HostProfile; plans: RoomPl
         </select>
         <input ref={fileInput} type="file" accept="image/*" onChange={onReceipt} className="hidden" id="plan-receipt" />
         <label htmlFor="plan-receipt"
-          className={`rounded-full px-4 py-1.5 text-sm font-medium ${planId && !busy ? "cursor-pointer bg-pink-600 hover:bg-pink-500" : "cursor-not-allowed bg-neutral-700 text-neutral-400"}`}>
+          className={`rounded-full px-4 py-1.5 text-sm font-medium ${planId && !busy ? "btn-gold cursor-pointer" : "cursor-not-allowed bg-neutral-700 text-neutral-400"}`}>
           {busy ? "Enviando…" : "Subir comprobante"}
         </label>
       </div>
+
+      {planId && payInfo.trim() && (
+        <div className="rounded-lg border border-neutral-700 bg-neutral-950 p-3 text-xs">
+          <p className="mb-1 font-semibold text-neutral-300">💳 Transfiere a estos datos y luego sube tu comprobante</p>
+          <p className="whitespace-pre-line text-neutral-400">{payInfo}</p>
+        </div>
+      )}
+
       <p className="text-xs text-neutral-500">
-        Elige un plan y sube el comprobante de transferencia. Un plan cubre varias habitaciones (bundle).
+        Elige un plan, transfiere y sube el comprobante. Un plan cubre varias habitaciones (bundle).
       </p>
-      {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-      {err && <p className="text-sm text-red-400">{err}</p>}
     </section>
   );
 }
