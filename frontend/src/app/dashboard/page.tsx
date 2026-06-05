@@ -328,22 +328,44 @@ export default function DashboardPage() {
 
 function BillingPanel() {
   const [items, setItems] = useState<Awaited<ReturnType<typeof dashboard.myReceipts>>>([]);
+  const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    dashboard.myReceipts().then(setItems).catch(() => {}).finally(() => setLoaded(true));
-  }, []);
+  async function toggle() {
+    if (!open && !loaded) {
+      setLoading(true);
+      try {
+        setItems(await dashboard.myReceipts());
+        setLoaded(true);
+      } catch {
+        // silencioso
+      } finally {
+        setLoading(false);
+      }
+    }
+    setOpen((o) => !o);
+  }
 
   const CLP = (n: number | null) =>
     n == null ? "—" : new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(n);
   const STATUS: Record<string, string> = { pending: "Pendiente", approved: "Aprobado", rejected: "Rechazado" };
 
-  if (!loaded) return <p className="text-sm text-neutral-500">Cargando…</p>;
-  if (items.length === 0) return <p className="text-sm text-neutral-500">Aún no tienes pagos registrados.</p>;
-
   return (
-    <ul className="space-y-2">
-      {items.map((r) => (
+    <div>
+      <button
+        onClick={toggle}
+        className="rounded-full border border-neutral-700 px-4 py-1.5 text-sm text-neutral-300 hover:border-pink-500"
+      >
+        {loading ? "Cargando…" : open ? "Ocultar historial" : "Ver historial de pagos"}
+      </button>
+
+      {open && loaded && (
+        items.length === 0 ? (
+          <p className="mt-3 text-sm text-neutral-500">Aún no tienes pagos registrados.</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {items.map((r) => (
         <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm">
           <div>
             <p className="font-medium">{CLP(r.amount)} · {r.publication_title}</p>
@@ -359,9 +381,12 @@ function BillingPanel() {
           }`}>
             {STATUS[r.status] ?? r.status}
           </span>
-        </li>
-      ))}
-    </ul>
+              </li>
+            ))}
+          </ul>
+        )
+      )}
+    </div>
   );
 }
 
