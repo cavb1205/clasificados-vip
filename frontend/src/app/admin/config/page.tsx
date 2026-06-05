@@ -31,6 +31,7 @@ export default function AdminConfigPage() {
   const [trialDays, setTrialDays] = useState(1);
   const [maxRooms, setMaxRooms] = useState(10);
   const [payInfo, setPayInfo] = useState("");
+  const [supportTg, setSupportTg] = useState("");
   const [savingTrial, setSavingTrial] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [creating, setCreating] = useState(false);
@@ -46,6 +47,7 @@ export default function AdminConfigPage() {
     setTrialDays(cfg.trial_days);
     setMaxRooms(cfg.max_active_rooms_per_host);
     setPayInfo(cfg.payment_instructions ?? "");
+    setSupportTg(cfg.support_telegram ?? "");
     setPlans(ps);
   }, []);
 
@@ -66,6 +68,7 @@ export default function AdminConfigPage() {
         trial_days: trialDays,
         max_active_rooms_per_host: maxRooms,
         payment_instructions: payInfo,
+        support_telegram: supportTg,
       });
       setMsg("Configuración guardada.");
     } catch (e) {
@@ -196,6 +199,21 @@ export default function AdminConfigPage() {
             <span className="mt-1 block text-xs text-neutral-500">
               Banco, tipo de cuenta, número, titular, RUT y correo. Se muestran a la
               modelo al elegir un plan y subir el comprobante.
+            </span>
+          </label>
+          <label className="w-full text-sm">
+            <span className="block text-xs uppercase tracking-wide text-neutral-500">
+              Soporte por Telegram
+            </span>
+            <input
+              value={supportTg}
+              onChange={(e) => setSupportTg(e.target.value)}
+              placeholder="@PortalVipSoporte (o t.me/PortalVipSoporte)"
+              className="mt-1 w-full max-w-md rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-base"
+            />
+            <span className="mt-1 block text-xs text-neutral-500">
+              Usuario de Telegram del equipo (sin teléfono). Aparece como botón de
+              soporte solo para modelos y anfitriones. Vacío = sin botón.
             </span>
           </label>
           <button

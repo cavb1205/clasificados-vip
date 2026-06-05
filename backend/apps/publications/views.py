@@ -60,6 +60,17 @@ class PaymentInfoView(generics.GenericAPIView):
         return Response({"payment_instructions": SiteConfig.get().payment_instructions})
 
 
+class SupportInfoView(generics.GenericAPIView):
+    """Canal de soporte (Telegram) configurado por el admin. Para el botón de
+    soporte que ven modelos y anfitriones."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.profiles.models import SiteConfig
+        return Response({"support_telegram": SiteConfig.get().support_telegram})
+
+
 class MyPublicationViewSet(viewsets.ModelViewSet):
     """La modelo gestiona sus anuncios y sube comprobantes de pago."""
 
@@ -371,7 +382,8 @@ class AdminSiteConfigSerializer(drf_serializers.ModelSerializer):
     class Meta:
         from apps.profiles.models import SiteConfig
         model = SiteConfig
-        fields = ["trial_days", "max_active_rooms_per_host", "payment_instructions"]
+        fields = ["trial_days", "max_active_rooms_per_host",
+                  "payment_instructions", "support_telegram"]
 
 
 class AdminSiteConfigView(generics.GenericAPIView):

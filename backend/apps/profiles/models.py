@@ -243,6 +243,16 @@ class SiteConfig(models.Model):
             "comprobante."
         ),
     )
+    support_telegram = models.CharField(
+        "Telegram de soporte",
+        max_length=120,
+        blank=True,
+        help_text=(
+            "Usuario de Telegram del equipo (ej: @PortalVipSoporte) o enlace "
+            "t.me/... Se muestra como botón de soporte solo a modelos y "
+            "anfitriones. Sin teléfono."
+        ),
+    )
 
     class Meta:
         verbose_name = "Configuración del sitio"
