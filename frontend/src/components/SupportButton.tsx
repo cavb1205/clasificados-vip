@@ -16,6 +16,8 @@ function telegramLink(raw: string): string | null {
  * Botón flotante de soporte por Telegram. Solo se muestra a modelos y
  * anfitriones (no a clientes ni anónimos) y solo si el admin configuró el canal.
  */
+const ROLE_LABEL: Record<string, string> = { model: "modelo", host: "anfitrión" };
+
 export function SupportButton() {
   const [href, setHref] = useState<string | null>(null);
 
@@ -24,10 +26,20 @@ export function SupportButton() {
     auth
       .me()
       .then((me) => {
-        const role = (me as { role?: string } | null)?.role;
+        const u = me as { role?: string; username?: string; email?: string } | null;
+        const role = u?.role;
         if (role !== "model" && role !== "host") return;
         return dashboard.supportInfo().then((d) => {
-          if (alive) setHref(telegramLink(d.support_telegram));
+          const link = telegramLink(d.support_telegram);
+          if (!alive || !link) return;
+          // Mensaje prellenado para que el soporte identifique de inmediato a quién
+          // atiende (usuario + correo + rol).
+          const text =
+            `Hola soporte 👋 Soy ${u?.username ?? ""}` +
+            (u?.email ? ` (${u.email})` : "") +
+            ` — ${ROLE_LABEL[role] ?? role} en PortalVip.\nMi consulta: `;
+          const sep = link.includes("?") ? "&" : "?";
+          setHref(`${link}${sep}text=${encodeURIComponent(text)}`);
         });
       })
       .catch(() => {});
