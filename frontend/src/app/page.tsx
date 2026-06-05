@@ -10,72 +10,55 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const cities = await getAllPopulatedCities();
 
-  // Agrupamos por región para que la grilla mantenga contexto geográfico,
-  // pero el selector de arriba permite saltar directo a cualquier comuna.
-  const byRegion = new Map<string, { name: string; cities: typeof cities }>();
-  for (const c of cities) {
-    const entry = byRegion.get(c.region.slug) ?? { name: c.region.name, cities: [] };
-    entry.cities.push(c);
-    byRegion.set(c.region.slug, entry);
-  }
+  // Orden por región y luego nombre: las comunas de una misma región quedan
+  // juntas en la nube de pastillas, sin necesidad de encabezados.
+  const sorted = [...cities].sort(
+    (a, b) =>
+      a.region.name.localeCompare(b.region.name) || a.name.localeCompare(b.name),
+  );
 
   return (
     <div>
-      <section className="mb-8">
+      <section className="mb-8 text-center sm:text-left">
         <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
           <span className="mr-2 align-middle text-vip" aria-hidden>✦</span>
           Anuncios{" "}
           <span className="text-gold">verificados</span>{" "}
           en Chile
         </h1>
-        <p className="mt-3 max-w-2xl text-lg text-neutral-400">
+        <p className="mx-auto mt-3 max-w-2xl text-lg text-neutral-400 sm:mx-0">
           Elige tu comuna y explora perfiles con identidad verificada.
         </p>
       </section>
 
       {cities.length === 0 ? (
-        <p className="text-sm text-neutral-400">
+        <p className="text-center text-sm text-neutral-400">
           Aún no hay anuncios activos. Vuelve pronto.
         </p>
       ) : (
-        <>
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="font-display text-xl font-semibold">
-              <span className="text-vip" aria-hidden>✦</span> Elige tu comuna
+        <section>
+          <div className="mb-6 text-center">
+            <h2 className="font-display text-2xl font-semibold tracking-tight">
+              <span className="text-vip" aria-hidden>📍</span> Elige tu comuna
             </h2>
-            <div className="w-full max-w-xs">
-              <CityPicker cities={cities} label="Buscar comuna rápido…" />
+            <div className="mx-auto mt-3 w-full max-w-xs">
+              <CityPicker cities={cities} label="Buscar comuna…" />
             </div>
           </div>
 
-          <div className="space-y-6">
-            {Array.from(byRegion.entries()).map(([regionSlug, { name, cities: rc }]) => (
-              <section key={regionSlug}>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                  {name}
-                </h3>
-                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {rc.map((city) => (
-                    <li key={city.id}>
-                      <Link
-                        href={`/chile/${regionSlug}/${city.slug}/${DEFAULT_GENDER_SLUG}`}
-                        className="card-gold group flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900 px-5 py-4 hover:border-pink-500"
-                      >
-                        <span className="flex items-center gap-2.5 text-base font-medium">
-                          <span className="text-vip" aria-hidden>📍</span>
-                          {city.name}
-                        </span>
-                        <span className="text-gold text-lg leading-none transition-transform group-hover:translate-x-0.5" aria-hidden>
-                          ›
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+          <ul className="flex flex-wrap justify-center gap-2.5 sm:gap-3">
+            {sorted.map((city) => (
+              <li key={city.id}>
+                <Link
+                  href={`/chile/${city.region.slug}/${city.slug}/${DEFAULT_GENDER_SLUG}`}
+                  className="block rounded-full bg-gradient-to-b from-[#e23744] to-[#bb2230] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_3px_12px_-4px_rgba(226,55,68,0.65)] ring-1 ring-white/10 transition hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_6px_18px_-4px_rgba(226,55,68,0.8)]"
+                >
+                  {city.name}
+                </Link>
+              </li>
             ))}
-          </div>
-        </>
+          </ul>
+        </section>
       )}
     </div>
   );
