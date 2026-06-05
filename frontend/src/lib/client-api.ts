@@ -256,9 +256,12 @@ export const dashboard = {
   adminDeletePlan: (id: number) =>
     apiFetch(`/admin/plans/${id}/`, { method: "DELETE" }),
   adminSiteConfig: () =>
-    apiFetch<{ trial_days: number; max_active_rooms_per_host: number }>("/admin/site-config/"),
-  adminUpdateSiteConfig: (data: { trial_days?: number; max_active_rooms_per_host?: number }) =>
+    apiFetch<{ trial_days: number; max_active_rooms_per_host: number; payment_instructions: string }>("/admin/site-config/"),
+  adminUpdateSiteConfig: (data: { trial_days?: number; max_active_rooms_per_host?: number; payment_instructions?: string }) =>
     apiFetch("/admin/site-config/", { method: "PUT", body: data }),
+  // Datos de pago que la modelo ve al elegir plan / subir comprobante
+  paymentInfo: () =>
+    apiFetch<{ payment_instructions: string }>("/payment-info/"),
   // KYC
   issueKycChallenge: () =>
     apiFetch<{ code: string; statement: string; expires_at: string }>(

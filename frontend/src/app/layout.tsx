@@ -5,6 +5,7 @@ import { Plus_Jakarta_Sans, Fraunces } from "next/font/google";
 import "./globals.css";
 import { AgeGate } from "@/components/AgeGate";
 import { AuthNav } from "@/components/AuthNav";
+import { Toaster } from "@/components/Toaster";
 
 // Tipografía UI: Plus Jakarta Sans (geométrica, moderna, alta legibilidad).
 const sans = Plus_Jakarta_Sans({
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     >
       <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100">
         <AgeGate />
+        <Toaster />
         <header className="gold-rule border-b border-neutral-900">
           <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-4">
             <Link href="/" className="flex items-center gap-2">

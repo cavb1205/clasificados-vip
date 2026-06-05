@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
+import { toast } from "@/components/Toaster";
 
 const MAX_IMG_MB = 10;
 const MAX_VIDEO_MB = 50;
@@ -404,37 +405,47 @@ function PhotosStep({ avatar, photos, onChange, onNext }: { avatar: string | nul
 }
 
 function AdStep({ plans, pubs, onChange, onNext }: { plans: Plan[]; pubs: Pub[]; onChange: () => void; onNext: () => void }) {
-  const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [payInfo, setPayInfo] = useState("");
   const existing = pubs[0];
 
+  useEffect(() => {
+    dashboard.paymentInfo().then((d) => setPayInfo(d.payment_instructions)).catch(() => {});
+  }, []);
+
   async function create(form: FormData) {
-    setErr(""); setBusy(true);
+    setBusy(true);
     try {
       await dashboard.createPublication({
-        title: form.get("title"),
         plan_id: form.get("plan_id") ? Number(form.get("plan_id")) : null,
       });
+      toast("Anuncio creado · ahora sube tu comprobante");
       onChange();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "No se pudo crear");
+      toast(e instanceof Error ? e.message : "No se pudo crear", "error");
     } finally { setBusy(false); }
   }
 
   return (
-    <Card title="Tu anuncio" intro="Crea tu anuncio. Cuando tu identidad esté verificada, quedas visible gratis durante tu periodo de prueba; luego eliges un plan y subes el comprobante.">
+    <Card title="Tu anuncio" intro="Elige tu plan y crea tu anuncio. Luego transfieres y subes el comprobante; el equipo lo aprueba y quedas visible.">
       {existing ? (
-        <div className="rounded-xl border border-emerald-700/50 bg-emerald-950/30 p-4 text-sm text-emerald-200">
-          ✅ Ya creaste tu anuncio <strong>“{existing.title}”</strong>. El pago y los detalles los gestionas en tu panel.
+        <div className="space-y-3">
+          <div className="rounded-xl border border-emerald-700/50 bg-emerald-950/30 p-4 text-sm text-emerald-200">
+            ✅ ¡Anuncio creado! Ahora <strong>transfiere</strong> y sube tu <strong>comprobante</strong> desde tu panel para activarlo.
+          </div>
+          {payInfo.trim() && (
+            <div className="rounded-lg border border-neutral-700 bg-neutral-950 p-3 text-xs">
+              <p className="mb-1 font-semibold text-neutral-300">💳 Datos para tu transferencia</p>
+              <p className="whitespace-pre-line text-neutral-400">{payInfo}</p>
+            </div>
+          )}
         </div>
       ) : (
         <form action={create} className="space-y-3">
-          <input name="title" placeholder="Título del anuncio" required className={inputCls} />
-          <select name="plan_id" className={inputCls} defaultValue="">
-            <option value="">Elegir plan después</option>
+          <select name="plan_id" required defaultValue="" className={inputCls}>
+            <option value="" disabled>Elige tu plan…</option>
             {plans.map((pl) => <option key={pl.id} value={pl.id}>{pl.name} — ${pl.price} / {pl.duration_days} días</option>)}
           </select>
-          {err && <p className="text-sm text-red-400">{err}</p>}
           <button disabled={busy} className="btn-gold w-full rounded-full py-2.5 font-medium disabled:opacity-50">
             {busy ? "Creando…" : "Crear anuncio"}
           </button>

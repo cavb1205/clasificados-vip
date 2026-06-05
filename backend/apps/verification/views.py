@@ -37,7 +37,7 @@ class IssueChallengeView(APIView):
             "Yo, la persona que aparece en la cédula que estoy mostrando, "
             "mayor de edad, hoy "
             f"{challenge.created_at.strftime('%d/%m/%Y')}, confirmo que quiero "
-            "publicar mi perfil y servicios en la plataforma Clasificados VIP "
+            "publicar mi perfil y servicios en la plataforma PortalVip Chile "
             "de forma libre y voluntaria, sin coerción de ninguna persona. "
             f"Código de validación: {challenge.code}."
         )

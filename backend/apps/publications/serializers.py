@@ -20,6 +20,8 @@ class PublicationSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    # El título es interno (no se muestra públicamente); se autogenera si no viene.
+    title = serializers.CharField(required=False, allow_blank=True, max_length=160)
 
     class Meta:
         model = Publication

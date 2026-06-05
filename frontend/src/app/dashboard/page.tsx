@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
+import { toast } from "@/components/Toaster";
 import type { Plan, Region, City, Service, ServiceCategory } from "@/lib/types";
 import { CATEGORY_LABEL } from "@/lib/types";
 
@@ -118,10 +119,10 @@ export default function DashboardPage() {
     try {
       if (profile) await dashboard.updateProfile(profile.id, data);
       else await dashboard.createProfile(data);
-      setMsg("Perfil guardado.");
+      toast("Perfil guardado");
       await loadAll();
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : "Error");
+      toast(e instanceof Error ? e.message : "Error al guardar", "error");
     }
   }
 
@@ -968,16 +969,20 @@ function PublicationManager({
   onChange: () => void;
   disabled: boolean;
 }) {
-  const [err, setErr] = useState("");
+  const [payInfo, setPayInfo] = useState("");
+  useEffect(() => {
+    dashboard.paymentInfo().then((d) => setPayInfo(d.payment_instructions)).catch(() => {});
+  }, []);
+
   async function create(form: FormData) {
     try {
       await dashboard.createPublication({
-        title: form.get("title"),
         plan_id: form.get("plan_id") ? Number(form.get("plan_id")) : null,
       });
+      toast("Anuncio creado · ahora sube tu comprobante de pago");
       onChange();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Error");
+      toast(e instanceof Error ? e.message : "Error al crear el anuncio", "error");
     }
   }
   return (
@@ -986,19 +991,28 @@ function PublicationManager({
         {publications.map((p) => (
           <li key={p.id} className="rounded-xl border border-neutral-800 p-4">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-medium">{p.title}</span>
+              <span className="font-medium">Tu anuncio</span>
               <span className={`rounded-full px-2 py-0.5 text-xs ${PUB_STATUS[p.status]?.cls ?? "bg-neutral-800"}`}>
                 {PUB_STATUS[p.status]?.label ?? p.status}
               </span>
             </div>
             {p.status === "active" && <ExpiryLine expires={p.expires_at} />}
+            {p.status === "draft" && (
+              <p className="mt-2 rounded-lg border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
+                <strong>Falta el pago.</strong> Transfiere según los datos de pago y
+                sube el <strong>comprobante</strong> aquí abajo para activar tu anuncio.
+              </p>
+            )}
             {p.status === "pending_payment" && (
-              <p className="mt-1 text-xs text-amber-300">
-                Comprobante enviado · esperando que el equipo lo apruebe.
+              <p className="mt-2 text-xs text-amber-300">
+                ✓ Comprobante recibido · el equipo lo está revisando. Te avisaremos al aprobarlo.
               </p>
             )}
             {(p.status === "draft" || p.status === "pending_payment") && (
-              <ReceiptForm pubId={p.id} onUploaded={onChange} />
+              <>
+                <PaymentBox info={payInfo} />
+                <ReceiptForm pubId={p.id} onUploaded={onChange} />
+              </>
             )}
             {p.status === "expired" && (
               <>
@@ -1006,8 +1020,13 @@ function PublicationManager({
                   Tu anuncio ya no se muestra. Renuévalo para volver a aparecer.
                 </p>
                 <button
-                  onClick={() => dashboard.renewPublication(p.id).then(onChange)}
-                  className="mt-3 rounded-full bg-pink-600 px-4 py-1.5 text-sm font-medium hover:bg-pink-500"
+                  onClick={() =>
+                    dashboard.renewPublication(p.id).then(() => {
+                      toast("Anuncio renovado · sube tu comprobante");
+                      onChange();
+                    })
+                  }
+                  className="btn-gold mt-3 rounded-full px-4 py-1.5 text-sm font-medium"
                 >
                   Renovar anuncio
                 </button>
@@ -1016,32 +1035,44 @@ function PublicationManager({
           </li>
         ))}
       </ul>
-      <form action={create} className="grid gap-2 text-sm sm:grid-cols-[1fr_auto_auto]">
-        <input
-          name="title"
-          placeholder="Título del anuncio"
-          required
-          disabled={disabled}
-          className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
-        />
-        <select
-          name="plan_id"
-          className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
-        >
-          {plans.map((pl) => (
-            <option key={pl.id} value={pl.id}>
-              {pl.name} — ${pl.price} / {pl.duration_days}d
-            </option>
-          ))}
-        </select>
-        <button
-          disabled={disabled}
-          className="rounded-full bg-pink-600 px-5 py-2.5 font-medium hover:bg-pink-500 disabled:opacity-50"
-        >
-          Crear anuncio
-        </button>
-      </form>
-      {err && <p className="text-sm text-red-400">{err}</p>}
+
+      {publications.length === 0 && (
+        <form action={create} className="space-y-2 text-sm">
+          <p className="text-neutral-400">
+            Elige un plan y crea tu anuncio. Después transfieres y subes el comprobante;
+            el equipo lo aprueba y quedas visible.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <select
+              name="plan_id"
+              required
+              defaultValue=""
+              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
+            >
+              <option value="" disabled>Elige tu plan…</option>
+              {plans.map((pl) => (
+                <option key={pl.id} value={pl.id}>
+                  {pl.name} — ${pl.price} / {pl.duration_days} días
+                </option>
+              ))}
+            </select>
+            <button disabled={disabled} className="btn-gold rounded-full px-5 py-2.5 font-medium disabled:opacity-50">
+              Crear anuncio
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+/** Caja con los datos de pago configurados por el admin. */
+function PaymentBox({ info }: { info: string }) {
+  if (!info.trim()) return null;
+  return (
+    <div className="mt-3 rounded-lg border border-neutral-700 bg-neutral-950 p-3 text-xs">
+      <p className="mb-1 font-semibold text-neutral-300">💳 Datos para tu transferencia</p>
+      <p className="whitespace-pre-line text-neutral-400">{info}</p>
     </div>
   );
 }
@@ -1106,6 +1137,7 @@ function ReceiptForm({ pubId, onUploaded }: { pubId: number; onUploaded: () => v
       fd.append("image", file);
       await dashboard.uploadReceipt(pubId, fd);
       clearSelection();
+      toast("Comprobante enviado · el equipo lo revisará");
       onUploaded();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error al subir");

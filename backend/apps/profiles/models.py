@@ -234,6 +234,15 @@ class SiteConfig(models.Model):
             "pero nunca más que este tope."
         ),
     )
+    payment_instructions = models.TextField(
+        "instrucciones de pago",
+        blank=True,
+        help_text=(
+            "Datos para transferir (banco, tipo de cuenta, número, titular, RUT, "
+            "correo). Se le muestran a la modelo al elegir un plan y subir el "
+            "comprobante."
+        ),
+    )
 
     class Meta:
         verbose_name = "Configuración del sitio"

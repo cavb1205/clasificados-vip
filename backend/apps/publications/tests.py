@@ -215,3 +215,25 @@ class AdminGrantAndDetailTests(_Base):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(r.data["publications"]), 1)
         self.assertEqual(len(r.data["receipts"]), 1)
+
+
+class PublicationTitleAndPaymentTests(_Base):
+    def setUp(self):
+        super().setUp()
+        from rest_framework.test import APIClient
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
+    def test_create_without_title_autogenerates(self):
+        from django.urls import reverse
+        r = self.api.post(reverse("api:publications:my-publications-list"), {}, format="json")
+        self.assertEqual(r.status_code, 201)
+        self.assertIn(self.profile.stage_name, r.data["title"])
+
+    def test_payment_info_endpoint(self):
+        from django.urls import reverse
+        from apps.profiles.models import SiteConfig
+        cfg = SiteConfig.get(); cfg.payment_instructions = "Banco X 123"; cfg.save()
+        r = self.api.get(reverse("api:publications:payment-info"))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data["payment_instructions"], "Banco X 123")

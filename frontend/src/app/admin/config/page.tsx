@@ -30,6 +30,7 @@ export default function AdminConfigPage() {
   const [ready, setReady] = useState(false);
   const [trialDays, setTrialDays] = useState(1);
   const [maxRooms, setMaxRooms] = useState(10);
+  const [payInfo, setPayInfo] = useState("");
   const [savingTrial, setSavingTrial] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [creating, setCreating] = useState(false);
@@ -44,6 +45,7 @@ export default function AdminConfigPage() {
     ]);
     setTrialDays(cfg.trial_days);
     setMaxRooms(cfg.max_active_rooms_per_host);
+    setPayInfo(cfg.payment_instructions ?? "");
     setPlans(ps);
   }, []);
 
@@ -63,6 +65,7 @@ export default function AdminConfigPage() {
       await dashboard.adminUpdateSiteConfig({
         trial_days: trialDays,
         max_active_rooms_per_host: maxRooms,
+        payment_instructions: payInfo,
       });
       setMsg("Configuración guardada.");
     } catch (e) {
@@ -179,9 +182,25 @@ export default function AdminConfigPage() {
               Límite global de anuncios de habitación activos por anfitrión (anti-spam).
             </span>
           </label>
+          <label className="w-full text-sm">
+            <span className="block text-xs uppercase tracking-wide text-neutral-500">
+              Datos de pago (los ve la modelo al pagar)
+            </span>
+            <textarea
+              value={payInfo}
+              onChange={(e) => setPayInfo(e.target.value)}
+              rows={5}
+              placeholder={"Banco Estado · Cuenta Vista 12345678\nTitular: Nombre Apellido · RUT 12.345.678-9\nCorreo: pagos@portalvip.cl\nEnvía el comprobante después de transferir."}
+              className="mt-1 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-base"
+            />
+            <span className="mt-1 block text-xs text-neutral-500">
+              Banco, tipo de cuenta, número, titular, RUT y correo. Se muestran a la
+              modelo al elegir un plan y subir el comprobante.
+            </span>
+          </label>
           <button
             disabled={savingTrial}
-            className="rounded-full bg-pink-600 px-5 py-2 text-sm font-medium hover:bg-pink-500 disabled:opacity-50"
+            className="btn-gold rounded-full px-5 py-2 text-sm font-medium disabled:opacity-50"
           >
             {savingTrial ? "Guardando…" : "Guardar"}
           </button>

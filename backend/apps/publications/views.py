@@ -50,6 +50,16 @@ class PlanListView(generics.ListAPIView):
     )
 
 
+class PaymentInfoView(generics.GenericAPIView):
+    """Instrucciones de pago configuradas por el admin (las ve la modelo al pagar)."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from apps.profiles.models import SiteConfig
+        return Response({"payment_instructions": SiteConfig.get().payment_instructions})
+
+
 class MyPublicationViewSet(viewsets.ModelViewSet):
     """La modelo gestiona sus anuncios y sube comprobantes de pago."""
 
@@ -66,7 +76,12 @@ class MyPublicationViewSet(viewsets.ModelViewSet):
         return Publication.objects.filter(profile__user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(profile=self._get_profile())
+        profile = self._get_profile()
+        # El título es interno; si no viene, lo autogeneramos con el nombre.
+        title = (serializer.validated_data.get("title") or "").strip()
+        if not title:
+            title = f"Anuncio de {profile.stage_name}"
+        serializer.save(profile=profile, title=title)
 
     @action(detail=True, methods=["post"], serializer_class=PaymentReceiptSerializer)
     def receipt(self, request, pk=None):
@@ -356,7 +371,7 @@ class AdminSiteConfigSerializer(drf_serializers.ModelSerializer):
     class Meta:
         from apps.profiles.models import SiteConfig
         model = SiteConfig
-        fields = ["trial_days", "max_active_rooms_per_host"]
+        fields = ["trial_days", "max_active_rooms_per_host", "payment_instructions"]
 
 
 class AdminSiteConfigView(generics.GenericAPIView):
