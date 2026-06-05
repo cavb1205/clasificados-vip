@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
 import { toast } from "@/components/Toaster";
+import { PlanPicker } from "@/components/PlanPicker";
+import type { Plan } from "@/lib/types";
 
 const MAX_IMG_MB = 10;
 const MAX_VIDEO_MB = 50;
@@ -25,7 +27,6 @@ interface ProfileLite {
 }
 interface Opt { id: number; name: string; slug: string }
 interface MediaItem { id: number; media_type: "photo" | "video"; file_url: string }
-interface Plan { id: number; name: string; price: number; duration_days: number }
 interface Pub { id: number; title: string; status: string }
 
 const STEPS = ["Bienvenida", "Tu perfil", "Tu identidad", "Tus fotos", "Tu anuncio", "¡Listo!"];
@@ -413,12 +414,10 @@ function AdStep({ plans, pubs, onChange, onNext }: { plans: Plan[]; pubs: Pub[];
     dashboard.paymentInfo().then((d) => setPayInfo(d.payment_instructions)).catch(() => {});
   }, []);
 
-  async function create(form: FormData) {
+  async function create(planId: number) {
     setBusy(true);
     try {
-      await dashboard.createPublication({
-        plan_id: form.get("plan_id") ? Number(form.get("plan_id")) : null,
-      });
+      await dashboard.createPublication({ plan_id: planId });
       toast("Anuncio creado · ahora sube tu comprobante");
       onChange();
     } catch (e) {
@@ -441,15 +440,7 @@ function AdStep({ plans, pubs, onChange, onNext }: { plans: Plan[]; pubs: Pub[];
           )}
         </div>
       ) : (
-        <form action={create} className="space-y-3">
-          <select name="plan_id" required defaultValue="" className={inputCls}>
-            <option value="" disabled>Elige tu plan…</option>
-            {plans.map((pl) => <option key={pl.id} value={pl.id}>{pl.name} — ${pl.price} / {pl.duration_days} días</option>)}
-          </select>
-          <button disabled={busy} className="btn-gold w-full rounded-full py-2.5 font-medium disabled:opacity-50">
-            {busy ? "Creando…" : "Crear anuncio"}
-          </button>
-        </form>
+        <PlanPicker plans={plans} onChoose={create} busy={busy} />
       )}
       <button onClick={onNext} className="mt-4 w-full rounded-full border border-neutral-700 py-2.5 text-sm text-neutral-300 hover:border-pink-500">
         Continuar →

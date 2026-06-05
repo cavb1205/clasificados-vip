@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
 import { toast } from "@/components/Toaster";
+import { PlanPicker } from "@/components/PlanPicker";
 import type { Plan, Region, City, Service, ServiceCategory } from "@/lib/types";
 import { CATEGORY_LABEL } from "@/lib/types";
 
@@ -999,11 +1000,9 @@ function PublicationManager({
     dashboard.paymentInfo().then((d) => setPayInfo(d.payment_instructions)).catch(() => {});
   }, []);
 
-  async function create(form: FormData) {
+  async function create(planId: number) {
     try {
-      await dashboard.createPublication({
-        plan_id: form.get("plan_id") ? Number(form.get("plan_id")) : null,
-      });
+      await dashboard.createPublication({ plan_id: planId });
       toast("Anuncio creado · ahora sube tu comprobante de pago");
       onChange();
     } catch (e) {
@@ -1062,30 +1061,13 @@ function PublicationManager({
       </ul>
 
       {publications.length === 0 && (
-        <form action={create} className="space-y-2 text-sm">
-          <p className="text-neutral-400">
-            Elige un plan y crea tu anuncio. Después transfieres y subes el comprobante;
-            el equipo lo aprueba y quedas visible.
+        <div className="space-y-3">
+          <p className="text-sm text-neutral-400">
+            Elige tu plan. Después transfieres y subes el comprobante; el equipo lo
+            aprueba y quedas visible.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <select
-              name="plan_id"
-              required
-              defaultValue=""
-              className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
-            >
-              <option value="" disabled>Elige tu plan…</option>
-              {plans.map((pl) => (
-                <option key={pl.id} value={pl.id}>
-                  {pl.name} — ${pl.price} / {pl.duration_days} días
-                </option>
-              ))}
-            </select>
-            <button disabled={disabled} className="btn-gold rounded-full px-5 py-2.5 font-medium disabled:opacity-50">
-              Crear anuncio
-            </button>
-          </div>
-        </form>
+          <PlanPicker plans={plans} onChoose={create} busy={disabled} />
+        </div>
       )}
     </div>
   );
