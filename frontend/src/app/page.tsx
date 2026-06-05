@@ -54,15 +54,20 @@ export default async function HomePage() {
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
                   {name}
                 </h3>
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {rc.map((city) => (
                     <li key={city.id}>
                       <Link
                         href={`/chile/${regionSlug}/${city.slug}/${DEFAULT_GENDER_SLUG}`}
-                        className="card-gold flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3.5 text-base font-medium hover:border-pink-500"
+                        className="card-gold group flex items-center justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900 px-5 py-4 hover:border-pink-500"
                       >
-                        <span className="text-vip" aria-hidden>📍</span>
-                        {city.name}
+                        <span className="flex items-center gap-2.5 text-base font-medium">
+                          <span className="text-vip" aria-hidden>📍</span>
+                          {city.name}
+                        </span>
+                        <span className="text-gold text-lg leading-none transition-transform group-hover:translate-x-0.5" aria-hidden>
+                          ›
+                        </span>
                       </Link>
                     </li>
                   ))}
