@@ -226,6 +226,10 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = DATA_UPLOAD_MAX_MEMORY_SIZE
 # --- Email / notificaciones al admin ---------------------------------------
 # Dev: console (imprime en stdout). Prod: SMTP real configurado por env.
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+# Tope de espera al conectar/enviar por SMTP. Sin esto, un host que no responde
+# bloquea hasta el timeout del SO. Las notificaciones al admin además se envían
+# en segundo plano (core.notifications) para no bloquear el request.
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@clasificados.vip")
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 # Destinatarios de mail_admins: lista de emails separados por coma en
