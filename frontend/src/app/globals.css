@@ -86,15 +86,29 @@
   color: transparent;
 }
 
-/* Rojo carmesí de MARCA (acentos: estrella ✦, badge VIP). Distinto del rojo de
-   error/peligro de la interfaz (Tailwind red-*), para no confundir. */
+/* Acento dorado de MARCA (estrella ✦, pin, badge VIP). */
 .text-vip {
-  color: #e23744;
+  color: #e9c15c;
 }
 .badge-vip {
-  background-image: linear-gradient(135deg, #e23744, #b51d2a);
-  color: #fff;
-  box-shadow: 0 2px 8px -2px rgba(226, 55, 68, 0.6);
+  background-image: linear-gradient(135deg, #f5d98a, #c8922f);
+  color: #2a1c08;
+  box-shadow: 0 2px 8px -2px rgba(201, 146, 47, 0.55);
+}
+
+/* Pastilla de comuna: negro elegante con borde y letras doradas; se rellena
+   sutil al hover. */
+.pill-gold {
+  border: 1px solid rgba(202, 162, 74, 0.45);
+  color: #e9c15c;
+  transition: transform 0.15s ease, background-color 0.15s ease,
+    border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.pill-gold:hover {
+  transform: translateY(-2px);
+  border-color: #e9c15c;
+  background-color: rgba(233, 193, 92, 0.1);
+  box-shadow: 0 6px 18px -6px rgba(233, 193, 92, 0.5);
 }
 
 /* Hover premium de tarjetas: leve elevación + halo dorado. */

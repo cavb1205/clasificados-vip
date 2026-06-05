@@ -51,7 +51,7 @@ export default async function HomePage() {
               <li key={city.id}>
                 <Link
                   href={`/chile/${city.region.slug}/${city.slug}/${DEFAULT_GENDER_SLUG}`}
-                  className="block rounded-full bg-gradient-to-b from-[#e23744] to-[#bb2230] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_3px_12px_-4px_rgba(226,55,68,0.65)] ring-1 ring-white/10 transition hover:-translate-y-0.5 hover:brightness-110 hover:shadow-[0_6px_18px_-4px_rgba(226,55,68,0.8)]"
+                  className="pill-gold block rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-semibold"
                 >
                   {city.name}
                 </Link>
