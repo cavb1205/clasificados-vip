@@ -41,9 +41,9 @@ describe("ProfileCard", () => {
     expect(screen.getByText(/Verificada/)).toBeInTheDocument();
   });
 
-  it("muestra los badges Destacada y Disponible ahora cuando corresponde", () => {
+  it("muestra los badges VIP y Disponible ahora cuando corresponde", () => {
     render(<ProfileCard profile={makeProfile({ is_featured: true, is_available_now: true })} />);
-    expect(screen.getByText("Destacada")).toBeInTheDocument();
+    expect(screen.getByText(/VIP/)).toBeInTheDocument();
     expect(screen.getByText(/Disponible ahora/)).toBeInTheDocument();
   });
 

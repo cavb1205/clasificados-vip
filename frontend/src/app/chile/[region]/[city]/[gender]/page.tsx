@@ -141,7 +141,7 @@ export default async function CityPage({
         </p>
         <div className="mt-1 flex items-baseline justify-between gap-2">
           <h1 className="font-display text-3xl font-semibold tracking-tight">
-            <span className="mr-2 align-middle text-pink-400" aria-hidden>✦</span>
+            <span className="mr-2 align-middle text-vip" aria-hidden>✦</span>
             {gender === "todos"
               ? `Anuncios en ${cityName}`
               : `${GENDER_LABEL[gender]} en ${cityName}`}

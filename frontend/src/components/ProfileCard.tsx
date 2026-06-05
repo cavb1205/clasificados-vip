@@ -54,8 +54,8 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
             ✓ Verificada
           </span>
           {profile.is_featured && (
-            <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-amber-950">
-              Destacada
+            <span className="badge-vip flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold">
+              ✦ VIP
             </span>
           )}
           {profile.is_available_now && (

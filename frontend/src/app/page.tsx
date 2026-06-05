@@ -21,13 +21,11 @@ export default async function HomePage() {
 
   return (
     <div>
-      <section className="mb-10">
+      <section className="mb-8">
         <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
-          <span className="mr-2 align-middle text-pink-400" aria-hidden>✦</span>
+          <span className="mr-2 align-middle text-vip" aria-hidden>✦</span>
           Anuncios{" "}
-          <span className="bg-gradient-to-br from-[#ecccb9] to-[#b97a5a] bg-clip-text text-transparent">
-            verificados
-          </span>{" "}
+          <span className="text-gold">verificados</span>{" "}
           en Chile
         </h1>
         <p className="mt-3 max-w-2xl text-lg text-neutral-400">
@@ -35,34 +33,35 @@ export default async function HomePage() {
         </p>
       </section>
 
-      {cities.length > 0 && (
-        <div className="mb-8 max-w-md">
-          <CityPicker cities={cities} label="Elige una comuna" />
-        </div>
-      )}
-
       {cities.length === 0 ? (
         <p className="text-sm text-neutral-400">
           Aún no hay anuncios activos. Vuelve pronto.
         </p>
       ) : (
         <>
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-            Comunas con anuncios activos
-          </h2>
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="font-display text-xl font-semibold">
+              <span className="text-vip" aria-hidden>✦</span> Elige tu comuna
+            </h2>
+            <div className="w-full max-w-xs">
+              <CityPicker cities={cities} label="Buscar comuna rápido…" />
+            </div>
+          </div>
+
           <div className="space-y-6">
             {Array.from(byRegion.entries()).map(([regionSlug, { name, cities: rc }]) => (
               <section key={regionSlug}>
-                <h3 className="mb-2 text-xs uppercase tracking-wide text-neutral-500">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
                   {name}
                 </h3>
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {rc.map((city) => (
                     <li key={city.id}>
                       <Link
                         href={`/chile/${regionSlug}/${city.slug}/${DEFAULT_GENDER_SLUG}`}
-                        className="block rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm hover:border-pink-600"
+                        className="card-gold flex items-center gap-2 rounded-xl border border-neutral-800 bg-neutral-900 px-4 py-3.5 text-base font-medium hover:border-pink-500"
                       >
+                        <span className="text-vip" aria-hidden>📍</span>
                         {city.name}
                       </Link>
                     </li>

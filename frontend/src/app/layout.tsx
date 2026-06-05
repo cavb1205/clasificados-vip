@@ -54,13 +54,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 className="h-8 w-auto"
               />
               <span className="flex flex-col leading-none">
-                <span className="font-display text-xl font-semibold tracking-tight">
-                  Portal
-                  <span className="bg-gradient-to-br from-[#ecccb9] to-[#b97a5a] bg-clip-text text-transparent">
-                    Vip
-                  </span>
+                <span className="text-gold font-display text-xl font-bold tracking-wide [text-shadow:0_1px_8px_rgba(233,193,92,0.25)]">
+                  PortalVip
                 </span>
-                <span className="mt-0.5 text-[10px] uppercase tracking-[0.25em] text-neutral-500">
+                <span className="mt-0.5 text-[10px] uppercase tracking-[0.3em] text-neutral-400">
                   Chile
                 </span>
               </span>
