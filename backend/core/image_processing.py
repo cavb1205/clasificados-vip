@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 JPEG_QUALITY = 82
 MAX_DIMENSION = 1600  # lado máximo en px tras redimensionar
-WATERMARK_TEXT = "clasificados.vip"
+WATERMARK_TEXT = "PortalVip"
 
 
 def _strip_exif(image: Image.Image) -> Image.Image:

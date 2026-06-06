@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from core.image_processing import process_image
-from core.video_processing import strip_video_metadata
+from core.video_processing import strip_video_metadata, watermark_media_async
 from .models import MediaContent, profile_media_limits
 
 
@@ -49,8 +49,12 @@ class MediaContentSerializer(serializers.ModelSerializer):
             processed = process_image(upload.read(), filename_stem="photo")
             media.file.save(processed.name, processed, save=False)
         else:
-            # Video: quitar metadata/GPS (ffmpeg) por privacidad.
+            # Video: quitar metadata/GPS (ffmpeg, rápido) ahora; el watermark
+            # (re-encode lento) se aplica en segundo plano para no bloquear.
             cleaned = strip_video_metadata(upload)
             media.file.save(cleaned.name, cleaned, save=False)
+            media.save()
+            watermark_media_async(media.pk)
+            return media
         media.save()
         return media
