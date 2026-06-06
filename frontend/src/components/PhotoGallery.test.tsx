@@ -29,7 +29,7 @@ describe("PhotoGallery", () => {
     expect(dialog).toBeInTheDocument();
     expect(screen.getByText("1 / 3")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Foto siguiente" }));
+    await user.click(screen.getByRole("button", { name: "Siguiente" }));
     expect(screen.getByText("2 / 3")).toBeInTheDocument();
 
     await user.keyboard("{Escape}");

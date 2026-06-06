@@ -26,7 +26,7 @@ export function AvatarView({ src, alt }: { src: string; alt: string }) {
       </button>
       {open && (
         <Lightbox
-          photos={[src]}
+          items={[{ type: "photo", url: src }]}
           alt={alt}
           index={0}
           onIndex={() => {}}
