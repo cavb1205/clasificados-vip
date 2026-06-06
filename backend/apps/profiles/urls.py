@@ -13,6 +13,7 @@ urlpatterns = [
     path("cities/", views.CityListView.as_view(), name="cities"),
     path("services/", views.ServiceListView.as_view(), name="services"),
     path("profiles/", views.PublicProfileListView.as_view(), name="public-list"),
+    path("profiles/slugs/", views.ProfileSlugsView.as_view(), name="public-slugs"),
     path("me/favorites/", views.MyFavoritesListView.as_view(), name="my-favorites"),
     path("profiles/<slug:slug>/", views.PublicProfileDetailView.as_view(), name="public-detail"),
     path("profiles/<slug:slug>/events/", views.LogProfileEventView.as_view(), name="log-event"),

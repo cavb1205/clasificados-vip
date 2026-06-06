@@ -249,6 +249,23 @@ class PublicProfileListView(generics.ListAPIView):
         return qs.order_by("-is_featured", "-rating_average", "-created_at")
 
 
+class ProfileSlugsView(APIView):
+    """Slugs de los perfiles públicamente visibles, para el sitemap (liviano)."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        rows = (
+            ModelProfile.objects.publicly_visible()
+            .distinct()
+            .values("slug", "updated_at")
+        )
+        return Response([
+            {"slug": r["slug"], "updated_at": r["updated_at"].isoformat()}
+            for r in rows
+        ])
+
+
 class PublicProfileDetailView(generics.RetrieveAPIView):
     serializer_class = PublicProfileSerializer
     permission_classes = [permissions.AllowAny]
@@ -327,14 +344,27 @@ class AdminModelProfileSerializer(drf_serializers.ModelSerializer):
     username = drf_serializers.CharField(source="user.username", read_only=True)
     city_name = drf_serializers.CharField(source="city.name", read_only=True, default=None)
     active_publication_count = drf_serializers.SerializerMethodField()
+    photos = drf_serializers.SerializerMethodField()
 
     class Meta:
         model = ModelProfile
         fields = [
             "id", "user_id", "stage_name", "slug", "gender", "age", "email", "username",
             "city_name", "verification_status", "is_suspended",
-            "suspension_reason", "photo_authenticity", "created_at", "active_publication_count",
+            "suspension_reason", "photo_authenticity", "photos", "created_at",
+            "active_publication_count",
         ]
+
+    def get_photos(self, obj):
+        request = self.context.get("request")
+        urls = []
+        for m in obj.media.all():
+            if m.media_type == "photo" and not m.is_hidden:
+                u = m.file.url
+                urls.append(request.build_absolute_uri(u) if request else u)
+                if len(urls) >= 6:
+                    break
+        return urls
 
     def get_active_publication_count(self, obj):
         from apps.publications.models import Publication
@@ -354,7 +384,7 @@ class AdminModelProfileListView(generics.ListAPIView):
     pagination_class = AdminPagination
 
     def get_queryset(self):
-        qs = ModelProfile.objects.select_related("user", "city")
+        qs = ModelProfile.objects.select_related("user", "city").prefetch_related("media")
         q = (self.request.query_params.get("q") or "").strip()
         status_filter = self.request.query_params.get("status")
         if q:

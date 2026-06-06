@@ -54,6 +54,10 @@ export const getPublications = (region: string, city: string) =>
 
 export const getServices = () => getJSON<Service[]>("/services/", 3600);
 
+/** Slugs de perfiles visibles, para el sitemap. */
+export const getProfileSlugs = () =>
+  getJSON<{ slug: string; updated_at: string }[]>("/profiles/slugs/", 600);
+
 export interface CityStoryGroup {
   slug: string;
   stage_name: string;

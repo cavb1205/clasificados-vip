@@ -21,9 +21,16 @@ interface AdminProfile {
   is_suspended: boolean;
   suspension_reason: string;
   photo_authenticity: "pending" | "none" | "light" | "heavy";
+  photos: string[];
   created_at: string;
   active_publication_count: number;
 }
+
+const AUTH_SET: { value: "none" | "light" | "heavy"; label: string }[] = [
+  { value: "none", label: "🟢 Sin retoque" },
+  { value: "light", label: "🟡 Leve" },
+  { value: "heavy", label: "🟠 Con retoque" },
+];
 
 type Tab = "" | "pending" | "verified" | "rejected" | "suspended" | "photo_pending";
 
@@ -100,6 +107,17 @@ export default function AdminModelosPage() {
     setBusyId(p.id);
     try {
       await dashboard.adminProfileAction(p.id, "unsuspend");
+      await reload(q, tab);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusyId(null);
+    }
+  }
+  async function classify(p: AdminProfile, value: "none" | "light" | "heavy") {
+    setBusyId(p.id);
+    try {
+      await dashboard.adminSetAuthenticity(p.id, value);
       await reload(q, tab);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error");
@@ -239,6 +257,34 @@ export default function AdminModelosPage() {
                   </div>
                 )}
               </div>
+
+              {tab === "photo_pending" && canModerate && (
+                <div className="mt-3 border-t border-neutral-800 pt-3">
+                  {p.photos.length > 0 ? (
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {p.photos.map((url) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={url} src={url} alt="" className="h-24 w-20 rounded-lg object-cover" />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mb-2 text-xs text-neutral-500">Sin fotos visibles.</p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-neutral-400">Clasificar:</span>
+                    {AUTH_SET.map((o) => (
+                      <button
+                        key={o.value}
+                        disabled={busyId === p.id}
+                        onClick={() => classify(p, o.value)}
+                        className="rounded-full border border-neutral-700 px-3 py-1 text-xs hover:border-pink-500 disabled:opacity-50"
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </li>
           ))}
         </ul>

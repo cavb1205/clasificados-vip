@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getCities, getRegions } from "@/lib/api";
+import { getCities, getProfileSlugs, getRegions } from "@/lib/api";
 
 const BASE = "https://clasificados.vip";
 
@@ -26,6 +26,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch (err) {
     console.error("sitemap: backend no respondió, devolviendo entradas mínimas", err);
+  }
+
+  // Perfiles públicos (las páginas que más buscan en Google).
+  try {
+    const slugs = await getProfileSlugs();
+    for (const p of slugs) {
+      entries.push({
+        url: `${BASE}/perfil/${p.slug}`,
+        lastModified: p.updated_at,
+        priority: 0.7,
+      });
+    }
+  } catch {
+    // Si falla, el sitemap igual sale con regiones/comunas.
   }
 
   return entries;
