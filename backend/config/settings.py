@@ -216,6 +216,9 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 # Límites de multimedia por perfil (validados en backend).
 MAX_PHOTOS_PER_PROFILE = int(os.getenv("MAX_PHOTOS_PER_PROFILE", "6"))
 MAX_VIDEOS_PER_PROFILE = int(os.getenv("MAX_VIDEOS_PER_PROFILE", "1"))
+# Límites ampliados para perfiles con plan destacado (beneficio del plan).
+MAX_PHOTOS_FEATURED = int(os.getenv("MAX_PHOTOS_FEATURED", "10"))
+MAX_VIDEOS_FEATURED = int(os.getenv("MAX_VIDEOS_FEATURED", "2"))
 MAX_PHOTOS_PER_ROOM = int(os.getenv("MAX_PHOTOS_PER_ROOM", "8"))
 
 # Límite de tamaño de uploads. 50MB acomoda el video de consentimiento KYC

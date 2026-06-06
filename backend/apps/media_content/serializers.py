@@ -1,8 +1,7 @@
-from django.conf import settings
 from rest_framework import serializers
 
 from core.image_processing import process_image
-from .models import MediaContent
+from .models import MediaContent, profile_media_limits
 
 
 class MediaContentSerializer(serializers.ModelSerializer):
@@ -27,10 +26,11 @@ class MediaContentSerializer(serializers.ModelSerializer):
 
         profile = self.context["profile"]
         media_type = attrs["media_type"]
+        max_photos, max_videos = profile_media_limits(profile)
         if media_type == MediaContent.MediaType.PHOTO:
-            limit, label = settings.MAX_PHOTOS_PER_PROFILE, "fotos"
+            limit, label = max_photos, "fotos"
         else:
-            limit, label = settings.MAX_VIDEOS_PER_PROFILE, "videos"
+            limit, label = max_videos, "videos"
         count = MediaContent.objects.filter(profile=profile, media_type=media_type).count()
         if count >= limit:
             raise serializers.ValidationError(

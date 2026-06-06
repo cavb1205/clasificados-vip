@@ -10,7 +10,6 @@ const CLP = new Intl.NumberFormat("es-CL", {
 
 const BASE_PERKS = [
   "Tu perfil visible en tu comuna",
-  "Fotos y video en tu muro",
   "Botón “Disponible ahora”",
   "Reseñas de clientes",
   "Contacto por WhatsApp / Telegram",
@@ -21,7 +20,10 @@ const FEATURED_PERKS = [
   "Apareces de primera en los listados",
   "Sello VIP dorado en tu perfil",
   "Historias (stories) de 24 h",
+  "Hasta 10 fotos y 2 videos en tu muro",
 ];
+
+const BASIC_MEDIA = "Hasta 6 fotos y 1 video en tu muro";
 
 /**
  * Selector de planes en tarjetas, mostrando precio y beneficios para que la
@@ -71,6 +73,11 @@ export function PlanPicker({
                   <span className="text-emerald-400" aria-hidden>✓</span> {perk}
                 </li>
               ))}
+              {!feat && (
+                <li className="flex gap-2 text-neutral-300">
+                  <span className="text-emerald-400" aria-hidden>✓</span> {BASIC_MEDIA}
+                </li>
+              )}
               {feat &&
                 FEATURED_PERKS.map((perk) => (
                   <li key={perk} className="flex gap-2 font-medium text-[#e9c15c]">

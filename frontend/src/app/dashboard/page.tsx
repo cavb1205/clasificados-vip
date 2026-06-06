@@ -49,6 +49,7 @@ interface Publication {
   id: number;
   title: string;
   status: string;
+  is_featured?: boolean;
   expires_at: string | null;
 }
 
@@ -126,6 +127,9 @@ export default function DashboardPage() {
       toast(e instanceof Error ? e.message : "Error al guardar", "error");
     }
   }
+
+  // Plan destacado activo → más cupos de fotos/videos.
+  const isFeatured = publications.some((p) => p.status === "active" && p.is_featured);
 
   return (
     <div className="space-y-10">
@@ -293,8 +297,11 @@ export default function DashboardPage() {
 
       {/* Multimedia (muro de fotos) */}
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Muro de fotos (máx. 6 fotos, 1 video)</h2>
-        <MediaManager media={media} onChange={loadAll} disabled={!profile} />
+        <h2 className="mb-3 text-lg font-semibold">
+          Muro de fotos (máx. {isFeatured ? 10 : 6} fotos, {isFeatured ? 2 : 1} video{isFeatured ? "s" : ""})
+          {isFeatured && <span className="ml-2 text-xs text-[#e9c15c]">⭐ plan destacado</span>}
+        </h2>
+        <MediaManager media={media} onChange={loadAll} disabled={!profile} featured={isFeatured} />
       </section>
 
       {/* Publicaciones */}
@@ -788,10 +795,12 @@ function MediaManager({
   media,
   onChange,
   disabled,
+  featured,
 }: {
   media: Media[];
   onChange: () => void;
   disabled: boolean;
+  featured?: boolean;
 }) {
   const [pending, setPending] = useState<PendingFile[]>([]);
   const [type, setType] = useState<"photo" | "video">("photo");
@@ -801,7 +810,9 @@ function MediaManager({
 
   const photos = media.filter((m) => m.media_type === "photo");
   const videos = media.filter((m) => m.media_type === "video");
-  const limit = type === "photo" ? PHOTO_LIMIT : VIDEO_LIMIT;
+  const photoLimit = featured ? 10 : PHOTO_LIMIT;
+  const videoLimit = featured ? 2 : VIDEO_LIMIT;
+  const limit = type === "photo" ? photoLimit : videoLimit;
   const usedNow = type === "photo" ? photos.length : videos.length;
   const remaining = Math.max(0, limit - usedNow);
 
@@ -1734,12 +1745,11 @@ function StoriesPanel({ publications }: { publications: Publication[] }) {
   const [err, setErr] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Solo perfiles con anuncio destacado activo pueden publicar historias.
   const eligible = publications.some(
-    (p) => p.status === "active" && p.expires_at &&
+    (p) =>
+      p.status === "active" && p.is_featured && p.expires_at &&
       new Date(p.expires_at).getTime() > Date.now(),
-    // Importante: además debe ser featured. El backend lo valida; aquí
-    // mostramos el panel como pista. Si no es eligible, mostramos mensaje
-    // explicativo abajo.
   );
 
   const reload = useCallback(async () => {
@@ -1779,28 +1789,35 @@ function StoriesPanel({ publications }: { publications: Publication[] }) {
             Se borran automáticamente a las 24h.
           </p>
         </div>
-        <label className="cursor-pointer rounded-full bg-pink-600 px-4 py-2 text-sm font-medium text-white hover:bg-pink-500">
-          {busy ? "Subiendo…" : "+ Subir"}
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*,video/*"
-            disabled={busy}
-            onChange={onUpload}
-            className="hidden"
-          />
-        </label>
+        {eligible && (
+          <label className="btn-gold cursor-pointer rounded-full px-4 py-2 text-sm font-medium">
+            {busy ? "Subiendo…" : "+ Subir"}
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*,video/*"
+              disabled={busy}
+              onChange={onUpload}
+              className="hidden"
+            />
+          </label>
+        )}
       </div>
+
+      {!eligible && (
+        <div className="mt-3 rounded-lg border border-[#caa24a]/40 bg-[#e9c15c]/[0.06] px-3 py-2.5 text-xs text-[#e9c15c]">
+          ⭐ <strong>Las historias son del plan Destacado.</strong> Mejora tu plan para
+          publicar historias de 24h y aparecer de primera.
+        </div>
+      )}
 
       {err && <p className="mt-2 text-xs text-red-400">{err}</p>}
 
-      {stories.length === 0 ? (
+      {eligible && stories.length === 0 ? (
         <p className="mt-3 text-xs text-neutral-500">
-          {eligible
-            ? "Aún no subiste historias. Toca + Subir para empezar."
-            : "Primero activa un anuncio con plan destacado para poder publicar historias."}
+          Aún no subiste historias. Toca + Subir para empezar.
         </p>
-      ) : (
+      ) : stories.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-3">
           {stories.map((s) => (
             <div key={s.id} className="group relative">
@@ -1829,7 +1846,7 @@ function StoriesPanel({ publications }: { publications: Publication[] }) {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

@@ -127,3 +127,28 @@ class AdminMediaHideTests(TestCase):
             {"action": "hide"}, format="json",
         )
         self.assertEqual(r.status_code, 403)
+
+
+class FeaturedMediaLimitTests(TestCase):
+    def setUp(self):
+        from apps.profiles.models import ModelProfile
+        from apps.publications.models import Publication, SubscriptionPlan
+        from django.utils import timezone
+        from datetime import timedelta
+        self.u = User.objects.create_user(username="f", email="f@e.com", password="x", role="model")
+        self.profile = ModelProfile.objects.create(
+            user=self.u, stage_name="Fea", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+        )
+        plan = SubscriptionPlan.objects.create(name="Dest", price=30000, duration_days=30, includes_featured=True)
+        Publication.objects.create(
+            profile=self.profile, plan=plan, title="A",
+            status=Publication.Status.ACTIVE, is_featured=True,
+            expires_at=timezone.now() + timedelta(days=10),
+        )
+
+    def test_featured_allows_more_photos(self):
+        from apps.media_content.models import profile_media_limits
+        max_photos, max_videos = profile_media_limits(self.profile)
+        self.assertEqual(max_photos, 10)
+        self.assertEqual(max_videos, 2)
