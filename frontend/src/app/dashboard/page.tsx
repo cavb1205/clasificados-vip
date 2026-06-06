@@ -37,6 +37,7 @@ interface Profile {
   available_until: string | null;
   whatsapp: string;
   telegram: string;
+  base_rate: number | null;
   services: Service[];
 }
 interface Media {
@@ -115,6 +116,8 @@ export default function DashboardPage() {
       telegram: form.get("telegram") ?? "",
       service_ids: Array.from(selectedTags),
     };
+    const rateRaw = form.get("base_rate");
+    data.base_rate = rateRaw ? Number(rateRaw) : null;
     // Solo enviamos city_id si el usuario eligió una comuna real. Si el select
     // está en el placeholder, dejamos el valor existente intacto (partial update).
     if (cityRaw) data.city_id = Number(cityRaw);
@@ -253,6 +256,16 @@ export default function DashboardPage() {
             name="telegram"
             defaultValue={profile?.telegram}
             placeholder="Telegram (usuario, sin @)"
+            className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
+          />
+          <input
+            name="base_rate"
+            type="number"
+            min={0}
+            step={1000}
+            defaultValue={profile?.base_rate ?? ""}
+            placeholder="Tarifa base (CLP, opcional)"
+            inputMode="numeric"
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
           <textarea

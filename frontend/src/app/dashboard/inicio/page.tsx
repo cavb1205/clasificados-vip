@@ -21,6 +21,7 @@ interface ProfileLite {
   whatsapp: string;
   telegram: string;
   description: string;
+  base_rate: number | null;
   avatar: string | null;
   verification_status: "pending" | "verified" | "rejected";
   latest_verification: { status: string } | null;
@@ -209,6 +210,7 @@ function ProfileStep({ profile, regions, onSaved }: { profile: ProfileLite | nul
       whatsapp: form.get("whatsapp") || "",
       telegram: form.get("telegram") || "",
       description: form.get("description") || "",
+      base_rate: form.get("base_rate") ? Number(form.get("base_rate")) : null,
     };
     const cityId = form.get("city_id");
     if (cityId) data.city_id = Number(cityId);
@@ -247,6 +249,7 @@ function ProfileStep({ profile, regions, onSaved }: { profile: ProfileLite | nul
         </div>
         <input name="whatsapp" defaultValue={profile?.whatsapp} placeholder="WhatsApp (ej: 56912345678)" inputMode="tel" className={inputCls} />
         <input name="telegram" defaultValue={profile?.telegram} placeholder="Telegram (opcional, sin @)" className={inputCls} />
+        <input name="base_rate" type="number" min={0} step={1000} defaultValue={profile?.base_rate ?? ""} placeholder="Tarifa base (CLP, opcional)" inputMode="numeric" className={inputCls} />
         <textarea name="description" defaultValue={profile?.description} placeholder="Cuéntales sobre ti (opcional)" rows={3} className={inputCls} />
         {err && <p className="text-sm text-red-400">{err}</p>}
         <button disabled={busy} className="btn-gold w-full rounded-full py-2.5 font-medium disabled:opacity-50">
