@@ -868,6 +868,13 @@ function MediaManager({
 
   return (
     <div className="space-y-4">
+      {(photos.length > photoLimit || videos.length > videoLimit) && (
+        <div className="rounded-lg border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
+          En tu plan solo se muestran las primeras <strong>{photoLimit} fotos</strong> y{" "}
+          <strong>{videoLimit} video</strong> en tu perfil público. Las demás quedan
+          guardadas y reaparecen si vuelves al plan <strong>Destacado</strong> ⭐.
+        </div>
+      )}
       {/* Existentes */}
       {photos.length > 0 && (
         <PhotoGrid photos={photos} onChange={onChange} />

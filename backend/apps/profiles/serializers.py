@@ -180,14 +180,21 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         return self._abs(obj.avatar.url) if obj.avatar else None
 
     def get_photos(self, obj):
-        return [self._abs(m.file.url) for m in self._photo_qs(obj)]
+        # Se muestran solo hasta el cupo del plan (las primeras según su orden).
+        # Las extra no se borran: reaparecen si vuelve a un plan con más cupo.
+        max_photos, _ = self._media_limits(obj)
+        return [self._abs(m.file.url) for m in self._photo_qs(obj)[:max_photos]]
 
     def get_videos(self, obj):
-        # Videos del muro no ocultados por moderación.
-        return [
-            self._abs(m.file.url)
-            for m in obj.media.filter(media_type="video", is_hidden=False)
-        ]
+        # Videos del muro no ocultos por moderación, hasta el cupo del plan.
+        _, max_videos = self._media_limits(obj)
+        videos = obj.media.filter(media_type="video", is_hidden=False)[:max_videos]
+        return [self._abs(m.file.url) for m in videos]
+
+    @staticmethod
+    def _media_limits(obj):
+        from apps.media_content.models import profile_media_limits
+        return profile_media_limits(obj)
 
     def get_cover_photo(self, obj):
         # La portada (tarjetas, og:image) prioriza el avatar; si no hay, la 1ª del muro.

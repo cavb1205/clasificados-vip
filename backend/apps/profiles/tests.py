@@ -455,3 +455,27 @@ class WallVideoPublicTests(APITestCase):
         )
         resp = self.client.get(reverse("api:profiles:public-detail", args=[self.profile.slug]))
         self.assertEqual(len(resp.data["videos"]), 0)
+
+
+class PublicPhotoCapTests(APITestCase):
+    """El perfil público muestra fotos solo hasta el cupo del plan (no borra)."""
+
+    def setUp(self):
+        from apps.media_content.models import MediaContent
+        self.MediaContent = MediaContent
+        u = _make_user("cap@example.com")
+        self.profile = ModelProfile.objects.create(
+            user=u, stage_name="Cap", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
+        )
+
+    def test_basic_shows_only_six_photos(self):
+        for i in range(8):
+            self.MediaContent.objects.create(
+                profile=self.profile, media_type="photo",
+                file=f"profiles/media/p{i}.jpg", order=i,
+            )
+        resp = self.client.get(reverse("api:profiles:public-detail", args=[self.profile.slug]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data["photos"]), 6)
