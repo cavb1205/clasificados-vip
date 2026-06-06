@@ -79,6 +79,7 @@ export interface PublicProfile {
   telegram: string;
   is_available_now: boolean;
   available_until: string | null;
+  photo_authenticity: "pending" | "none" | "light" | "heavy";
 }
 
 export interface PublicPublication {

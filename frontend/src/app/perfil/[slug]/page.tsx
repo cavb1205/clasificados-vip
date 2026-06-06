@@ -14,6 +14,13 @@ import { DEFAULT_GENDER_SLUG } from "@/lib/types";
 
 const GENDER_LABEL: Record<string, string> = { female: "Mujer", trans: "Trans", male: "Hombre" };
 
+// Insignia de autenticidad de fotos (la asigna el admin). "pending" no muestra badge.
+const PHOTO_AUTH: Record<string, { emoji: string; label: string; cls: string } | undefined> = {
+  none: { emoji: "🟢", label: "Sin retoque", cls: "border-emerald-500/50 text-emerald-300" },
+  light: { emoji: "🟡", label: "Retoque leve", cls: "border-amber-500/50 text-amber-300" },
+  heavy: { emoji: "🟠", label: "Con retoque", cls: "border-orange-500/50 text-orange-300" },
+};
+
 function Stars({ value }: { value: number }) {
   const full = Math.round(value);
   return (
@@ -167,6 +174,14 @@ export default async function ProfilePage({ params }: { params: Params }) {
             <span className="flex items-center gap-1 rounded-full bg-sky-600/20 px-2.5 py-1 font-medium text-sky-200">
               ✓ Identidad verificada
             </span>
+            {PHOTO_AUTH[profile.photo_authenticity] && (
+              <span
+                title="Nivel de retoque de las fotos, evaluado por el equipo"
+                className={`flex items-center gap-1 rounded-full border px-2.5 py-1 font-medium ${PHOTO_AUTH[profile.photo_authenticity]!.cls}`}
+              >
+                {PHOTO_AUTH[profile.photo_authenticity]!.emoji} {PHOTO_AUTH[profile.photo_authenticity]!.label}
+              </span>
+            )}
             {profile.is_available_now && (
               <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 font-medium text-emerald-200">
                 <span className="relative flex h-2 w-2">

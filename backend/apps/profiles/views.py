@@ -333,7 +333,7 @@ class AdminModelProfileSerializer(drf_serializers.ModelSerializer):
         fields = [
             "id", "user_id", "stage_name", "slug", "gender", "age", "email", "username",
             "city_name", "verification_status", "is_suspended",
-            "suspension_reason", "created_at", "active_publication_count",
+            "suspension_reason", "photo_authenticity", "created_at", "active_publication_count",
         ]
 
     def get_active_publication_count(self, obj):
@@ -392,8 +392,17 @@ class AdminModelProfileActionView(generics.GenericAPIView):
             profile.is_suspended = False
             profile.suspension_reason = ""
             profile.save(update_fields=["is_suspended", "suspension_reason"])
+        elif action == "set_authenticity":
+            value = (request.data.get("value") or "").lower()
+            if value not in dict(ModelProfile.PhotoAuthenticity.choices):
+                return Response({"detail": "Nivel inválido."}, status=400)
+            profile.photo_authenticity = value
+            profile.save(update_fields=["photo_authenticity"])
+            log_action(request.user, "model.set_authenticity",
+                       target=f"{profile.stage_name} (#{profile.id})", note=value)
+            return Response(AdminModelProfileSerializer(profile).data)
         else:
-            return Response({"detail": "action debe ser suspend|unsuspend"}, status=400)
+            return Response({"detail": "action debe ser suspend|unsuspend|set_authenticity"}, status=400)
         log_action(request.user, f"model.{action}",
                    target=f"{profile.stage_name} (#{profile.id})", note=request.data.get("reason") or "")
         return Response(AdminModelProfileSerializer(profile).data)

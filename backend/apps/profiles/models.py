@@ -161,6 +161,22 @@ class ModelProfile(models.Model):
     # puede estar verified + suspended (oculta del público hasta liberar).
     is_suspended = models.BooleanField("suspendido", default=False)
     suspension_reason = models.CharField(max_length=200, blank=True)
+
+    class PhotoAuthenticity(models.TextChoices):
+        PENDING = "pending", "Por revisar"
+        NONE = "none", "Sin retoque"
+        LIGHT = "light", "Retoque leve"
+        HEAVY = "heavy", "Con retoque"
+
+    # Nivel de retoque de las fotos, evaluado por el admin (apoyado en el KYC).
+    # Vuelve a PENDING cuando la modelo cambia las fotos de su muro.
+    photo_authenticity = models.CharField(
+        "autenticidad de fotos",
+        max_length=10,
+        choices=PhotoAuthenticity.choices,
+        default=PhotoAuthenticity.PENDING,
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

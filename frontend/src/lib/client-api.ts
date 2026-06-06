@@ -231,6 +231,11 @@ export const dashboard = {
       method: "POST",
       body: { action, reason },
     }),
+  adminSetAuthenticity: (id: number, value: "none" | "light" | "heavy" | "pending") =>
+    apiFetch(`/admin/profiles/${id}/action/`, {
+      method: "POST",
+      body: { action: "set_authenticity", value },
+    }),
   adminExpirePublication: (id: number) =>
     apiFetch(`/admin/publications/${id}/expire/`, { method: "POST" }),
   adminGrantDays: (publicationId: number, days: number, note = "") =>

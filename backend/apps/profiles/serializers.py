@@ -164,7 +164,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         fields = [
             "stage_name", "slug", "gender", "description", "age", "services",
             "base_rate", "city", "avatar", "photos", "videos", "cover_photo",
-            "is_featured", "rating_average", "rating_count",
+            "is_featured", "rating_average", "rating_count", "photo_authenticity",
             "whatsapp", "telegram",
             "is_available_now", "available_until",
         ]

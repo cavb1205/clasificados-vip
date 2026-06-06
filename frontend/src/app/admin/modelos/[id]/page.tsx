@@ -17,7 +17,15 @@ interface ProfileLite {
   verification_status: string;
   is_suspended: boolean;
   suspension_reason: string;
+  photo_authenticity: "pending" | "none" | "light" | "heavy";
 }
+
+const AUTH_OPTIONS: { value: "none" | "light" | "heavy" | "pending"; label: string }[] = [
+  { value: "none", label: "🟢 Sin retoque" },
+  { value: "light", label: "🟡 Retoque leve" },
+  { value: "heavy", label: "🟠 Con retoque" },
+  { value: "pending", label: "Por revisar" },
+];
 
 const CLP = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
 const fdate = (s: string | null) => (s ? new Date(s).toLocaleDateString("es-CL") : "—");
@@ -64,6 +72,18 @@ export default function AdminModeloFichaPage() {
     setBusy(true);
     try {
       await dashboard.adminProfileAction(p.id, action, reason);
+      await reload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setAuthenticity(value: "none" | "light" | "heavy" | "pending") {
+    setBusy(true);
+    try {
+      await dashboard.adminSetAuthenticity(id, value);
       await reload();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error");
@@ -161,6 +181,28 @@ export default function AdminModeloFichaPage() {
       )}
 
       <Section title="Muro de fotos y videos">
+        {canModerate && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm">
+            <span className="text-neutral-400">Autenticidad (retoque):</span>
+            {AUTH_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                disabled={busy}
+                onClick={() => setAuthenticity(o.value)}
+                className={`rounded-full border px-3 py-1 text-xs disabled:opacity-50 ${
+                  p.photo_authenticity === o.value
+                    ? "border-pink-500 bg-pink-600/20 text-pink-200"
+                    : "border-neutral-700 text-neutral-300 hover:border-pink-500"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+            <span className="ml-auto text-xs text-neutral-600">
+              Compara con su KYC. Vuelve a “Por revisar” si cambia sus fotos.
+            </span>
+          </div>
+        )}
         {data.media.length === 0 ? (
           <Empty>Sin multimedia.</Empty>
         ) : (

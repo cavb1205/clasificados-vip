@@ -479,3 +479,44 @@ class PublicPhotoCapTests(APITestCase):
         resp = self.client.get(reverse("api:profiles:public-detail", args=[self.profile.slug]))
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.data["photos"]), 6)
+
+
+class PhotoAuthenticityTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="ad2", email="ad2@example.com", password="x", role="admin", is_staff=True
+        )
+        u = _make_user("auth@example.com")
+        self.profile = ModelProfile.objects.create(
+            user=u, stage_name="Au", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            photo_authenticity=ModelProfile.PhotoAuthenticity.NONE,
+        )
+
+    def test_admin_sets_level_and_logs(self):
+        from apps.audit.models import AdminActionLog
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:profiles:admin-profile-action", args=[self.profile.id]),
+            {"action": "set_authenticity", "value": "light"}, format="json",
+        )
+        self.assertEqual(r.status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.photo_authenticity, "light")
+        self.assertEqual(AdminActionLog.objects.filter(action="model.set_authenticity").count(), 1)
+
+    def test_invalid_level_rejected(self):
+        self.client.force_authenticate(self.admin)
+        r = self.client.post(
+            reverse("api:profiles:admin-profile-action", args=[self.profile.id]),
+            {"action": "set_authenticity", "value": "perfecta"}, format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_adding_photo_resets_to_pending(self):
+        from apps.media_content.models import MediaContent
+        MediaContent.objects.create(
+            profile=self.profile, media_type="photo", file="profiles/media/x.jpg"
+        )
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.photo_authenticity, "pending")
