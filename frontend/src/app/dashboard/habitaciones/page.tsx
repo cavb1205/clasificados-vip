@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,7 +32,6 @@ export default function RoomsBrowsePage() {
   const [roomCities, setRoomCities] = useState<RoomCity[]>([]);
   const [cityId, setCityId] = useState("");
   const [availableNow, setAvailableNow] = useState(false);
-  const [selected, setSelected] = useState<PublicRoom | null>(null);
 
   const load = useCallback(async () => {
     const params: Record<string, string> = {};
@@ -155,29 +154,21 @@ export default function RoomsBrowsePage() {
           ) : (
             <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {items.map((room) => (
-                <RoomCard key={room.id} room={room} onOpen={() => setSelected(room)} />
+                <RoomCard key={room.id} room={room} />
               ))}
             </ul>
           )}
         </>
       )}
-
-      {selected && <RoomDetailModal room={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
 
-function waLink(number: string, title: string) {
-  const digits = number.replace(/[^\d]/g, "");
-  const text = encodeURIComponent(`Hola, vi tu publicación "${title}" en PortalVip Chile.`);
-  return `https://wa.me/${digits}?text=${text}`;
-}
-
-function RoomCard({ room, onOpen }: { room: PublicRoom; onOpen: () => void }) {
+function RoomCard({ room }: { room: PublicRoom }) {
   const cover = room.photos[0];
   return (
     <li className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
-      <button type="button" onClick={onOpen} className="block w-full text-left">
+      <Link href={`/dashboard/habitaciones/${room.id}`} className="block w-full text-left">
         <div className="relative">
           {cover ? (
             <Image src={cover.image_url} alt={room.title} width={640} height={400} unoptimized className="h-44 w-full object-cover" />
@@ -212,136 +203,7 @@ function RoomCard({ room, onOpen }: { room: PublicRoom; onOpen: () => void }) {
           {room.description && <p className="line-clamp-2 text-sm text-neutral-300">{room.description}</p>}
           <p className="pt-1 text-xs text-pink-400">Ver detalle →</p>
         </div>
-      </button>
+      </Link>
     </li>
-  );
-}
-
-function RoomDetailModal({ room, onClose }: { room: PublicRoom; onClose: () => void }) {
-  const [idx, setIdx] = useState(0);
-  const [reportMsg, setReportMsg] = useState("");
-  const photos = room.photos;
-  const photo = photos[idx];
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  async function report() {
-    const reason = window.prompt("¿Por qué reportas esta habitación? (opcional)");
-    if (reason === null) return;
-    try {
-      await rooms.report(room.id, reason);
-      setReportMsg("Gracias, recibimos tu reporte.");
-    } catch {
-      setReportMsg("No se pudo enviar el reporte.");
-    }
-  }
-
-  // Accesibilidad del diálogo (WCAG): cerrar con Esc, trap de foco, restaurar
-  // el foco al cerrar y bloquear el scroll del fondo.
-  useEffect(() => {
-    const prevActive = document.activeElement as HTMLElement | null;
-    const node = dialogRef.current;
-    const focusables = () =>
-      node
-        ? Array.from(
-            node.querySelectorAll<HTMLElement>(
-              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-            ),
-          ).filter((el) => !el.hasAttribute("disabled"))
-        : [];
-    focusables()[0]?.focus();
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
-      if (e.key === "Tab") {
-        const f = focusables();
-        if (f.length === 0) return;
-        const first = f[0];
-        const last = f[f.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    }
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-      prevActive?.focus?.();
-    };
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-4" onClick={onClose}>
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="room-modal-title"
-        className="my-6 w-full max-w-lg rounded-2xl border border-neutral-800 bg-neutral-950"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="relative">
-          {photo ? (
-            <Image src={photo.image_url} alt={room.title} width={900} height={600} unoptimized className="max-h-[55vh] w-full rounded-t-2xl object-contain bg-black" />
-          ) : (
-            <div className="flex h-56 w-full items-center justify-center rounded-t-2xl bg-neutral-800 text-neutral-600">Sin foto</div>
-          )}
-          <button aria-label="Cerrar" onClick={onClose} className="absolute right-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-sm text-white hover:bg-black">✕</button>
-          {photos.length > 1 && (
-            <>
-              <button aria-label="Foto anterior" onClick={() => setIdx((i) => (i - 1 + photos.length) % photos.length)} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 px-3 py-1.5 text-white hover:bg-black">‹</button>
-              <button aria-label="Foto siguiente" onClick={() => setIdx((i) => (i + 1) % photos.length)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/70 px-3 py-1.5 text-white hover:bg-black">›</button>
-              <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 text-xs text-white">{idx + 1}/{photos.length}</span>
-            </>
-          )}
-        </div>
-        <div className="space-y-3 p-5">
-          <div className="flex items-start justify-between gap-2">
-            <h2 id="room-modal-title" className="text-lg font-semibold">
-              {room.is_featured && <span className="mr-1 text-amber-300">⭐</span>}
-              {room.title}
-            </h2>
-            <p className="whitespace-nowrap text-sm font-medium text-pink-300">
-              {CLP.format(room.price)} <span className="text-xs text-neutral-400">{PERIOD_LABEL[room.price_period]}</span>
-            </p>
-          </div>
-          <p className="text-xs text-neutral-400">
-            {room.city ?? "—"}{room.region && `, ${room.region}`}{room.sector && ` · ${room.sector}`}
-          </p>
-          {room.is_available_now && (
-            <span className="inline-block rounded-full bg-emerald-600/20 px-2 py-0.5 text-xs font-medium text-emerald-300">
-              🟢 Disponible ahora
-            </span>
-          )}
-          {room.description && <p className="whitespace-pre-line text-sm text-neutral-200">{room.description}</p>}
-          <p className="text-xs text-neutral-500">Por privacidad solo se muestra la comuna y un sector, nunca la dirección exacta.</p>
-          <div className="flex gap-2 pt-1">
-            {room.whatsapp && (
-              <a href={waLink(room.whatsapp, room.title)} target="_blank" rel="noopener noreferrer"
-                className="flex-1 rounded-full bg-emerald-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500">WhatsApp</a>
-            )}
-            {room.phone && (
-              <a href={`tel:${room.phone}`} className="flex-1 rounded-full border border-neutral-700 px-3 py-2 text-center text-sm hover:border-pink-500">Llamar</a>
-            )}
-          </div>
-          {reportMsg ? (
-            <p className="text-xs text-emerald-400">{reportMsg}</p>
-          ) : (
-            <button onClick={report} className="text-xs text-neutral-500 hover:text-red-400">
-              Reportar esta habitación
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }

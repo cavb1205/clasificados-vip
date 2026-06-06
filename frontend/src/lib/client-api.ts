@@ -371,6 +371,7 @@ export const rooms = {
   // Modelo activa
   browse: (params: Record<string, string> = {}) =>
     apiFetch<PublicRoom[]>(`/rooms/?${new URLSearchParams(params).toString()}`),
+  detail: (id: number | string) => apiFetch<PublicRoom>(`/rooms/${id}/`),
   // Comunas con anuncios activos (para el filtro del browse)
   cities: () =>
     apiFetch<{ id: number; name: string; region_name: string }[]>("/room-cities/"),

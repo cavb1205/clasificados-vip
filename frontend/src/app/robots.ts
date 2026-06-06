@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: { userAgent: "*", allow: "/", disallow: ["/dashboard", "/login", "/registro", "/buscar"] },
-    sitemap: "https://clasificados.vip/sitemap.xml",
+    rules: { userAgent: "*", allow: "/", disallow: ["/dashboard", "/admin", "/anfitrion", "/cuenta", "/login", "/registro", "/buscar"] },
+    sitemap: "https://portalvip.cl/sitemap.xml",
   };
 }

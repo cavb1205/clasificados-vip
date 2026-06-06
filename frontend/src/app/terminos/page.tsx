@@ -17,11 +17,6 @@ export default function TermsPage() {
         <p className="text-sm text-neutral-500">Vigente desde {LAST_UPDATED}</p>
       </header>
 
-      <div className="rounded-lg border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
-        ⚠️ <strong>Borrador.</strong> Este documento debe ser revisado por un abogado
-        en derecho digital chileno antes de su publicación definitiva.
-      </div>
-
       <h2 id="objeto" className="mt-8 text-xl font-semibold text-neutral-100">1. Objeto</h2>
       <p>
         PortalVip Chile (&quot;la Plataforma&quot;) es un directorio en línea de anuncios
@@ -122,8 +117,7 @@ export default function TermsPage() {
       <h2 id="contacto" className="mt-6 text-xl font-semibold text-neutral-100">11. Contacto</h2>
       <p>
         Para consultas sobre estos términos, escribir a{" "}
-        <span className="text-pink-400">contacto@clasificados.vip</span> (correo a definir
-        cuando se publique el dominio).
+        <span className="text-pink-400">contacto@portalvip.cl</span>.
       </p>
     </article>
   );

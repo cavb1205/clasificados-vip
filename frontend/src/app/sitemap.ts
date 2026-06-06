@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getCities, getProfileSlugs, getRegions } from "@/lib/api";
 
-const BASE = "https://clasificados.vip";
+const BASE = "https://portalvip.cl";
 
 // Si el backend está abajo en el momento del build, devolvemos solo la home en
 // vez de romper el deploy — el sitemap se regenera en el próximo build/revalidate.

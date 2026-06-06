@@ -129,27 +129,44 @@ class CityStoriesView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
+        from django.db.models import Prefetch
+
         now = timezone.now()
         region = request.query_params.get("region")
         city = request.query_params.get("city")
-        profiles = ModelProfile.objects.publicly_visible().filter(
-            stories__expires_at__gt=now
+        # Prefetch en 2 queries (historias vivas + media) en vez de N por modelo.
+        profiles = (
+            ModelProfile.objects.publicly_visible()
+            .filter(stories__expires_at__gt=now)
         )
         if city:
             profiles = profiles.filter(city__slug=city)
         if region:
             profiles = profiles.filter(city__region__slug=region)
-        profiles = profiles.distinct().select_related("city")[:60]
+        profiles = (
+            profiles.distinct().select_related("city")
+            .prefetch_related(
+                Prefetch(
+                    "stories",
+                    queryset=Story.objects.filter(expires_at__gt=now).order_by("created_at"),
+                    to_attr="live_stories",
+                ),
+                "media",
+            )[:60]
+        )
 
         def avatar_fallback(p):
             if getattr(p, "avatar", None):
                 return request.build_absolute_uri(p.avatar.url)
-            photo = p.media.filter(media_type="photo", is_hidden=False).first()
+            photo = next(
+                (m for m in p.media.all() if m.media_type == "photo" and not m.is_hidden),
+                None,
+            )
             return request.build_absolute_uri(photo.file.url) if photo else None
 
         out = []
         for p in profiles:
-            stories = list(_live_stories(p).order_by("created_at"))
+            stories = list(p.live_stories)
             if not stories:
                 continue
             # La burbuja muestra la HISTORIA más reciente (no el avatar) para que

@@ -24,7 +24,7 @@ const display = Fraunces({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://clasificados.vip"),
+  metadataBase: new URL("https://portalvip.cl"),
   title: {
     default: "PortalVip Chile — Anuncios verificados",
     template: "%s · PortalVip Chile",

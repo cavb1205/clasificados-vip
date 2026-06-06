@@ -17,12 +17,6 @@ export default function PrivacyPage() {
         <p className="text-sm text-neutral-500">Vigente desde {LAST_UPDATED}</p>
       </header>
 
-      <div className="rounded-lg border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
-        ⚠️ <strong>Borrador.</strong> Este documento debe ser revisado por un abogado
-        especializado en protección de datos (Ley 19.628 Chile, y GDPR si llega tráfico
-        europeo).
-      </div>
-
       <h2 id="responsable" className="mt-8 text-xl font-semibold text-neutral-100">1. Responsable del tratamiento</h2>
       <p>
         PortalVip Chile (en adelante &quot;la Plataforma&quot;) es responsable del
@@ -129,7 +123,7 @@ export default function PrivacyPage() {
       </ul>
       <p>
         Para ejercer estos derechos, escribir a{" "}
-        <span className="text-pink-400">privacidad@clasificados.vip</span> con copia de
+        <span className="text-pink-400">privacidad@portalvip.cl</span> con copia de
         tu cédula para acreditar tu identidad.
       </p>
 
@@ -158,8 +152,7 @@ export default function PrivacyPage() {
       <h2 id="contacto" className="mt-6 text-xl font-semibold text-neutral-100">12. Contacto</h2>
       <p>
         Encargado de privacidad:{" "}
-        <span className="text-pink-400">privacidad@clasificados.vip</span> (correo a
-        definir cuando se publique el dominio).
+        <span className="text-pink-400">privacidad@portalvip.cl</span>.
       </p>
 
       <p className="mt-8 text-sm text-neutral-500">
