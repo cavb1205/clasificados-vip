@@ -168,11 +168,17 @@ class PaymentReceipt(models.Model):
         self.reviewed_by = reviewer
         self.reviewed_at = timezone.now()
         self.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        self.publication.activate()
+        pub = self.publication
+        if pub.is_live:
+            # Renovación por adelantado: suma días al vencimiento actual.
+            days = pub.plan.duration_days if pub.plan else PUBLICATION_DAYS
+            pub.extend(days=days)
+        else:
+            pub.activate()
         self._notify_owner(
             title="✅ Pago aprobado",
-            message=f"Tu anuncio '{self.publication.title}' ya está activo "
-                    f"hasta el {self.publication.expires_at:%d-%m-%Y}.",
+            message=f"Tu anuncio '{pub.title}' está activo "
+                    f"hasta el {pub.expires_at:%d-%m-%Y}.",
         )
 
     def reject(self, *, reviewer=None, note=""):

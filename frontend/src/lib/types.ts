@@ -10,6 +10,7 @@ export interface City {
   name: string;
   slug: string;
   region: Region;
+  profile_count?: number | null;
 }
 
 export interface Story {

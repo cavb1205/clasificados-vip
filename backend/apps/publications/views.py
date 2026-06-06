@@ -96,13 +96,19 @@ class MyPublicationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], serializer_class=PaymentReceiptSerializer)
     def receipt(self, request, pk=None):
-        """Sube el comprobante de transferencia → publicación pasa a pending_payment."""
+        """Sube el comprobante de transferencia.
+
+        Si el anuncio está vivo (renovar por adelantado), NO cambia el estado:
+        sigue visible y al aprobar el admin se EXTIENDE el vencimiento. Si está
+        en borrador/expirado, pasa a pending_payment como siempre.
+        """
         publication = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save(publication=publication)
-        publication.status = Publication.Status.PENDING_PAYMENT
-        publication.save(update_fields=["status", "updated_at"])
+        if not publication.is_live:
+            publication.status = Publication.Status.PENDING_PAYMENT
+            publication.save(update_fields=["status", "updated_at"])
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], serializer_class=PublicationSerializer)

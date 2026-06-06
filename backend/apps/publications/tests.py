@@ -237,3 +237,22 @@ class PublicationTitleAndPaymentTests(_Base):
         r = self.api.get(reverse("api:publications:payment-info"))
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data["payment_instructions"], "Banco X 123")
+
+
+class RenewAheadTests(_Base):
+    def test_approving_receipt_on_live_pub_extends(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        plan = SubscriptionPlan.objects.create(name="M", price=15000, duration_days=30)
+        pub = Publication.objects.create(
+            profile=self.profile, plan=plan, title="A",
+            status=Publication.Status.ACTIVE,
+            expires_at=timezone.now() + timedelta(days=5),
+        )
+        old_exp = pub.expires_at
+        PaymentReceipt.objects.create(publication=pub).approve()
+        pub.refresh_from_db()
+        self.assertEqual(pub.status, Publication.Status.ACTIVE)
+        # Se sumaron ~30 días al vencimiento previo (no se reseteó a now+30).
+        delta = pub.expires_at - old_exp
+        self.assertGreater(delta, timedelta(days=29, hours=23))

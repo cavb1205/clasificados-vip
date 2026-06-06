@@ -103,6 +103,19 @@ class CityListView(generics.ListAPIView):
             ).filter(_has=True)
         return qs
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        if self.request.query_params.get("has_profiles") == "true":
+            counts = {
+                row["city"]: row["n"]
+                for row in (
+                    ModelProfile.objects.publicly_visible()
+                    .values("city").annotate(n=Count("id", distinct=True))
+                )
+            }
+            ctx["profile_counts"] = counts
+        return ctx
+
 
 class MyProfileViewSet(viewsets.ModelViewSet):
     """La modelo gestiona su único perfil (incl. actualizar ciudad en tiempo real)."""

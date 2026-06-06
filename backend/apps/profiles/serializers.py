@@ -28,10 +28,15 @@ class RegionSerializer(serializers.ModelSerializer):
 
 class CitySerializer(serializers.ModelSerializer):
     region = RegionSerializer(read_only=True)
+    profile_count = serializers.SerializerMethodField()
 
     class Meta:
         model = City
-        fields = ["id", "name", "slug", "region"]
+        fields = ["id", "name", "slug", "region", "profile_count"]
+
+    def get_profile_count(self, obj):
+        counts = self.context.get("profile_counts")
+        return counts.get(obj.id, 0) if counts is not None else None
 
 
 class ServiceSerializer(serializers.ModelSerializer):

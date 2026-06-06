@@ -51,9 +51,14 @@ export default async function HomePage() {
               <li key={city.id}>
                 <Link
                   href={`/chile/${city.region.slug}/${city.slug}/${DEFAULT_GENDER_SLUG}`}
-                  className="pill-gold block rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-semibold"
+                  className="pill-gold flex items-center gap-1.5 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-semibold"
                 >
                   {city.name}
+                  {city.profile_count ? (
+                    <span className="rounded-full bg-[#e9c15c]/15 px-1.5 text-xs font-bold text-[#e9c15c]">
+                      {city.profile_count}
+                    </span>
+                  ) : null}
                 </Link>
               </li>
             ))}

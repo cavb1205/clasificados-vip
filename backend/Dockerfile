@@ -7,9 +7,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
-# Dependencias de sistema mínimas: libpq para psycopg, libjpeg/zlib para Pillow.
+# Dependencias de sistema mínimas: libpq para psycopg, libjpeg/zlib para Pillow,
+# ffmpeg para limpiar metadata/GPS de los videos del muro al subirlos.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 libjpeg62-turbo zlib1g \
+    libpq5 libjpeg62-turbo zlib1g ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Usuario no-root para correr el proceso.

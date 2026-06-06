@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from core.image_processing import process_image
+from core.video_processing import strip_video_metadata
 from .models import MediaContent, profile_media_limits
 
 
@@ -48,6 +49,8 @@ class MediaContentSerializer(serializers.ModelSerializer):
             processed = process_image(upload.read(), filename_stem="photo")
             media.file.save(processed.name, processed, save=False)
         else:
-            media.file = upload
+            # Video: quitar metadata/GPS (ffmpeg) por privacidad.
+            cleaned = strip_video_metadata(upload)
+            media.file.save(cleaned.name, cleaned, save=False)
         media.save()
         return media

@@ -1027,6 +1027,7 @@ function PublicationManager({
   disabled: boolean;
 }) {
   const [payInfo, setPayInfo] = useState("");
+  const [renewId, setRenewId] = useState<number | null>(null);
   useEffect(() => {
     dashboard.paymentInfo().then((d) => setPayInfo(d.payment_instructions)).catch(() => {});
   }, []);
@@ -1051,7 +1052,34 @@ function PublicationManager({
                 {PUB_STATUS[p.status]?.label ?? p.status}
               </span>
             </div>
-            {p.status === "active" && <ExpiryLine expires={p.expires_at} />}
+            {p.status === "active" && (
+              <>
+                <ExpiryLine expires={p.expires_at} />
+                {renewId === p.id ? (
+                  <div className="mt-2">
+                    <p className="text-xs text-emerald-300">
+                      Renueva por adelantado: transfiere y sube el comprobante. Al
+                      aprobarlo, los días se <strong>suman</strong> a tu vencimiento (no pierdes nada).
+                    </p>
+                    <PaymentBox info={payInfo} />
+                    <ReceiptForm
+                      pubId={p.id}
+                      onUploaded={() => {
+                        setRenewId(null);
+                        onChange();
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setRenewId(p.id)}
+                    className="mt-2 rounded-full border border-pink-500 px-4 py-1.5 text-xs text-pink-200 hover:bg-pink-600/20"
+                  >
+                    Renovar ahora
+                  </button>
+                )}
+              </>
+            )}
             {p.status === "draft" && (
               <p className="mt-2 rounded-lg border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
                 <strong>Falta el pago.</strong> Transfiere según los datos de pago y
