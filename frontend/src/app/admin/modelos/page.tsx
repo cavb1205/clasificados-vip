@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
 import { Pager } from "@/components/Pager";
 import { NotifyButton } from "@/components/NotifyButton";
@@ -20,11 +20,19 @@ interface AdminProfile {
   verification_status: "pending" | "verified" | "rejected";
   is_suspended: boolean;
   suspension_reason: string;
+  photo_authenticity: "pending" | "none" | "light" | "heavy";
   created_at: string;
   active_publication_count: number;
 }
 
-type Tab = "" | "pending" | "verified" | "rejected" | "suspended";
+type Tab = "" | "pending" | "verified" | "rejected" | "suspended" | "photo_pending";
+
+const AUTH_BADGE: Record<string, { label: string; cls: string }> = {
+  none: { label: "🟢 Sin retoque", cls: "bg-emerald-600/20 text-emerald-200" },
+  light: { label: "🟡 Retoque leve", cls: "bg-amber-600/20 text-amber-200" },
+  heavy: { label: "🟠 Con retoque", cls: "bg-orange-600/20 text-orange-200" },
+  pending: { label: "Fotos por revisar", cls: "bg-pink-600/20 text-pink-200" },
+};
 
 const GENDER_LABEL: Record<string, string> = {
   female: "Mujer",
@@ -34,7 +42,8 @@ const GENDER_LABEL: Record<string, string> = {
 
 export default function AdminModelosPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>((searchParams.get("status") as Tab) || "");
   const [q, setQ] = useState("");
   const [items, setItems] = useState<AdminProfile[]>([]);
   const [page, setPage] = useState(1);
@@ -58,7 +67,7 @@ export default function AdminModelosPage() {
       .then((me) => {
         const u = me as { is_staff?: boolean; role?: string } | null;
         setCanModerate(!!u?.is_staff || u?.role === "moderator");
-        return reload("", "");
+        return reload("", tab);
       })
       .then(() => setReady(true))
       .catch(() => router.replace("/login?next=/admin/modelos"));
@@ -128,6 +137,7 @@ export default function AdminModelosPage() {
               ["", "Todas"],
               ["pending", "KYC pendiente"],
               ["verified", "Verificadas"],
+              ["photo_pending", "Fotos por revisar"],
               ["rejected", "Rechazadas"],
               ["suspended", "Suspendidas"],
             ] as const
@@ -194,6 +204,11 @@ export default function AdminModelosPage() {
                       {p.active_publication_count} pub activa
                       {p.active_publication_count === 1 ? "" : "s"}
                     </Badge>
+                    {AUTH_BADGE[p.photo_authenticity] && (
+                      <span className={`rounded-full px-2 py-0.5 ${AUTH_BADGE[p.photo_authenticity].cls}`}>
+                        {AUTH_BADGE[p.photo_authenticity].label}
+                      </span>
+                    )}
                   </p>
                   {p.is_suspended && p.suspension_reason && (
                     <p className="mt-2 text-xs text-red-300">

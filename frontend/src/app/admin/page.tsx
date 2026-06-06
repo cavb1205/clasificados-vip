@@ -11,6 +11,7 @@ interface Stats {
   pending_room_payments: number;
   pending_reviews: number;
   open_reports: number;
+  pending_photo_review: number;
   verified_models: number;
   active_publications: number;
   expiring_soon: number;
@@ -94,6 +95,11 @@ export default function AdminHomePage() {
             label="Stories reportadas"
             count={stats.open_reports}
             href="/admin/reportes"
+          />
+          <PendingCard
+            label="Fotos por revisar"
+            count={stats.pending_photo_review}
+            href="/admin/modelos?status=photo_pending"
           />
         </div>
       </section>

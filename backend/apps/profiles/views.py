@@ -373,6 +373,12 @@ class AdminModelProfileListView(generics.ListAPIView):
             qs = qs.filter(verification_status=ModelProfile.VerificationStatus.REJECTED)
         elif status_filter == "suspended":
             qs = qs.filter(is_suspended=True)
+        elif status_filter == "photo_pending":
+            qs = qs.filter(
+                verification_status=ModelProfile.VerificationStatus.VERIFIED,
+                photo_authenticity=ModelProfile.PhotoAuthenticity.PENDING,
+                media__media_type="photo",
+            ).distinct()
         return qs
 
 

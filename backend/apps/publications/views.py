@@ -314,6 +314,11 @@ class AdminStatsView(generics.GenericAPIView):
                 + ProfileReport.objects.count()
                 + RoomReport.objects.count()
             ),
+            "pending_photo_review": ModelProfile.objects.filter(
+                verification_status=ModelProfile.VerificationStatus.VERIFIED,
+                photo_authenticity=ModelProfile.PhotoAuthenticity.PENDING,
+                media__media_type="photo",
+            ).distinct().count(),
             "verified_models": ModelProfile.objects.filter(
                 verification_status=ModelProfile.VerificationStatus.VERIFIED
             ).count(),

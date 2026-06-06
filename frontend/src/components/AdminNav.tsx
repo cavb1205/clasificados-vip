@@ -11,6 +11,7 @@ interface Stats {
   pending_room_payments?: number;
   pending_reviews?: number;
   open_reports?: number;
+  pending_photo_review?: number;
 }
 
 interface Item {
@@ -27,7 +28,7 @@ const ITEMS: Item[] = [
   { href: "/admin/pagos", label: "Pagos", badge: "pending_payments", adminOnly: true },
   { href: "/admin/resenas", label: "Reseñas", badge: "pending_reviews" },
   { href: "/admin/reportes", label: "Reportes", badge: "open_reports" },
-  { href: "/admin/modelos", label: "Modelos" },
+  { href: "/admin/modelos", label: "Modelos", badge: "pending_photo_review" },
   { href: "/admin/anfitriones", label: "Anfitriones" },
   { href: "/admin/habitaciones", label: "Habitaciones", badge: "pending_room_payments" },
   { href: "/admin/usuarios", label: "Usuarios", adminOnly: true },
