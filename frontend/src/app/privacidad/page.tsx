@@ -127,11 +127,14 @@ export default function PrivacyPage() {
         tu cédula para acreditar tu identidad.
       </p>
 
-      <h2 id="cookies" className="mt-6 text-xl font-semibold text-neutral-100">9. Cookies</h2>
+      <h2 id="cookies" className="mt-6 text-xl font-semibold text-neutral-100">9. Cookies y analítica</h2>
       <p>
         Usamos cookies <strong>técnicas estrictamente necesarias</strong> para la
-        autenticación y la seguridad (token JWT HttpOnly, token CSRF). No usamos cookies
-        de seguimiento publicitario ni de analítica de terceros.
+        autenticación y la seguridad (token JWT HttpOnly, token CSRF). Para medir el
+        tráfico del sitio de forma <strong>agregada y anónima</strong> usamos Vercel Web
+        Analytics, que <strong>no usa cookies</strong> ni recolecta datos personales
+        identificables. No usamos cookies de seguimiento publicitario ni elaboramos
+        perfiles de usuarios.
       </p>
 
       <h2 id="menores" className="mt-6 text-xl font-semibold text-neutral-100">10. Menores de edad</h2>

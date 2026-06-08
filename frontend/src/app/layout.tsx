@@ -7,6 +7,7 @@ import { AgeGate } from "@/components/AgeGate";
 import { AuthNav } from "@/components/AuthNav";
 import { Toaster } from "@/components/Toaster";
 import { SupportButton } from "@/components/SupportButton";
+import { Analytics } from "@vercel/analytics/next";
 
 // Tipografía UI: Plus Jakarta Sans (geométrica, moderna, alta legibilidad).
 const sans = Plus_Jakarta_Sans({
@@ -92,6 +93,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </Link>
           </p>
         </footer>
+        <Analytics />
       </body>
     </html>
   );
