@@ -89,6 +89,7 @@ class ModelProfileQuerySet(models.QuerySet):
             is_suspended=False,
         ).filter(
             models.Q(verified_at__gte=trial_cutoff)
+            | models.Q(referral_bonus_until__gt=now)
             | models.Q(
                 publications__status=Publication.Status.ACTIVE,
                 publications__expires_at__gt=now,
@@ -177,6 +178,15 @@ class ModelProfile(models.Model):
         default=PhotoAuthenticity.PENDING,
     )
 
+    # Referidos: cada modelo tiene un código; al referir a otra que se verifica,
+    # ambas reciben días gratis (referral_bonus_until extiende la visibilidad).
+    referral_code = models.CharField(max_length=12, unique=True, blank=True, db_index=True)
+    referred_by = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="referrals"
+    )
+    referral_rewarded = models.BooleanField(default=False)
+    referral_bonus_until = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -203,7 +213,23 @@ class ModelProfile(models.Model):
                 n += 1
                 slug = f"{base}-{n}"
             self.slug = slug
+        if not self.referral_code:
+            import uuid
+            code = uuid.uuid4().hex[:8]
+            while ModelProfile.objects.exclude(pk=self.pk).filter(referral_code=code).exists():
+                code = uuid.uuid4().hex[:8]
+            self.referral_code = code
         super().save(*args, **kwargs)
+
+    def grant_referral_bonus(self, days=30):
+        """Suma días de bono de referido a partir de su vencimiento actual (o ahora)."""
+        from django.utils import timezone
+        from datetime import timedelta
+        base = self.referral_bonus_until if (
+            self.referral_bonus_until and self.referral_bonus_until > timezone.now()
+        ) else timezone.now()
+        self.referral_bonus_until = base + timedelta(days=days)
+        self.save(update_fields=["referral_bonus_until"])
 
 
 class ProfileEvent(models.Model):

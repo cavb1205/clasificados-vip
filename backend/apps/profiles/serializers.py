@@ -65,6 +65,9 @@ class ModelProfileSerializer(serializers.ModelSerializer):
     pending_verification = serializers.SerializerMethodField()
     latest_verification = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
+    referrals_count = serializers.SerializerMethodField()
+    # Código de quien la invitó (solo se aplica al crear el perfil).
+    referred_by_code = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = ModelProfile
@@ -76,14 +79,33 @@ class ModelProfileSerializer(serializers.ModelSerializer):
             "verification_status", "verified_at", "trial_ends_at",
             "pending_verification", "latest_verification",
             "available_until",
+            "referral_code", "referrals_count", "referred_by_code",
             "created_at", "updated_at",
         ]
         read_only_fields = [
             "slug", "verification_status", "verified_at", "trial_ends_at",
             "pending_verification", "latest_verification",
-            "available_until",
+            "available_until", "referral_code",
             "created_at", "updated_at",
         ]
+
+    def get_referrals_count(self, obj) -> int:
+        return obj.referrals.filter(referral_rewarded=True).count()
+
+    def create(self, validated_data):
+        code = (validated_data.pop("referred_by_code", "") or "").strip()
+        profile = super().create(validated_data)
+        if code:
+            ref = ModelProfile.objects.filter(referral_code=code).first()
+            if ref and ref.pk != profile.pk:
+                profile.referred_by = ref
+                profile.save(update_fields=["referred_by"])
+        return profile
+
+    def update(self, instance, validated_data):
+        # El referido solo se fija al crear; en update se ignora.
+        validated_data.pop("referred_by_code", None)
+        return super().update(instance, validated_data)
 
     def get_pending_verification(self, obj) -> bool:
         """True si el usuario subió KYC y está esperando revisión del admin."""

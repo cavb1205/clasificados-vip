@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { RefCapture } from "@/components/RefCapture";
 
 export const metadata: Metadata = {
   title: "Publica con nosotras — Primer mes gratis",
@@ -24,9 +25,21 @@ const PERKS = [
   ["⭐", "Founding member", "Sé de las primeras y obtén beneficios de lanzamiento."],
 ];
 
-export default function PublicaPage() {
+export default async function PublicaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ref?: string }>;
+}) {
+  const invited = Boolean((await searchParams)?.ref);
   return (
     <div className="space-y-12">
+      <RefCapture />
+      {invited && (
+        <div className="rounded-xl border border-[#caa24a]/40 bg-[#e9c15c]/[0.06] px-4 py-3 text-center text-sm text-[#e9c15c]">
+          🎁 <strong>Vienes con invitación de una modelo.</strong> Al registrarte y verificarte,
+          tú y ella reciben <strong>un mes gratis extra</strong> — además de tu primer mes gratis.
+        </div>
+      )}
       <section className="text-center">
         <span className="inline-block rounded-full bg-[#e9c15c]/15 px-3 py-1 text-xs font-semibold text-[#e9c15c]">
           🎁 Lanzamiento · Primer mes gratis

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/client-api";
+import { RefCapture } from "@/components/RefCapture";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -34,6 +35,7 @@ export default function RegisterPage() {
 
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-sm space-y-4">
+      <RefCapture />
       <h1 className="text-2xl font-bold">Crear cuenta</h1>
       <input
         required

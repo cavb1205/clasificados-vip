@@ -215,8 +215,14 @@ function ProfileStep({ profile, regions, onSaved }: { profile: ProfileLite | nul
     const cityId = form.get("city_id");
     if (cityId) data.city_id = Number(cityId);
     try {
-      if (profile) await dashboard.updateProfile(profile.id, data);
-      else await dashboard.createProfile(data);
+      if (profile) {
+        await dashboard.updateProfile(profile.id, data);
+      } else {
+        const ref = localStorage.getItem("pv_ref");
+        if (ref) data.referred_by_code = ref;
+        await dashboard.createProfile(data);
+        localStorage.removeItem("pv_ref");
+      }
       onSaved();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo guardar");

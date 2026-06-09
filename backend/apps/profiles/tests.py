@@ -520,3 +520,45 @@ class PhotoAuthenticityTests(APITestCase):
         )
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.photo_authenticity, "pending")
+
+
+class ReferralTests(APITestCase):
+    def setUp(self):
+        self.referrer = ModelProfile.objects.create(
+            user=_make_user("ref@example.com"), stage_name="Ref", age=25,
+        )
+
+    def test_create_with_code_sets_referred_by(self):
+        u = _make_user("new@example.com")
+        self.client.force_authenticate(u)
+        r = self.client.post(
+            "/api/v1/me/profile/",
+            {"stage_name": "Nueva", "age": 24, "referred_by_code": self.referrer.referral_code},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201)
+        p = ModelProfile.objects.get(user=u)
+        self.assertEqual(p.referred_by_id, self.referrer.id)
+
+    def test_verification_rewards_both(self):
+        from apps.verification.views import _sync_profile_on_decision
+        referred = ModelProfile.objects.create(
+            user=_make_user("rd@example.com"), stage_name="Rd", age=24,
+            referred_by=self.referrer,
+        )
+        _sync_profile_on_decision(referred.user, ModelProfile.VerificationStatus.VERIFIED)
+        referred.refresh_from_db(); self.referrer.refresh_from_db()
+        self.assertTrue(referred.referral_rewarded)
+        self.assertIsNotNone(referred.referral_bonus_until)
+        self.assertIsNotNone(self.referrer.referral_bonus_until)
+
+    def test_bonus_makes_profile_visible(self):
+        from django.utils import timezone
+        from datetime import timedelta
+        p = ModelProfile.objects.create(
+            user=_make_user("bonus@example.com"), stage_name="Bonus", age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now() - timedelta(days=999),  # trial vencido
+            referral_bonus_until=timezone.now() + timedelta(days=10),
+        )
+        self.assertIn(p, ModelProfile.objects.publicly_visible())

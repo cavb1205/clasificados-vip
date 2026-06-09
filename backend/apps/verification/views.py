@@ -110,10 +110,41 @@ def _sync_profile_on_decision(user, status_value):
         return
     profile.verification_status = status_value
     fields = ["verification_status"]
-    if status_value == ModelProfile.VerificationStatus.VERIFIED and profile.verified_at is None:
+    first_verification = (
+        status_value == ModelProfile.VerificationStatus.VERIFIED
+        and profile.verified_at is None
+    )
+    if first_verification:
         profile.verified_at = timezone.now()
         fields.append("verified_at")
     profile.save(update_fields=fields)
+
+    # Premio de referidos: al verificarse por primera vez una modelo referida,
+    # ambas (referida y quien la invitó) reciben días gratis. Una sola vez.
+    if first_verification and profile.referred_by_id and not profile.referral_rewarded:
+        _reward_referral(profile)
+
+
+def _reward_referral(profile):
+    from apps.notifications.models import notify_user
+
+    referrer = profile.referred_by
+    profile.grant_referral_bonus(30)
+    profile.referral_rewarded = True
+    profile.save(update_fields=["referral_rewarded"])
+    if referrer:
+        referrer.grant_referral_bonus(30)
+        for user in (profile.user, referrer.user):
+            try:
+                notify_user(
+                    user, kind="generic", title="🎁 ¡Mes gratis por referido!",
+                    message=(
+                        "Ganaste 30 días gratis de visibilidad gracias al programa de "
+                        "referidos de PortalVip. ¡Gracias por invitar!"
+                    ),
+                )
+            except Exception:
+                pass
 
 
 class AdminKYCQueueView(generics.ListAPIView):

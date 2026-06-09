@@ -8,6 +8,7 @@ import { auth, dashboard } from "@/lib/client-api";
 import { toast } from "@/components/Toaster";
 import { PlanPicker } from "@/components/PlanPicker";
 import { SharePanel } from "@/components/SharePanel";
+import { ReferralPanel } from "@/components/ReferralPanel";
 import type { Plan, Region, City, Service, ServiceCategory } from "@/lib/types";
 import { CATEGORY_LABEL } from "@/lib/types";
 
@@ -40,6 +41,8 @@ interface Profile {
   whatsapp: string;
   telegram: string;
   base_rate: number | null;
+  referral_code: string;
+  referrals_count: number;
   services: Service[];
 }
 interface Media {
@@ -124,8 +127,14 @@ export default function DashboardPage() {
     // está en el placeholder, dejamos el valor existente intacto (partial update).
     if (cityRaw) data.city_id = Number(cityRaw);
     try {
-      if (profile) await dashboard.updateProfile(profile.id, data);
-      else await dashboard.createProfile(data);
+      if (profile) {
+        await dashboard.updateProfile(profile.id, data);
+      } else {
+        const ref = localStorage.getItem("pv_ref");
+        if (ref) data.referred_by_code = ref;
+        await dashboard.createProfile(data);
+        localStorage.removeItem("pv_ref");
+      }
       toast("Perfil guardado");
       await loadAll();
     } catch (e) {
@@ -186,6 +195,14 @@ export default function DashboardPage() {
         <section>
           <h2 className="mb-3 text-lg font-semibold">Comparte tu perfil 🔗</h2>
           <SharePanel slug={profile.slug} stageName={profile.stage_name} />
+        </section>
+      )}
+
+      {/* Referidos */}
+      {profile?.referral_code && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Invita y gana 🎁</h2>
+          <ReferralPanel code={profile.referral_code} count={profile.referrals_count ?? 0} />
         </section>
       )}
 
