@@ -180,7 +180,8 @@ class ModelProfile(models.Model):
 
     # Referidos: cada modelo tiene un código; al referir a otra que se verifica,
     # ambas reciben días gratis (referral_bonus_until extiende la visibilidad).
-    referral_code = models.CharField(max_length=12, unique=True, blank=True, db_index=True)
+    # unique=True ya provee índice; no agregar db_index (duplicaría el índice _like).
+    referral_code = models.CharField(max_length=12, unique=True, blank=True)
     referred_by = models.ForeignKey(
         "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="referrals"
     )

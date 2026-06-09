@@ -30,11 +30,13 @@ class Migration(migrations.Migration):
             name='referral_bonus_until',
             field=models.DateTimeField(blank=True, null=True),
         ),
-        # Se agrega sin unique para poder poblar los existentes, luego se hace unique.
+        # Se agrega sin unique/índice para poder poblar los existentes; luego se hace
+        # unique (que crea el índice). Si se pone db_index aquí, el _like se crearía dos
+        # veces (aquí y en el AlterField unique) → "relation ..._like already exists".
         migrations.AddField(
             model_name='modelprofile',
             name='referral_code',
-            field=models.CharField(blank=True, db_index=True, default='', max_length=12),
+            field=models.CharField(blank=True, default='', max_length=12),
         ),
         migrations.AddField(
             model_name='modelprofile',
@@ -50,6 +52,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='modelprofile',
             name='referral_code',
-            field=models.CharField(blank=True, db_index=True, max_length=12, unique=True),
+            field=models.CharField(blank=True, max_length=12, unique=True),
         ),
     ]
