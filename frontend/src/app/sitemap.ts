@@ -6,7 +6,10 @@ const BASE = "https://portalvip.cl";
 // Si el backend está abajo en el momento del build, devolvemos solo la home en
 // vez de romper el deploy — el sitemap se regenera en el próximo build/revalidate.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const entries: MetadataRoute.Sitemap = [{ url: BASE, priority: 1 }];
+  const entries: MetadataRoute.Sitemap = [
+    { url: BASE, priority: 1 },
+    { url: `${BASE}/publica`, priority: 0.7 },
+  ];
 
   try {
     const regions = await getRegions();

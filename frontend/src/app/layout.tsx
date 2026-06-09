@@ -84,7 +84,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
         <footer className="border-t border-neutral-800 px-4 py-6 text-center text-xs text-neutral-500">
           <p>Solo mayores de 18 años · No intermediamos transacciones · © PortalVip Chile</p>
-          <p className="mt-2 flex justify-center gap-4">
+          <p className="mt-2 flex flex-wrap justify-center gap-4">
+            <Link href="/publica" className="text-[#e9c15c] hover:text-[#f5d98a]">
+              Publica con nosotras
+            </Link>
             <Link href="/terminos" className="hover:text-pink-400">
               Términos
             </Link>

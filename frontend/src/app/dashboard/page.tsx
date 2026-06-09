@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
 import { toast } from "@/components/Toaster";
 import { PlanPicker } from "@/components/PlanPicker";
+import { SharePanel } from "@/components/SharePanel";
 import type { Plan, Region, City, Service, ServiceCategory } from "@/lib/types";
 import { CATEGORY_LABEL } from "@/lib/types";
 
@@ -23,6 +24,7 @@ interface LatestVerification {
 
 interface Profile {
   id: number;
+  slug: string;
   stage_name: string;
   gender: "female" | "trans" | "male";
   description: string;
@@ -177,6 +179,14 @@ export default function DashboardPage() {
       )}
       {profile && profile.verification_status === "verified" && (
         <StoriesPanel publications={publications} />
+      )}
+
+      {/* Compartir perfil */}
+      {profile && profile.verification_status === "verified" && profile.slug && (
+        <section>
+          <h2 className="mb-3 text-lg font-semibold">Comparte tu perfil 🔗</h2>
+          <SharePanel slug={profile.slug} stageName={profile.stage_name} />
+        </section>
       )}
 
       {/* Estadísticas */}
@@ -1672,11 +1682,12 @@ function VisibilityBanner({
 
   if (inTrial) {
     const hoursLeft = Math.ceil((trialEnds - now) / 3_600_000);
+    const left = hoursLeft > 48 ? `${Math.ceil(hoursLeft / 24)} días` : `${hoursLeft} h`;
     return (
-      <div className="rounded-xl border border-pink-700/50 bg-pink-950/30 px-4 py-3 text-sm text-pink-200">
-        🎁 <strong>Trial gratuito activo</strong> · tu perfil es visible por las
-        próximas <strong>{hoursLeft} h</strong>. Crea un anuncio y sube el
-        comprobante de pago para seguir visible cuando termine.
+      <div className="rounded-xl border border-[#caa24a]/40 bg-[#e9c15c]/[0.06] px-4 py-3 text-sm text-[#e9c15c]">
+        🎁 <strong>Tu período gratis está activo</strong> · tu perfil es visible{" "}
+        <strong>{left}</strong> más, sin pagar. Antes de que termine, elige un plan y
+        sube tu comprobante para seguir visible.
       </div>
     );
   }
