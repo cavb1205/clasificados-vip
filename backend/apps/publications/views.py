@@ -394,7 +394,7 @@ class AdminSiteConfigSerializer(drf_serializers.ModelSerializer):
         from apps.profiles.models import SiteConfig
         model = SiteConfig
         fields = ["trial_days", "max_active_rooms_per_host",
-                  "payment_instructions", "support_telegram"]
+                  "payment_instructions", "support_telegram", "referral_bonus_days"]
 
 
 class AdminSiteConfigView(generics.GenericAPIView):

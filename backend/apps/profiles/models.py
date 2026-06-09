@@ -295,6 +295,14 @@ class SiteConfig(models.Model):
             "anfitriones. Sin teléfono."
         ),
     )
+    referral_bonus_days = models.PositiveIntegerField(
+        "días gratis por referido",
+        default=30,
+        help_text=(
+            "Días de visibilidad gratis que reciben AMBAS (la que invita y la "
+            "invitada) cuando una referida se verifica."
+        ),
+    )
 
     class Meta:
         verbose_name = "Configuración del sitio"

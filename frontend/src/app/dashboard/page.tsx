@@ -43,6 +43,7 @@ interface Profile {
   base_rate: number | null;
   referral_code: string;
   referrals_count: number;
+  referral_bonus_days: number;
   services: Service[];
 }
 interface Media {
@@ -202,7 +203,7 @@ export default function DashboardPage() {
       {profile?.referral_code && (
         <section>
           <h2 className="mb-3 text-lg font-semibold">Invita y gana 🎁</h2>
-          <ReferralPanel code={profile.referral_code} count={profile.referrals_count ?? 0} />
+          <ReferralPanel code={profile.referral_code} count={profile.referrals_count ?? 0} days={profile.referral_bonus_days ?? 30} />
         </section>
       )}
 

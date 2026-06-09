@@ -261,8 +261,8 @@ export const dashboard = {
   adminDeletePlan: (id: number) =>
     apiFetch(`/admin/plans/${id}/`, { method: "DELETE" }),
   adminSiteConfig: () =>
-    apiFetch<{ trial_days: number; max_active_rooms_per_host: number; payment_instructions: string; support_telegram: string }>("/admin/site-config/"),
-  adminUpdateSiteConfig: (data: { trial_days?: number; max_active_rooms_per_host?: number; payment_instructions?: string; support_telegram?: string }) =>
+    apiFetch<{ trial_days: number; max_active_rooms_per_host: number; payment_instructions: string; support_telegram: string; referral_bonus_days: number }>("/admin/site-config/"),
+  adminUpdateSiteConfig: (data: { trial_days?: number; max_active_rooms_per_host?: number; payment_instructions?: string; support_telegram?: string; referral_bonus_days?: number }) =>
     apiFetch("/admin/site-config/", { method: "PUT", body: data }),
   // Datos de pago que la modelo ve al elegir plan / subir comprobante
   paymentInfo: () =>

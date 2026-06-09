@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
  * Programa de referidos: la modelo invita a otras con su link. Cuando la
  * invitada se verifica, ambas reciben un mes gratis. La oferta crece sola.
  */
-export function ReferralPanel({ code, count }: { code: string; count: number }) {
+export function ReferralPanel({ code, count, days }: { code: string; count: number; days: number }) {
   const [url, setUrl] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -31,14 +31,14 @@ export function ReferralPanel({ code, count }: { code: string; count: number }) 
     <div className="rounded-xl border border-[#caa24a]/30 bg-[#e9c15c]/[0.04] p-4">
       <p className="text-sm text-neutral-200">
         Por cada modelo que invites y se verifique, <strong className="text-[#e9c15c]">tú y ella
-        ganan 1 mes gratis</strong> (30 días). <strong>Sin límite</strong>: invitas a 3 amigas =
-        3 meses gratis, y se suman a lo que ya tengas.
+        ganan {days} días gratis</strong>. <strong>Sin límite</strong>: cada amiga que invites son
+        otros {days} días, y se suman a lo que ya tengas.
       </p>
 
       <ol className="mt-3 space-y-1.5 text-xs text-neutral-400">
         <li><strong className="text-neutral-200">1.</strong> Le pasas tu link (abajo) por WhatsApp o se lo muestras.</li>
         <li><strong className="text-neutral-200">2.</strong> Ella se registra y verifica su identidad.</li>
-        <li><strong className="text-neutral-200">3.</strong> Apenas se aprueba, <strong className="text-[#e9c15c]">las dos reciben su mes gratis</strong> y te avisamos.</li>
+        <li><strong className="text-neutral-200">3.</strong> Apenas se aprueba, <strong className="text-[#e9c15c]">las dos reciben sus {days} días gratis</strong> y te avisamos.</li>
       </ol>
 
       <div className="mt-3 flex items-center gap-2">
@@ -60,7 +60,7 @@ export function ReferralPanel({ code, count }: { code: string; count: number }) 
           <>
             🎉 Has invitado a <strong className="text-neutral-200">{count}</strong> modelo
             {count === 1 ? "" : "s"} verificada{count === 1 ? "" : "s"} ·{" "}
-            <strong className="text-[#e9c15c]">{count * 30} días gratis ganados</strong>.
+            <strong className="text-[#e9c15c]">{count * days} días gratis ganados</strong>.
           </>
         ) : (
           <>Aún no has invitado a nadie. ¡Empieza con tus amigas del rubro!</>

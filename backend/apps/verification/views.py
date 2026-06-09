@@ -127,13 +127,15 @@ def _sync_profile_on_decision(user, status_value):
 
 def _reward_referral(profile):
     from apps.notifications.models import notify_user
+    from apps.profiles.models import SiteConfig
 
+    days = SiteConfig.get().referral_bonus_days
     referrer = profile.referred_by
-    profile.grant_referral_bonus(30)
+    profile.grant_referral_bonus(days)
     profile.referral_rewarded = True
     profile.save(update_fields=["referral_rewarded"])
     if referrer:
-        referrer.grant_referral_bonus(30)
+        referrer.grant_referral_bonus(days)
         for user in (profile.user, referrer.user):
             try:
                 notify_user(

@@ -66,6 +66,7 @@ class ModelProfileSerializer(serializers.ModelSerializer):
     latest_verification = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
     referrals_count = serializers.SerializerMethodField()
+    referral_bonus_days = serializers.SerializerMethodField()
     # Código de quien la invitó (solo se aplica al crear el perfil).
     referred_by_code = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
@@ -79,7 +80,7 @@ class ModelProfileSerializer(serializers.ModelSerializer):
             "verification_status", "verified_at", "trial_ends_at",
             "pending_verification", "latest_verification",
             "available_until",
-            "referral_code", "referrals_count", "referred_by_code",
+            "referral_code", "referrals_count", "referral_bonus_days", "referred_by_code",
             "created_at", "updated_at",
         ]
         read_only_fields = [
@@ -91,6 +92,9 @@ class ModelProfileSerializer(serializers.ModelSerializer):
 
     def get_referrals_count(self, obj) -> int:
         return obj.referrals.filter(referral_rewarded=True).count()
+
+    def get_referral_bonus_days(self, obj) -> int:
+        return SiteConfig.get().referral_bonus_days
 
     def create(self, validated_data):
         code = (validated_data.pop("referred_by_code", "") or "").strip()

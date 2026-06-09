@@ -32,6 +32,7 @@ export default function AdminConfigPage() {
   const [maxRooms, setMaxRooms] = useState(10);
   const [payInfo, setPayInfo] = useState("");
   const [supportTg, setSupportTg] = useState("");
+  const [refDays, setRefDays] = useState(30);
   const [savingTrial, setSavingTrial] = useState(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [creating, setCreating] = useState(false);
@@ -48,6 +49,7 @@ export default function AdminConfigPage() {
     setMaxRooms(cfg.max_active_rooms_per_host);
     setPayInfo(cfg.payment_instructions ?? "");
     setSupportTg(cfg.support_telegram ?? "");
+    setRefDays(cfg.referral_bonus_days ?? 30);
     setPlans(ps);
   }, []);
 
@@ -69,6 +71,7 @@ export default function AdminConfigPage() {
         max_active_rooms_per_host: maxRooms,
         payment_instructions: payInfo,
         support_telegram: supportTg,
+        referral_bonus_days: refDays,
       });
       setMsg("Configuración guardada.");
     } catch (e) {
@@ -167,6 +170,23 @@ export default function AdminConfigPage() {
             />
             <span className="mt-1 block text-xs text-neutral-500">
               Días que un perfil recién verificado es visible sin pagar.
+            </span>
+          </label>
+          <label className="flex-1 text-sm">
+            <span className="block text-xs uppercase tracking-wide text-neutral-500">
+              Días gratis por referido
+            </span>
+            <input
+              type="number"
+              min={0}
+              max={365}
+              value={refDays}
+              onChange={(e) => setRefDays(Number(e.target.value))}
+              className="mt-1 w-full max-w-xs rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-base"
+            />
+            <span className="mt-1 block text-xs text-neutral-500">
+              Días gratis que reciben ambas (la que invita y la invitada) cuando una
+              referida se verifica.
             </span>
           </label>
           <label className="flex-1 text-sm">
