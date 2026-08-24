@@ -34,6 +34,12 @@ class Command(BaseCommand):
             for obj in queryset.iterator():
                 file_field = getattr(obj, field_name)
                 name = file_field.name
+                # `avatar` es nullable y los perfiles sin archivo pueden entrar
+                # al queryset con `exclude(avatar="")`; no se puede pasar None
+                # a Storage.exists().
+                if not name:
+                    skipped += 1
+                    continue
                 if target.exists(name):
                     skipped += 1
                     if delete_public and source.exists(name):
