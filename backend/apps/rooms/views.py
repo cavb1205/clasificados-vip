@@ -1,4 +1,9 @@
-from django.http import Http404, HttpResponse
+import mimetypes
+
+from django.db import transaction
+from django.http import FileResponse, Http404, HttpResponse
+from django.urls import reverse
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -388,8 +393,31 @@ class AdminRoomReceiptSerializer(drf_serializers.ModelSerializer):
         request = self.context.get("request")
         if not obj.image:
             return None
-        url = obj.image.url
-        return request.build_absolute_uri(url) if request else url
+        path = reverse("api:rooms:admin-room-payment-image", args=[obj.pk])
+        return request.build_absolute_uri(path) if request else path
+
+
+class AdminRoomPaymentReceiptImageView(generics.GenericAPIView):
+    """Sirve un comprobante de habitación desde storage privado a admins."""
+
+    permission_classes = [permissions.IsAdminUser]
+    queryset = RoomReceipt.objects.all()
+
+    def get(self, request, pk):
+        receipt = self.get_object()
+        if not receipt.image:
+            raise Http404
+        try:
+            stream = receipt.image.open("rb")
+        except (FileNotFoundError, OSError):
+            raise Http404
+        content_type = mimetypes.guess_type(receipt.image.name)[0] or "application/octet-stream"
+        response = FileResponse(stream, content_type=content_type)
+        response["Content-Disposition"] = "inline"
+        response["Cache-Control"] = "private, no-store, max-age=0"
+        response["X-Content-Type-Options"] = "nosniff"
+        response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        return response
 
 
 class AdminRoomPaymentQueueView(generics.ListAPIView):
@@ -409,17 +437,40 @@ class AdminRoomPaymentActionView(generics.GenericAPIView):
     queryset = RoomReceipt.objects.all()
 
     def post(self, request, pk):
-        receipt = self.get_object()
         action_kind = (request.data.get("action") or "").lower()
         note = request.data.get("note") or ""
-        if action_kind == "approve":
-            receipt.approve(reviewer=request.user)
-        elif action_kind == "reject":
-            receipt.reject(reviewer=request.user, note=note)
-        else:
+        if action_kind not in {"approve", "reject"}:
             return Response({"detail": "action debe ser approve|reject"}, status=400)
-        log_action(request.user, f"room_payment.{action_kind}",
-                   target=f"{receipt.owner.display_name} · {receipt.plan.name}", note=note)
+        with transaction.atomic():
+            receipt = get_object_or_404(
+                RoomReceipt.objects.select_for_update().select_related(
+                    "owner", "owner__user", "plan"
+                ),
+                pk=pk,
+            )
+            expected_status = (
+                RoomReceipt.Status.APPROVED
+                if action_kind == "approve"
+                else RoomReceipt.Status.REJECTED
+            )
+            if receipt.status == expected_status:
+                changed = False
+            elif receipt.status != RoomReceipt.Status.PENDING:
+                return Response(
+                    {"detail": "El comprobante ya fue resuelto con otra decisión."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            elif action_kind == "approve":
+                receipt.approve(reviewer=request.user)
+                changed = True
+            else:
+                receipt.reject(reviewer=request.user, note=note)
+                changed = True
+        if changed:
+            log_action(
+                request.user, f"room_payment.{action_kind}",
+                target=f"{receipt.owner.display_name} · {receipt.plan.name}", note=note,
+            )
         return Response(
             AdminRoomReceiptSerializer(receipt, context={"request": request}).data
         )

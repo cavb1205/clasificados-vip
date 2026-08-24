@@ -19,18 +19,22 @@ else:
     raise SystemExit(1)
 PY
 
-echo "→ migrate"
-python manage.py migrate --noinput
+if [[ "${SKIP_ENTRYPOINT_PREP:-0}" != "1" ]]; then
+  echo "→ migrate"
+  python manage.py migrate --noinput
 
-echo "→ collectstatic"
-python manage.py collectstatic --noinput
+  echo "→ collectstatic"
+  python manage.py collectstatic --noinput
 
-# Seed idempotente (no daña si ya estaba cargado).
-if [[ "${SEED_ON_START:-0}" == "1" ]]; then
-  echo "→ seed_chile + seed_plans + seed_room_plans"
-  python manage.py seed_chile || true
-  python manage.py seed_plans || true
-  python manage.py seed_room_plans || true
+  # Seed idempotente (no daña si ya estaba cargado).
+  if [[ "${SEED_ON_START:-0}" == "1" ]]; then
+    echo "→ seed_chile + seed_plans + seed_room_plans"
+    python manage.py seed_chile || true
+    python manage.py seed_plans || true
+    python manage.py seed_room_plans || true
+  fi
+else
+  echo "→ preparación de app omitida (scheduler)"
 fi
 
 echo "→ arrancando: $@"

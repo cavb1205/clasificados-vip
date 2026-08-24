@@ -1,3 +1,9 @@
+import mimetypes
+
+from django.http import FileResponse, Http404
+from django.db import transaction
+from django.urls import reverse
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
@@ -198,8 +204,31 @@ class AdminPaymentReceiptSerializer(drf_serializers.ModelSerializer):
         request = self.context.get("request")
         if not obj.image:
             return None
-        url = obj.image.url
-        return request.build_absolute_uri(url) if request else url
+        path = reverse("api:publications:admin-payment-image", args=[obj.pk])
+        return request.build_absolute_uri(path) if request else path
+
+
+class AdminPaymentReceiptImageView(generics.GenericAPIView):
+    """Sirve un comprobante desde storage privado solo a administradores."""
+
+    permission_classes = [permissions.IsAdminUser]
+    queryset = PaymentReceipt.objects.all()
+
+    def get(self, request, pk):
+        receipt = self.get_object()
+        if not receipt.image:
+            raise Http404
+        try:
+            stream = receipt.image.open("rb")
+        except (FileNotFoundError, OSError):
+            raise Http404
+        content_type = mimetypes.guess_type(receipt.image.name)[0] or "application/octet-stream"
+        response = FileResponse(stream, content_type=content_type)
+        response["Content-Disposition"] = "inline"
+        response["Cache-Control"] = "private, no-store, max-age=0"
+        response["X-Content-Type-Options"] = "nosniff"
+        response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        return response
 
 
 class AdminPaymentQueueView(generics.ListAPIView):
@@ -225,18 +254,42 @@ class AdminPaymentActionView(generics.GenericAPIView):
     queryset = PaymentReceipt.objects.all()
 
     def post(self, request, pk):
-        receipt = self.get_object()
         action_kind = (request.data.get("action") or "").lower()
         note = request.data.get("note") or ""
-        if action_kind == "approve":
-            receipt.approve(reviewer=request.user)
-        elif action_kind == "reject":
-            receipt.reject(reviewer=request.user, note=note)
-        else:
+        if action_kind not in {"approve", "reject"}:
             return Response({"detail": "action debe ser approve|reject"}, status=400)
+        with transaction.atomic():
+            receipt = get_object_or_404(
+                PaymentReceipt.objects.select_for_update().select_related(
+                    "publication", "publication__plan", "publication__profile"
+                ),
+                pk=pk,
+            )
+            expected_status = (
+                PaymentReceipt.Status.APPROVED
+                if action_kind == "approve"
+                else PaymentReceipt.Status.REJECTED
+            )
+            if receipt.status == expected_status:
+                changed = False
+            elif receipt.status != PaymentReceipt.Status.PENDING:
+                return Response(
+                    {"detail": "El comprobante ya fue resuelto con otra decisión."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+            elif action_kind == "approve":
+                receipt.approve(reviewer=request.user)
+                changed = True
+            else:
+                receipt.reject(reviewer=request.user, note=note)
+                changed = True
         from apps.audit.models import log_action
-        log_action(request.user, f"payment.{action_kind}",
-                   target=f"{receipt.publication.profile.stage_name} · {receipt.publication.title}", note=note)
+        if changed:
+            log_action(
+                request.user, f"payment.{action_kind}",
+                target=f"{receipt.publication.profile.stage_name} · {receipt.publication.title}",
+                note=note,
+            )
         return Response(
             AdminPaymentReceiptSerializer(receipt, context={"request": request}).data
         )

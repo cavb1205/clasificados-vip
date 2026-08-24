@@ -1,3 +1,7 @@
+import mimetypes
+
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
 from rest_framework import mixins, permissions, viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -7,8 +11,24 @@ from apps.audit.models import log_action
 from apps.notifications.models import notify_user
 from apps.profiles.models import ModelProfile
 from core.permissions import IsModerator, IsModel
-from .models import MediaContent
+from .models import MediaContent, profile_media_limits
 from .serializers import MediaContentSerializer
+
+
+def _private_file_response(file_field):
+    if not file_field:
+        raise Http404
+    try:
+        stream = file_field.open("rb")
+    except (FileNotFoundError, OSError):
+        raise Http404
+    content_type = mimetypes.guess_type(file_field.name)[0] or "application/octet-stream"
+    response = FileResponse(stream, content_type=content_type)
+    response["Content-Disposition"] = "inline"
+    response["Cache-Control"] = "private, no-store, max-age=0"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    return response
 
 
 class MyMediaViewSet(
@@ -37,6 +57,51 @@ class MyMediaViewSet(
         if self.request.method == "POST":
             context["profile"] = self._get_profile()
         return context
+
+
+class PublicMediaFileView(APIView):
+    """Sirve una pieza del muro solo si sigue siendo pública y está en cupo."""
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request, pk):
+        item = get_object_or_404(
+            MediaContent.objects.select_related("profile"), pk=pk
+        )
+        if item.is_hidden or not ModelProfile.objects.publicly_visible().filter(
+            pk=item.profile_id
+        ).exists():
+            raise Http404
+
+        max_photos, max_videos = profile_media_limits(item.profile)
+        limit = max_photos if item.media_type == MediaContent.MediaType.PHOTO else max_videos
+        allowed_ids = item.profile.media.filter(
+            media_type=item.media_type, is_hidden=False
+        ).values_list("pk", flat=True)[:limit]
+        if item.pk not in allowed_ids:
+            raise Http404
+        return _private_file_response(item.file)
+
+
+class MyMediaFileView(APIView):
+    """Sirve una pieza al dueño del perfil, incluso si no es pública."""
+
+    permission_classes = [permissions.IsAuthenticated, IsModel]
+
+    def get(self, request, pk):
+        item = get_object_or_404(MediaContent, pk=pk, profile__user=request.user)
+        return _private_file_response(item.file)
+
+
+class AdminMediaFileView(APIView):
+    """Sirve una pieza al equipo de moderación para revisión administrativa."""
+
+    permission_classes = [IsModerator]
+
+    def get(self, request, pk):
+        item = get_object_or_404(MediaContent, pk=pk)
+        return _private_file_response(item.file)
 
 
 class AdminMediaHideView(APIView):

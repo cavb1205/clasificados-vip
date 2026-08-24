@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.urls import reverse
 
 from core.image_processing import process_image
 from core.video_processing import strip_video_metadata, watermark_media_async
@@ -16,13 +17,18 @@ class MediaContentSerializer(serializers.ModelSerializer):
 
     def get_file_url(self, obj):
         request = self.context.get("request")
-        url = obj.file.url
+        url = reverse("api:media_content:my-file", args=[obj.pk])
         return request.build_absolute_uri(url) if request else url
 
     def validate(self, attrs):
-        # En PATCH (partial) no exigimos el contexto de perfil ni el límite,
-        # porque la edición típica es solo `order`.
+        # En PATCH solo se permite reordenar. Cambiar tipo o reemplazar el
+        # archivo debe pasar por el flujo de alta, que aplica límites y pipeline.
         if self.partial:
+            unexpected = set(attrs) - {"order"}
+            if unexpected:
+                raise serializers.ValidationError(
+                    {field: "Solo se puede modificar el orden." for field in unexpected}
+                )
             return attrs
 
         profile = self.context["profile"]

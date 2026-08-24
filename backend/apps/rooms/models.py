@@ -236,7 +236,7 @@ class RoomReceipt(models.Model):
     plan = models.ForeignKey(
         SubscriptionPlan, on_delete=models.PROTECT, related_name="room_receipts"
     )
-    image = models.ImageField(upload_to="room_receipts/")
+    image = models.ImageField(upload_to="room_receipts/", storage=_private_storage)
     amount = models.PositiveIntegerField("monto declarado (CLP)", null=True, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     reviewed_by = models.ForeignKey(
@@ -257,6 +257,8 @@ class RoomReceipt(models.Model):
         return f"Comprobante plan #{self.pk} ({self.status})"
 
     def approve(self, *, reviewer=None):
+        if self.status != self.Status.PENDING:
+            return self.status == self.Status.APPROVED
         self.status = self.Status.APPROVED
         self.reviewed_by = reviewer
         self.reviewed_at = timezone.now()
@@ -268,8 +270,11 @@ class RoomReceipt(models.Model):
                     f"{self.owner.plan_expires_at:%d-%m-%Y}. Ya puedes publicar "
                     f"hasta {self.owner.plan_slots} habitación(es).",
         )
+        return True
 
     def reject(self, *, reviewer=None, note=""):
+        if self.status != self.Status.PENDING:
+            return self.status == self.Status.REJECTED
         self.status = self.Status.REJECTED
         self.reviewed_by = reviewer
         self.reviewed_at = timezone.now()
@@ -280,6 +285,7 @@ class RoomReceipt(models.Model):
             title="Comprobante rechazado",
             message=note or "Revisa el comprobante de tu plan y vuelve a subirlo.",
         )
+        return True
 
     def _notify_owner(self, *, title: str, message: str):
         from apps.notifications.models import Notification, notify_user

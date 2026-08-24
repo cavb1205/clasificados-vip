@@ -19,6 +19,9 @@ class CustomUser(AbstractUser):
     email = models.EmailField("correo electrónico", unique=True)
     role = models.CharField(max_length=12, choices=Role.choices, default=Role.CLIENT)
     email_verified = models.BooleanField(default=False)
+    # Incrementar este valor invalida todos los JWT emitidos anteriormente para
+    # la cuenta (por ejemplo, después de cambiar o resetear la contraseña).
+    session_version = models.PositiveIntegerField(default=0)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]

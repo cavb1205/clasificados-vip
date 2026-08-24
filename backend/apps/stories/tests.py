@@ -1,9 +1,11 @@
 from datetime import timedelta
 from io import BytesIO, StringIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.core.management import call_command
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -70,6 +72,57 @@ class EligibilityTests(_Base):
         self.assertEqual(resp.status_code, 201)
         self.assertEqual(resp.data["kind"], "photo")
         self.assertIn("file_url", resp.data)
+
+
+class VideoStoryPipelineTests(_Base):
+    @patch("apps.stories.views.watermark_story_async")
+    @patch("apps.stories.views.strip_video_metadata")
+    def test_video_upload_uses_metadata_pipeline_and_watermark(
+        self, strip_metadata, watermark
+    ):
+        self._make_active_featured_pub()
+        cleaned = ContentFile(b"metadata-free", name="video-clean.mp4")
+        strip_metadata.return_value = cleaned
+        upload = SimpleUploadedFile(
+            "raw.mp4", b"raw-video", content_type="video/mp4"
+        )
+
+        response = self.client.post(
+            reverse("api:stories:my-list"), {"upload": upload}, format="multipart"
+        )
+
+        self.assertEqual(response.status_code, 201)
+        story = Story.objects.get(pk=response.data["id"])
+        strip_metadata.assert_called_once()
+        watermark.assert_called_once_with(story.pk)
+        with story.file.open("rb") as stored:
+            self.assertEqual(stored.read(), b"metadata-free")
+
+
+class PrivateStoryFileTests(_Base):
+    def test_story_uses_private_storage_and_gated_file_endpoint(self):
+        from rest_framework.test import APIClient
+
+        field = Story._meta.get_field("file")
+        self.assertEqual(field.storage.__class__.__name__, "PrivateMediaStorage")
+        self._make_active_featured_pub()
+        story = self._make_story()
+        url = reverse("api:stories:file", args=[story.pk])
+        response = APIClient().get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "private, no-store, max-age=0")
+
+        story_url = reverse("api:stories:public-list", args=[self.profile.slug])
+        listing = APIClient().get(story_url)
+        self.assertEqual(listing.status_code, 200)
+        self.assertIn(f"/api/v1/stories/{story.pk}/file/", listing.data[0]["file_url"])
+
+    def test_story_file_is_hidden_when_profile_is_no_longer_public(self):
+        self.profile.verified_at = timezone.now() - timedelta(days=60)
+        self.profile.save(update_fields=["verified_at"])
+        story = self._make_story()
+        response = self.client.get(reverse("api:stories:file", args=[story.pk]))
+        self.assertEqual(response.status_code, 404)
 
 
 class CapacityTests(_Base):
@@ -149,3 +202,30 @@ class CityStoriesViewTests(TestCase):
         from django.urls import reverse
         r = self.api.get(reverse("api:stories:by-city"), {"region": "rm", "city": "otra"})
         self.assertEqual(len(r.data), 0)
+
+
+class PublicStoryVisibilityTests(_Base):
+    def test_profile_stories_require_publicly_visible_profile(self):
+        self.profile.verified_at = timezone.now() - timedelta(days=60)
+        self.profile.save(update_fields=["verified_at"])
+        story = self._make_story()
+
+        response = self.client.get(
+            reverse("api:stories:public-list", args=[self.profile.slug])
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Story.objects.filter(pk=story.pk).exists())
+
+    def test_active_publication_makes_story_profile_visible(self):
+        self.profile.verified_at = timezone.now() - timedelta(days=60)
+        self.profile.save(update_fields=["verified_at"])
+        self._make_active_featured_pub()
+        self._make_story()
+
+        response = self.client.get(
+            reverse("api:stories:public-list", args=[self.profile.slug])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)

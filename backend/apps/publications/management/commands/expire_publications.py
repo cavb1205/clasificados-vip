@@ -1,9 +1,9 @@
-"""Expira publicaciones vencidas. Pensado para ejecutarse vía Cron Job:
+"""Expira publicaciones vencidas.
 
-    */15 * * * *  cd /ruta/backend && .venv/bin/python manage.py expire_publications
+En producción lo ejecuta el contenedor `vip-scheduler` cada 15 minutos. También
+se puede invocar manualmente y soporta `--dry-run` para inspeccionar sin escribir.
 
 Busca publicaciones ACTIVE cuyo expires_at ya pasó y las marca EXPIRED.
-Soporta --dry-run para inspeccionar sin escribir.
 """
 
 from django.core.management.base import BaseCommand

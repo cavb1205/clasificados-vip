@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.files.storage import storages
 from django.db import models
 from django.utils import timezone
 
@@ -10,6 +11,11 @@ from apps.profiles.models import ModelProfile
 
 # Duración por defecto si una publicación no tiene plan asignado (compatibilidad).
 PUBLICATION_DAYS = 30
+
+
+def _private_storage():
+    """Resuelve el storage privado al runtime, igual que KYC y habitaciones."""
+    return storages["private"]
 
 
 class SubscriptionPlan(models.Model):
@@ -142,7 +148,7 @@ class PaymentReceipt(models.Model):
     publication = models.ForeignKey(
         Publication, on_delete=models.CASCADE, related_name="receipts"
     )
-    image = models.ImageField(upload_to="receipts/")
+    image = models.ImageField(upload_to="receipts/", storage=_private_storage)
     amount = models.PositiveIntegerField("monto declarado (CLP)", null=True, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     reviewed_by = models.ForeignKey(
@@ -164,6 +170,8 @@ class PaymentReceipt(models.Model):
 
     def approve(self, *, reviewer=None):
         """Aprueba el pago y activa la publicación asociada."""
+        if self.status != self.Status.PENDING:
+            return self.status == self.Status.APPROVED
         self.status = self.Status.APPROVED
         self.reviewed_by = reviewer
         self.reviewed_at = timezone.now()
@@ -180,8 +188,11 @@ class PaymentReceipt(models.Model):
             message=f"Tu anuncio '{pub.title}' está activo "
                     f"hasta el {pub.expires_at:%d-%m-%Y}.",
         )
+        return True
 
     def reject(self, *, reviewer=None, note=""):
+        if self.status != self.Status.PENDING:
+            return self.status == self.Status.REJECTED
         self.status = self.Status.REJECTED
         self.reviewed_by = reviewer
         self.reviewed_at = timezone.now()
@@ -192,6 +203,7 @@ class PaymentReceipt(models.Model):
             title="Comprobante rechazado",
             message=note or f"Revisa el comprobante de '{self.publication.title}' y vuelve a subirlo.",
         )
+        return True
 
     def _notify_owner(self, *, title: str, message: str):
         # Import perezoso para evitar ciclos a nivel de módulo.

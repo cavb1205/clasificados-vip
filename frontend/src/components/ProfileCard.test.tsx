@@ -18,6 +18,7 @@ function makeProfile(overrides: Partial<PublicProfile> = {}): PublicProfile {
     city: { id: 1, name: "Santiago", slug: "santiago", region: { id: 1, name: "RM", slug: "rm" } } as PublicProfile["city"],
     avatar: null,
     photos: [],
+    videos: [],
     cover_photo: null,
     is_featured: false,
     rating_average: null,
@@ -26,6 +27,7 @@ function makeProfile(overrides: Partial<PublicProfile> = {}): PublicProfile {
     telegram: "",
     is_available_now: false,
     available_until: null,
+    photo_authenticity: "pending",
     ...overrides,
   };
 }

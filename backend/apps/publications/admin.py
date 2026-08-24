@@ -30,13 +30,14 @@ class PaymentReceiptAdmin(admin.ModelAdmin):
     @admin.action(description="Aprobar pago (activa la publicación por 30 días)")
     def approve_payment(self, request, queryset):
         count = 0
-        for receipt in queryset.exclude(status=PaymentReceipt.Status.APPROVED):
+        for receipt in queryset.filter(status=PaymentReceipt.Status.PENDING):
             receipt.approve(reviewer=request.user)
             count += 1
         self.message_user(request, f"{count} pago(s) aprobado(s) y publicación(es) activada(s).")
 
     @admin.action(description="Rechazar pago")
     def reject_payment(self, request, queryset):
+        queryset = queryset.filter(status=PaymentReceipt.Status.PENDING)
         for receipt in queryset:
             receipt.reject(reviewer=request.user)
         self.message_user(request, f"{queryset.count()} pago(s) rechazado(s).")

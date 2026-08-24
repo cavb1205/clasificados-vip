@@ -23,13 +23,18 @@ descomentar las variables `POSTGRES_*`.
 ## Decisiones clave
 - **Almacenamiento migrable:** API `STORAGES` de Django. Hoy `FileSystemStorage`
   (local); migrar a S3/R2 cambia solo el `BACKEND` en `settings.STORAGES`, sin tocar
-  modelos ni vistas. Media pública (`/media`) y KYC privado (`/private_media`) separados.
+  modelos ni vistas. Los archivos de perfil (avatars y muro), comprobantes privados
+  y KYC privado (`/private_media`) quedan separados. Todo archivo sensible se sirve
+  mediante endpoints protegidos o con gate de visibilidad, nunca desde `/media`.
 - **KYC cifrado:** cédula y selfie se cifran con Fernet antes de escribirse al almacén
   privado (`core/encryption.py`). Solo un admin las descifra en memoria vía vista
   protegida, y cada acceso queda en `VerificationAccessLog`.
 - **Privacidad multimedia:** toda foto pasa por `core/image_processing.py` →
-  strip EXIF/GPS + watermark + JPEG optimizado. Límites 6 fotos / 1 video validados
-  en backend.
+  strip EXIF/GPS + watermark + JPEG optimizado. Los videos pierden metadata/GPS y
+  reciben watermark asíncrono; las stories se sirven desde endpoints gateados.
+  Límites 6 fotos / 1 video validados en backend.
+- **Pagos:** las transiciones parten solo de `pending`; repetir la misma decisión es
+  idempotente y una decisión opuesta devuelve conflicto sin renovar dos veces.
 - **Auth:** JWT en cookies HttpOnly; las escrituras exigen token CSRF
   (`apps/users/authentication.py`). Sembrar cookie CSRF en `GET /api/v1/auth/csrf/`.
 - **Visibilidad:** los perfiles nacen `pending` e invisibles; el endpoint público solo
@@ -39,11 +44,14 @@ descomentar las variables `POSTGRES_*`.
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `auth/csrf/` | Siembra cookie CSRF |
-| POST | `auth/register/` · `auth/login/` · `auth/logout/` · `auth/refresh/` | Auth |
+| POST | `auth/register/` · `auth/login/` · `auth/logout/` · `auth/refresh/` | Auth con cookies HttpOnly, refresh rotatorio y revocable |
 | GET | `auth/me/` | Usuario actual |
 | GET | `regions/` · `cities/?region=<slug>` | Catálogo geográfico |
 | CRUD | `me/profile/` | Perfil propio de la modelo |
+| GET | `me/profile/avatar/file/` · `profiles/<slug>/avatar/file/` | Avatar propio o público con gate de visibilidad |
 | CRUD | `me/media/` | Multimedia propia (con pipeline + límites) |
+| GET | `me/media/<id>/file/` · `profile-media/<id>/file/` | Multimedia del dueño o pieza pública dentro del cupo |
+| GET | `admin/media/<id>/file/` | Multimedia para moderación (admin/moderador) |
 | POST | `verification/submit/` | Subir documentos KYC |
 | GET | `profiles/?q=&region=&city=&service=&min_age=&max_age=&min_rate=&max_rate=&page=` | Listado público paginado (12/pág) con filtros y búsqueda |
 | GET | `profiles/<slug>/` | Detalle público |
@@ -62,6 +70,14 @@ descomentar las variables `POSTGRES_*`.
 Cubren: cookies HttpOnly + rechazo CSRF, strip EXIF/GPS + compresión, límites de media,
 cifrado KYC round-trip, aprobación admin → perfil verificado, visibilidad pública.
 
+Si ya existían comprobantes, stories, avatars o multimedia de perfiles en el volumen
+público, después de desplegar las migraciones ejecuta primero
+`python manage.py migrate_receipt_media_private`,
+`python manage.py migrate_story_media_private` y
+`python manage.py migrate_profile_media_private` para copiarlos al storage privado.
+Verifica las colas/visores y repite los comandos con `--delete-public` para borrar
+las copias públicas.
+
 ## Planes de suscripción (configurables por el admin)
 - `SubscriptionPlan` define duración (en días), precio y si incluye destacado. El admin
   crea/edita planes desde el panel (diario, semanal, mensual, 90 días… lo que quiera) sin
@@ -73,11 +89,11 @@ cifrado KYC round-trip, aprobación admin → perfil verificado, visibilidad pú
 - El admin aprueba el `PaymentReceipt` → `Publication.activate()`: pasa a `active` y fija
   `expires_at = now + plan.duration_days` (30 días si no hay plan). Si el plan incluye
   destacado, marca `is_featured`.
-- Cron de expiración:
-  ```
-  */15 * * * *  cd /ruta/backend && .venv/bin/python manage.py expire_publications
-  ```
-  (`--dry-run` para simular).
+- Mantenimiento periódico: `docker-compose.production.yml` levanta `vip-scheduler`, que
+  cada 15 minutos ejecuta `expire_publications`, `expire_rooms` y
+  `delete_expired_stories`. Tiene timeout por tarea, heartbeat y healthcheck; si una tarea
+  falla, el proceso termina para que Docker lo reinicie. Para una ejecución manual:
+  `docker exec vip-scheduler python manage.py expire_publications --dry-run`.
 
 ## Notificaciones al admin
 Signals `post_save` envían email a `settings.ADMINS` cuando se crea:
@@ -98,8 +114,9 @@ En dev el backend de email es `console` (los mensajes salen por el stdout del
 ## Backups (`backup.sh`)
 Respaldo diario (cron 03:00) en el VPS: dump lógico de la DB vip (`pg_dump` 17 vía contenedor
 en la red `easypanel`) + tar de los volúmenes `private_media` (KYC cifrado) y `media`.
-Rotación: últimos 14 de cada tipo en `/opt/vip/backups`. La copia operativa vive en
-`/opt/vip/backup.sh`; este archivo es la versión versionada.
+Los artefactos se validan (`gzip -t`/`tar -tzf`) y se publican atómicamente con permisos
+restringidos. Rotación: últimos 14 de cada tipo en `/opt/vip/backups`. La copia operativa vive
+en `/opt/vip/backup.sh`; este archivo es la versión versionada.
 
 **Off-site pendiente:** hoy los backups quedan en el mismo droplet (protege contra borrados/
 migraciones malas, NO contra pérdida del droplet). El script ya trae el hook `rclone` (remote
@@ -110,8 +127,10 @@ Restore rápido: `gunzip -c db-XXXX.sql.gz | psql -h <host> -U <user> -d <db>` y
 `tar xzf media-XXXX.tar.gz -C /destino`.
 
 **Restore validado** (`restore-test.sh`): prueba aislada que toma un backup fresco, lo restaura
-en un Postgres efímero (NO toca producción) y compara conteos restaurado-vs-prod + el media tar.
-Verificado 2026-06-01: 0 errores, todos los conteos coinciden. Re-correr periódicamente.
+en un Postgres efímero (NO toca producción), compara todos los modelos gestionados contra
+producción y valida los conteos de archivos de `private_media` y `media`. Requiere ejecutarse
+con `sudo` y termina con código distinto de cero si el dump, los conteos o los archivos no
+coinciden; correrlo periódicamente, por ejemplo después de un cambio importante de esquema.
 
 ## Pendiente
 - Off-site de backups (Spaces) · dominio real + media a bucket · SMTP real (ver roadmap).

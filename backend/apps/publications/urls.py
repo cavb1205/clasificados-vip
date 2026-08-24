@@ -21,6 +21,11 @@ urlpatterns = [
         name="admin-payments",
     ),
     path(
+        "admin/payments/<int:pk>/image/",
+        views.AdminPaymentReceiptImageView.as_view(),
+        name="admin-payment-image",
+    ),
+    path(
         "admin/payments/<int:pk>/action/",
         views.AdminPaymentActionView.as_view(),
         name="admin-payment-action",

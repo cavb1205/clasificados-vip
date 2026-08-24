@@ -91,29 +91,26 @@ def add_video_watermark(data: bytes, ext: str = ".mp4") -> "ContentFile | None":
             return None
 
 
-def watermark_media_async(media_pk: int) -> None:
-    """Aplica el watermark a un MediaContent (video) en un hilo en segundo plano
-    y reemplaza el archivo. No bloquea el request."""
+def watermark_file_async(model, object_pk: int) -> None:
+    """Aplica watermark a un modelo con `file` en segundo plano."""
 
     def _run():
         from django.core.files.storage import default_storage
         from django.db import connection
 
         try:
-            from apps.media_content.models import MediaContent
-
-            m = MediaContent.objects.filter(pk=media_pk).first()
-            if not m or not m.file:
+            item = model.objects.filter(pk=object_pk).first()
+            if not item or not item.file:
                 return
-            m.file.open("rb")
-            data = m.file.read()
-            m.file.close()
-            ext = os.path.splitext(m.file.name)[1] or ".mp4"
+            item.file.open("rb")
+            data = item.file.read()
+            item.file.close()
+            ext = os.path.splitext(item.file.name)[1] or ".mp4"
             wm = add_video_watermark(data, ext)
             if wm:
-                old = m.file.name
-                m.file.save(os.path.basename(wm.name), wm, save=True)
-                if old and old != m.file.name:
+                old = item.file.name
+                item.file.save(os.path.basename(wm.name), wm, save=True)
+                if old and old != item.file.name:
                     try:
                         default_storage.delete(old)
                     except Exception:
@@ -124,3 +121,15 @@ def watermark_media_async(media_pk: int) -> None:
             connection.close()
 
     threading.Thread(target=_run, daemon=True).start()
+
+
+def watermark_media_async(media_pk: int) -> None:
+    """Aplica watermark a un MediaContent sin bloquear la subida."""
+    from apps.media_content.models import MediaContent
+    watermark_file_async(MediaContent, media_pk)
+
+
+def watermark_story_async(story_pk: int) -> None:
+    """Aplica watermark a una Story de video sin bloquear la subida."""
+    from apps.stories.models import Story
+    watermark_file_async(Story, story_pk)

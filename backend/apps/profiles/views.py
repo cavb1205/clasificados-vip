@@ -1,6 +1,10 @@
+import mimetypes
 from datetime import timedelta
 
+from django.http import FileResponse, Http404
 from django.db.models import Avg, Count, Exists, OuterRef, Q
+from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
@@ -194,7 +198,56 @@ class MyProfileViewSet(viewsets.ModelViewSet):
         if profile.avatar:
             profile.avatar.delete(save=False)
         profile.avatar.save(processed.name, processed, save=True)
-        return Response({"avatar": request.build_absolute_uri(profile.avatar.url)})
+        url = reverse("api:profiles:my-profile-avatar-file")
+        return Response({"avatar": request.build_absolute_uri(url)})
+
+
+def _private_file_response(file_field):
+    if not file_field:
+        raise Http404
+    try:
+        stream = file_field.open("rb")
+    except (FileNotFoundError, OSError):
+        raise Http404
+    content_type = mimetypes.guess_type(file_field.name)[0] or "application/octet-stream"
+    response = FileResponse(stream, content_type=content_type)
+    response["Content-Disposition"] = "inline"
+    response["Cache-Control"] = "private, no-store, max-age=0"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    return response
+
+
+class MyProfileAvatarFileView(APIView):
+    """Sirve el avatar propio aunque el perfil todavía no sea público."""
+
+    permission_classes = [permissions.IsAuthenticated, IsModel]
+
+    def get(self, request):
+        profile = get_object_or_404(ModelProfile, user=request.user)
+        return _private_file_response(profile.avatar)
+
+
+class PublicProfileAvatarFileView(APIView):
+    """Sirve el avatar solo mientras el perfil sea públicamente visible."""
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request, slug):
+        profile = get_object_or_404(
+            ModelProfile.objects.publicly_visible().distinct(), slug=slug
+        )
+        return _private_file_response(profile.avatar)
+
+
+class AdminProfileAvatarFileView(generics.GenericAPIView):
+    permission_classes = [IsModerator]
+    queryset = ModelProfile.objects.all()
+
+    def get(self, request, pk):
+        profile = self.get_object()
+        return _private_file_response(profile.avatar)
 
 
 class PublicProfileListView(generics.ListAPIView):
@@ -373,7 +426,7 @@ class AdminModelProfileSerializer(drf_serializers.ModelSerializer):
         urls = []
         for m in obj.media.all():
             if m.media_type == "photo" and not m.is_hidden:
-                u = m.file.url
+                u = reverse("api:media_content:admin-file", args=[m.pk])
                 urls.append(request.build_absolute_uri(u) if request else u)
                 if len(urls) >= 6:
                     break
@@ -476,7 +529,8 @@ class AdminProfileDetailView(APIView):
         media = [
             {
                 "id": m.id, "media_type": m.media_type,
-                "url": _abs(m.file.url) if m.file else None,
+                "url": _abs(reverse("api:media_content:admin-file", args=[m.pk]))
+                if m.file else None,
                 "is_hidden": m.is_hidden,
             }
             for m in profile.media.all()

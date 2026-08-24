@@ -1,6 +1,7 @@
 import re
 from datetime import timedelta
 
+from django.urls import reverse
 from rest_framework import serializers
 
 from .models import City, ModelProfile, Region, Service, SiteConfig
@@ -143,7 +144,7 @@ class ModelProfileSerializer(serializers.ModelSerializer):
         if not obj.avatar:
             return None
         request = self.context.get("request")
-        url = obj.avatar.url
+        url = reverse("api:profiles:my-profile-avatar-file")
         return request.build_absolute_uri(url) if request else url
 
     def get_trial_ends_at(self, obj):
@@ -208,19 +209,27 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         return obj.media.filter(media_type="photo", is_hidden=False)
 
     def get_avatar(self, obj):
-        return self._abs(obj.avatar.url) if obj.avatar else None
+        if not obj.avatar:
+            return None
+        return self._abs(reverse("api:profiles:public-avatar-file", args=[obj.slug]))
 
     def get_photos(self, obj):
         # Se muestran solo hasta el cupo del plan (las primeras según su orden).
         # Las extra no se borran: reaparecen si vuelve a un plan con más cupo.
         max_photos, _ = self._media_limits(obj)
-        return [self._abs(m.file.url) for m in self._photo_qs(obj)[:max_photos]]
+        return [
+            self._abs(reverse("api:media_content:public-file", args=[m.pk]))
+            for m in self._photo_qs(obj)[:max_photos]
+        ]
 
     def get_videos(self, obj):
         # Videos del muro no ocultos por moderación, hasta el cupo del plan.
         _, max_videos = self._media_limits(obj)
         videos = obj.media.filter(media_type="video", is_hidden=False)[:max_videos]
-        return [self._abs(m.file.url) for m in videos]
+        return [
+            self._abs(reverse("api:media_content:public-file", args=[m.pk]))
+            for m in videos
+        ]
 
     @staticmethod
     def _media_limits(obj):
@@ -230,6 +239,9 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     def get_cover_photo(self, obj):
         # La portada (tarjetas, og:image) prioriza el avatar; si no hay, la 1ª del muro.
         if obj.avatar:
-            return self._abs(obj.avatar.url)
+            return self._abs(reverse("api:profiles:public-avatar-file", args=[obj.slug]))
         first = self._photo_qs(obj).first()
-        return self._abs(first.file.url) if first else None
+        return (
+            self._abs(reverse("api:media_content:public-file", args=[first.pk]))
+            if first else None
+        )

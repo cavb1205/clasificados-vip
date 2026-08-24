@@ -94,6 +94,47 @@ class PlanApprovalTests(_Base):
         self.assertGreater(delta, timedelta(days=29, hours=23))
 
 
+class RoomPaymentTransitionTests(_Base):
+    def setUp(self):
+        super().setUp()
+        self.plan = _room_plan(days=30, slots=2)
+        self.receipt = RoomReceipt.objects.create(owner=self.host, plan=self.plan)
+        self.admin = User.objects.create_user(
+            username="room-admin", email="room-admin@example.com",
+            password="x", role="admin", is_staff=True,
+        )
+        self.client.force_authenticate(self.admin)
+        self.url = reverse(
+            "api:rooms:admin-room-payment-action", args=[self.receipt.id]
+        )
+
+    def test_repeated_approval_does_not_extend_plan_twice(self):
+        first = self.client.post(self.url, {"action": "approve"}, format="json")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.host.refresh_from_db()
+        first_expiry = self.host.plan_expires_at
+
+        second = self.client.post(self.url, {"action": "approve"}, format="json")
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.host.refresh_from_db()
+        self.assertEqual(self.host.plan_expires_at, first_expiry)
+
+    def test_opposite_decision_after_approval_conflicts(self):
+        self.client.post(self.url, {"action": "approve"}, format="json")
+        response = self.client.post(
+            self.url, {"action": "reject", "note": "duplicado"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.receipt.refresh_from_db()
+        self.assertEqual(self.receipt.status, RoomReceipt.Status.APPROVED)
+
+
+class PrivateRoomReceiptTests(_Base):
+    def test_room_receipt_uses_private_storage(self):
+        field = RoomReceipt._meta.get_field("image")
+        self.assertEqual(field.storage.__class__.__name__, "PrivateMediaStorage")
+
+
 class PublishLimitTests(_Base):
     def test_publish_requires_active_plan(self):
         listing = self._new_listing()

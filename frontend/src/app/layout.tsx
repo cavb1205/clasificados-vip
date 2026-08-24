@@ -1,28 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { Plus_Jakarta_Sans, Fraunces } from "next/font/google";
 import "./globals.css";
 import { AgeGate } from "@/components/AgeGate";
 import { AuthNav } from "@/components/AuthNav";
 import { Toaster } from "@/components/Toaster";
 import { SupportButton } from "@/components/SupportButton";
 import { Analytics } from "@vercel/analytics/next";
-
-// Tipografía UI: Plus Jakarta Sans (geométrica, moderna, alta legibilidad).
-const sans = Plus_Jakarta_Sans({
-  variable: "--font-sans",
-  subsets: ["latin"],
-  display: "swap",
-});
-// Tipografía de display: Fraunces (serif con optical sizing, da el toque
-// elegante a títulos y al logo).
-const display = Fraunces({
-  variable: "--font-display",
-  subsets: ["latin"],
-  display: "swap",
-  axes: ["opsz"],
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://portalvip.cl"),
@@ -38,7 +22,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html
       lang="es-CL"
-      className={`${sans.variable} ${display.variable} h-full antialiased`}
+      className="h-full antialiased"
       style={{ colorScheme: "dark" }}
     >
       <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100">

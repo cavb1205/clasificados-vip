@@ -1,7 +1,7 @@
 """URL configuration para clasificados_vip."""
 from django.conf import settings
 from django.contrib import admin
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.urls import include, path, re_path
 from django.views.static import serve as static_serve
 
@@ -25,12 +25,22 @@ urlpatterns = [
     path("healthz/", lambda r: JsonResponse({"status": "ok"})),
 ]
 
-# Servimos /media/ desde Django también en producción. Django.conf.urls.static
+# Servimos el resto de /media/ desde Django también en producción; los prefijos
+# de avatars y muro quedan bloqueados justo arriba. Django.conf.urls.static
 # es no-op cuando DEBUG=False, así que montamos el handler manualmente con
 # re_path + serve. Para baja escala es correcto (gunicorn sirve archivos de
 # pocos MB sin problema). Cuando migremos a S3/R2 el storage devolverá URLs
 # absolutas del bucket y esto se puede retirar.
+def _blocked_profile_media(request, path=""):
+    """Impide el bypass de archivos históricos aún no migrados."""
+    return HttpResponse(status=404)
+
+
 urlpatterns += [
+    re_path(
+        r"^media/profiles/(?:avatars|media)/(?P<path>.*)$",
+        _blocked_profile_media,
+    ),
     re_path(
         r"^media/(?P<path>.*)$",
         static_serve,

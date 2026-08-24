@@ -17,6 +17,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
  * pueda compararla con el header X-CSRFToken.
  */
 let cachedCsrf: string | null = null;
+let refreshPromise: Promise<boolean> | null = null;
 
 async function ensureCsrf(): Promise<string> {
   if (cachedCsrf) return cachedCsrf;
@@ -60,16 +61,58 @@ async function rawFetch(
   });
 }
 
+async function isCsrfFailure(response: Response): Promise<boolean> {
+  if (response.status !== 403) return false;
+  const payload = await response.clone().json().catch(() => null);
+  return JSON.stringify(payload ?? {}).toLowerCase().includes("csrf");
+}
+
+async function refreshSession(): Promise<boolean> {
+  // Varias requests pueden detectar el access token expirado al mismo tiempo;
+  // todas esperan el mismo refresh en lugar de rotar el refresh token en paralelo.
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = rawFetch("/auth/refresh/", "POST", undefined, false)
+    .then(async (response) => {
+      if (await isCsrfFailure(response)) {
+        invalidateCsrf();
+        response = await rawFetch("/auth/refresh/", "POST", undefined, false);
+      }
+      return response.ok;
+    })
+    .catch(() => false)
+    .finally(() => {
+      refreshPromise = null;
+    });
+  return refreshPromise;
+}
+
 export async function apiFetch<T = unknown>(
   path: string,
   { method = "GET", body, isForm = false }: RequestOptions = {},
 ): Promise<T> {
   let res = await rawFetch(path, method, body, isForm);
 
-  // El token CSRF puede haber rotado (login/logout); reintentar una vez con uno nuevo.
-  if (res.status === 403 && method !== "GET" && method !== "HEAD") {
+  // El token CSRF puede haber rotado (login/logout); solo reintentamos cuando
+  // el 403 realmente contiene un error CSRF. Un 403 de permisos nunca debe
+  // repetir un POST potencialmente side-effectful.
+  if (
+    method !== "GET" &&
+    method !== "HEAD" &&
+    await isCsrfFailure(res)
+  ) {
     invalidateCsrf();
     res = await rawFetch(path, method, body, isForm);
+  }
+
+  // Si expiró el access token, renovar una vez y repetir la request original.
+  // Los endpoints de auth se excluyen para evitar bucles de refresh.
+  if (res.status === 401 && !path.startsWith("/auth/")) {
+    if (await refreshSession()) {
+      res = await rawFetch(path, method, body, isForm);
+    } else {
+      emitAuthChanged();
+    }
   }
 
   if (!res.ok) {
@@ -100,6 +143,12 @@ export const auth = {
     invalidateCsrf();
     emitAuthChanged();
     return r;
+  },
+  refresh: async () => {
+    if (!(await refreshSession())) {
+      throw new Error("La sesión expiró.");
+    }
+    return { detail: "ok" };
   },
   me: () => apiFetch("/auth/me/"),
 };

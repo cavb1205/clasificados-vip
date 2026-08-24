@@ -2,9 +2,13 @@ from datetime import timedelta
 from io import StringIO
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.management import call_command
+from django.urls import reverse
 from django.utils import timezone
 from django.test import TestCase
+from rest_framework import status
+from rest_framework.test import APIClient
 
 from apps.profiles.models import ModelProfile
 from .models import PaymentReceipt, Publication, SubscriptionPlan
@@ -42,6 +46,72 @@ class PaymentApprovalTests(_Base):
         self.assertGreater(delta, timedelta(days=29, hours=23))
         self.assertLess(delta, timedelta(days=30, minutes=1))
         self.assertTrue(pub.is_live)
+
+
+class PaymentTransitionTests(_Base):
+    def setUp(self):
+        super().setUp()
+        self.admin = User.objects.create_user(
+            username="payments-admin", email="payments-admin@example.com",
+            password="x", role="admin", is_staff=True,
+        )
+        self.pub = Publication.objects.create(
+            profile=self.profile, title="Anuncio", status=Publication.Status.PENDING_PAYMENT
+        )
+        self.receipt = PaymentReceipt.objects.create(publication=self.pub)
+        self.api = APIClient()
+        self.api.force_authenticate(self.admin)
+        self.url = reverse(
+            "api:publications:admin-payment-action", args=[self.receipt.id]
+        )
+
+    def test_repeated_approval_is_idempotent(self):
+        first = self.api.post(self.url, {"action": "approve"}, format="json")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+        self.pub.refresh_from_db()
+        first_expiry = self.pub.expires_at
+
+        second = self.api.post(self.url, {"action": "approve"}, format="json")
+        self.assertEqual(second.status_code, status.HTTP_200_OK)
+        self.pub.refresh_from_db()
+        self.assertEqual(self.pub.expires_at, first_expiry)
+
+    def test_opposite_decision_after_approval_conflicts(self):
+        self.api.post(self.url, {"action": "approve"}, format="json")
+        response = self.api.post(
+            self.url, {"action": "reject", "note": "duplicado"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.receipt.refresh_from_db()
+        self.assertEqual(self.receipt.status, PaymentReceipt.Status.APPROVED)
+
+
+class PrivateReceiptTests(_Base):
+    def test_payment_receipt_uses_private_storage(self):
+        field = PaymentReceipt._meta.get_field("image")
+        self.assertEqual(field.storage.__class__.__name__, "PrivateMediaStorage")
+
+    def test_payment_receipt_image_endpoint_is_admin_only(self):
+        pub = Publication.objects.create(
+            profile=self.profile, title="Anuncio", status=Publication.Status.PENDING_PAYMENT
+        )
+        receipt = PaymentReceipt.objects.create(publication=pub)
+        receipt.image.save("receipt.jpg", ContentFile(b"private receipt"), save=True)
+        admin = User.objects.create_user(
+            username="admin", email="admin@example.com", password="x",
+            role="admin", is_staff=True,
+        )
+        url = reverse("api:publications:admin-payment-image", args=[receipt.id])
+        client = APIClient()
+
+        client.force_authenticate(self.user)
+        self.assertEqual(client.get(url).status_code, status.HTTP_403_FORBIDDEN)
+
+        client.force_authenticate(admin)
+        response = client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Cache-Control"], "private, no-store, max-age=0")
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
 
 
 class SubscriptionPlanTests(_Base):

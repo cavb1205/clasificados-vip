@@ -1,6 +1,12 @@
 from django.conf import settings
+from django.core.files.storage import storages
 from django.db import models
 from django.utils.text import slugify
+
+
+def _private_storage():
+    """Storage separado para avatars y documentos no servidos desde /media/."""
+    return storages["private"]
 
 
 class Region(models.Model):
@@ -124,7 +130,8 @@ class ModelProfile(models.Model):
     # Foto de perfil (avatar), independiente del muro de fotos (MediaContent).
     # Pasa por el pipeline de privacidad (EXIF/GPS + marca) al subirse.
     avatar = models.ImageField(
-        "foto de perfil", upload_to="profiles/avatars/", null=True, blank=True
+        "foto de perfil", upload_to="profiles/avatars/", storage=_private_storage,
+        null=True, blank=True,
     )
     age = models.PositiveSmallIntegerField(help_text="Edad verificada (18+)")
     services = models.ManyToManyField(Service, related_name="profiles", blank=True)

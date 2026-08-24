@@ -1,8 +1,12 @@
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.test import TestCase, override_settings
+from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
+from rest_framework.test import APIClient
 
 from apps.profiles.models import ModelProfile
 from core.image_processing import has_gps_metadata, process_image
@@ -76,6 +80,21 @@ class MediaLimitTests(TestCase):
         first.refresh_from_db()
         self.assertEqual(first.order, 9)
 
+    def test_patch_cannot_change_type_outside_upload_pipeline(self):
+        from rest_framework.test import APIClient
+        self._make_photo()
+        first = MediaContent.objects.first()
+        client = APIClient()
+        client.force_authenticate(self.profile.user)
+        resp = client.patch(
+            f"/api/v1/me/media/{first.id}/",
+            {"media_type": "video"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        first.refresh_from_db()
+        self.assertEqual(first.media_type, MediaContent.MediaType.PHOTO)
+
     def test_photo_limit_enforced(self):
         from django.core.exceptions import ValidationError
 
@@ -83,6 +102,66 @@ class MediaLimitTests(TestCase):
         self._make_photo()
         with self.assertRaises(ValidationError):
             self._make_photo()  # tercera supera el límite de 2
+
+
+class PrivateMediaFileTests(TestCase):
+    def setUp(self):
+        self.model_user = User.objects.create_user(
+            username="media-model", email="media-model@example.com", password="x", role="model"
+        )
+        self.profile = ModelProfile.objects.create(
+            user=self.model_user,
+            stage_name="Media",
+            age=25,
+            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
+        )
+        self.media = MediaContent(profile=self.profile, media_type="photo")
+        self.media.file.save("photo.jpg", ContentFile(b"private photo"), save=True)
+        self.admin = User.objects.create_user(
+            username="media-admin", email="media-admin@example.com", password="x",
+            role="admin", is_staff=True,
+        )
+        self.api = APIClient()
+
+    def test_media_uses_private_storage_and_gated_urls(self):
+        field = MediaContent._meta.get_field("file")
+        self.assertEqual(field.storage.__class__.__name__, "PrivateMediaStorage")
+
+        public_url = reverse("api:media_content:public-file", args=[self.media.pk])
+        response = self.api.get(public_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "private, no-store, max-age=0")
+        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+
+        detail = self.api.get(
+            reverse("api:profiles:public-detail", args=[self.profile.slug])
+        )
+        self.assertIn(public_url, detail.data["photos"][0])
+
+        self.api.force_authenticate(self.model_user)
+        self.assertEqual(
+            self.api.get(reverse("api:media_content:my-file", args=[self.media.pk])).status_code,
+            200,
+        )
+
+        self.api.force_authenticate(self.admin)
+        self.assertEqual(
+            self.api.get(reverse("api:media_content:admin-file", args=[self.media.pk])).status_code,
+            200,
+        )
+
+    def test_hidden_media_is_not_public_but_remains_available_to_owner(self):
+        self.media.is_hidden = True
+        self.media.save(update_fields=["is_hidden"])
+        public_url = reverse("api:media_content:public-file", args=[self.media.pk])
+        self.assertEqual(self.api.get(public_url).status_code, 404)
+
+        self.api.force_authenticate(self.model_user)
+        self.assertEqual(
+            self.api.get(reverse("api:media_content:my-file", args=[self.media.pk])).status_code,
+            200,
+        )
 
 
 class AdminMediaHideTests(TestCase):

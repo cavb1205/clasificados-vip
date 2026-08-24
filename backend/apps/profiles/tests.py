@@ -418,6 +418,31 @@ class AvatarTests(APITestCase):
         pub = self.client.get(reverse("api:profiles:public-detail", args=[self.profile.slug]))
         self.assertEqual(pub.data["cover_photo"], pub.data["avatar"])
 
+    def test_avatar_uses_private_storage_and_visibility_gate(self):
+        from apps.profiles.models import ModelProfile
+
+        self.client.force_authenticate(self.user)
+        up = SimpleUploadedFile("a.jpg", _jpeg_bytes(), content_type="image/jpeg")
+        self.client.post(
+            reverse("api:profiles:my-profile-avatar"), {"upload": up}, format="multipart"
+        )
+
+        field = ModelProfile._meta.get_field("avatar")
+        self.assertEqual(field.storage.__class__.__name__, "PrivateMediaStorage")
+        own_url = reverse("api:profiles:my-profile-avatar-file")
+        self.assertEqual(self.client.get(own_url).status_code, 200)
+
+        public_url = reverse(
+            "api:profiles:public-avatar-file", args=[self.profile.slug]
+        )
+        response = self.client.get(public_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "private, no-store, max-age=0")
+
+        self.profile.is_suspended = True
+        self.profile.save(update_fields=["is_suspended"])
+        self.assertEqual(self.client.get(public_url).status_code, 404)
+
     def test_delete_avatar_clears_it(self):
         self.profile.avatar.save("x.jpg", SimpleUploadedFile("x.jpg", _jpeg_bytes()), save=True)
         self.client.force_authenticate(self.user)

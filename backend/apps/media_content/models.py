@@ -1,8 +1,14 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.files.storage import storages
 from django.db import models
 
 from apps.profiles.models import ModelProfile
+
+
+def _private_storage():
+    """El muro se sirve por endpoints gateados, no desde /media/."""
+    return storages["private"]
 
 
 def profile_media_limits(profile) -> tuple[int, int]:
@@ -33,7 +39,7 @@ class MediaContent(models.Model):
         ModelProfile, on_delete=models.CASCADE, related_name="media"
     )
     media_type = models.CharField(max_length=5, choices=MediaType.choices)
-    file = models.FileField(upload_to="profiles/media/")
+    file = models.FileField(upload_to="profiles/media/", storage=_private_storage)
     order = models.PositiveSmallIntegerField(default=0)
     is_hidden = models.BooleanField(
         "oculta por moderación", default=False,

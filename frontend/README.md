@@ -48,10 +48,13 @@ comuna y robots responden con datos reales.
 ## Imágenes
 - `cover_photo` en las tarjetas de comuna y galería de `photos` en el perfil, vía
   `next/image` (responsive `sizes`, `priority` en la primera). OG image usa la portada.
-- `next.config.ts` declara `remotePatterns` para `localhost:8000/media/**`. En **dev** se
-  activa `images.dangerouslyAllowLocalIP` porque Next 16 bloquea por SSRF la optimización de
-  imágenes desde IPs privadas/localhost; en producción ese guard queda activo y la media debe
-  servirse desde un dominio público (S3/R2) — actualizar `remotePatterns` con ese host.
+- `next.config.ts` declara `remotePatterns` para los endpoints gateados de perfiles, multimedia,
+  stories y habitaciones. El dashboard usa `unoptimized` para archivos privados, de modo que
+  las cookies HttpOnly lleguen al endpoint protegido; las imágenes públicas sí pueden pasar por
+  el optimizador de Next. En **dev** se activa `images.dangerouslyAllowLocalIP` porque Next 16
+  bloquea por SSRF la optimización desde IPs privadas/localhost; en producción ese guard queda
+  activo y la media debe servirse desde un dominio público (S3/R2) — actualizar `remotePatterns`
+  con ese host.
 
 ## Filtros y paginación
 - `/chile/[region]/[city]` lee `searchParams` (`service`, `min_age`, `max_age`, `min_rate`,

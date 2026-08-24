@@ -1371,6 +1371,7 @@ function PhotoGrid({ photos, onChange }: { photos: Media[]; onChange: () => void
                 alt="foto"
                 width={200}
                 height={200}
+                unoptimized
                 draggable={false}
                 className="aspect-square w-full object-cover"
               />

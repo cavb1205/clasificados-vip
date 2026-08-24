@@ -1,7 +1,7 @@
-"""Cron job: borra stories cuyo expires_at ya pasó.
+"""Borra stories cuyo expires_at ya pasó.
 
-Diseñado para ejecutarse cada hora desde crontab:
-    0 * * * *  sudo docker exec vip-backend python manage.py delete_expired_stories
+En producción lo ejecuta el contenedor `vip-scheduler` cada 15 minutos. También
+se puede invocar manualmente con `--dry-run` para inspeccionar sin escribir.
 
 Borra el archivo físico del storage Y la fila de la DB — la idea es que el
 contenido efímero no deje rastro permanente (privacidad + storage).

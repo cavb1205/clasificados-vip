@@ -7,6 +7,7 @@ app_name = "stories"
 urlpatterns = [
     path("me/stories/", views.MyStoriesView.as_view(), name="my-list"),
     path("me/stories/<int:pk>/", views.MyStoryDeleteView.as_view(), name="my-delete"),
+    path("stories/<int:pk>/file/", views.StoryFileView.as_view(), name="file"),
     path("profiles/<slug:slug>/stories/", views.ProfileStoriesView.as_view(), name="public-list"),
     path("stories/by-city/", views.CityStoriesView.as_view(), name="by-city"),
     path("stories/<int:pk>/report/", views.StoryReportView.as_view(), name="report"),
@@ -14,6 +15,11 @@ urlpatterns = [
         "admin/story-reports/",
         views.AdminStoryReportQueueView.as_view(),
         name="admin-reports",
+    ),
+    path(
+        "admin/story-reports/<int:pk>/file/",
+        views.AdminStoryFileView.as_view(),
+        name="admin-file",
     ),
     path(
         "admin/story-reports/<int:pk>/action/",

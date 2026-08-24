@@ -1,3 +1,4 @@
+from django.urls import reverse
 from rest_framework import serializers
 
 from .models import Story
@@ -13,7 +14,9 @@ class StorySerializer(serializers.ModelSerializer):
 
     def get_file_url(self, obj):
         request = self.context.get("request")
-        url = obj.file.url
+        if not obj.file:
+            return None
+        url = reverse("api:stories:file", args=[obj.pk])
         return request.build_absolute_uri(url) if request else url
 
 

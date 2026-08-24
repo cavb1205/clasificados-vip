@@ -48,6 +48,35 @@ services:
       retries: 3
       start_period: 30s
 
+  # Mantenimiento periódico: no depende de un cron instalado en el host.
+  vip-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: clasificados-vip-backend:latest
+    container_name: vip-scheduler
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        format: raw
+    environment:
+      SKIP_ENTRYPOINT_PREP: "1"
+      SEED_ON_START: "0"
+      SCHEDULER_INTERVAL_SECONDS: "900"
+      SCHEDULER_JOB_TIMEOUT_SECONDS: "600"
+    command: ["./scheduler.sh"]
+    volumes:
+      - vip_media:/app/media
+      - vip_private_media:/app/private_media
+    networks:
+      - easypanel
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,sys,time; p='/tmp/scheduler-heartbeat'; sys.exit(0 if os.path.exists(p) and time.time()-os.path.getmtime(p)<1800 else 1)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
 networks:
   easypanel:
     external: true

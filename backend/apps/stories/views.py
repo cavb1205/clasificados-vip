@@ -1,6 +1,10 @@
 """Endpoints de Stories: subir, listar propio, listar público, eliminar, reportar."""
 
+import mimetypes
+
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -10,6 +14,7 @@ from apps.profiles.models import ModelProfile
 from apps.publications.models import Publication
 from core.image_processing import process_image
 from core.permissions import IsModel, IsModerator
+from core.video_processing import strip_video_metadata, watermark_story_async
 
 from .models import MAX_STORIES_ALIVE, Story, StoryReport
 from .serializers import StorySerializer
@@ -32,6 +37,22 @@ def _is_eligible(profile: ModelProfile) -> bool:
 
 def _live_stories(profile: ModelProfile):
     return Story.objects.filter(profile=profile, expires_at__gt=timezone.now())
+
+
+def _story_file_response(story):
+    if not story.file:
+        raise Http404
+    try:
+        stream = story.file.open("rb")
+    except (FileNotFoundError, OSError):
+        raise Http404
+    content_type = mimetypes.guess_type(story.file.name)[0] or "application/octet-stream"
+    response = FileResponse(stream, content_type=content_type)
+    response["Content-Disposition"] = "inline"
+    response["Cache-Control"] = "private, no-store, max-age=0"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    return response
 
 
 class MyStoriesView(generics.ListCreateAPIView):
@@ -81,8 +102,13 @@ class MyStoriesView(generics.ListCreateAPIView):
             processed = process_image(upload.read(), filename_stem="story")
             story.file.save(processed.name, processed, save=False)
         else:
-            story.file = upload
+            # El video también debe perder metadata/GPS. El watermark requiere
+            # re-encode y se ejecuta en segundo plano, igual que MediaContent.
+            cleaned = strip_video_metadata(upload)
+            story.file.save(cleaned.name, cleaned, save=False)
         story.save()
+        if kind == "video":
+            watermark_story_async(story.pk)
         return Response(
             StorySerializer(story, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -111,11 +137,26 @@ class ProfileStoriesView(generics.ListAPIView):
 
     def get_queryset(self):
         profile = get_object_or_404(
-            ModelProfile,
-            slug=self.kwargs["slug"],
-            verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            ModelProfile.objects.publicly_visible(), slug=self.kwargs["slug"]
         )
         return _live_stories(profile).order_by("created_at")
+
+
+class StoryFileView(APIView):
+    """Sirve una story vigente solo si el perfil sigue siendo públicamente visible."""
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request, pk):
+        story = get_object_or_404(
+            Story.objects.filter(
+                profile__in=ModelProfile.objects.publicly_visible(),
+                expires_at__gt=timezone.now(),
+            ),
+            pk=pk,
+        )
+        return _story_file_response(story)
 
 
 class CityStoriesView(APIView):
@@ -176,7 +217,7 @@ class CityStoriesView(APIView):
                 (s for s in reversed(stories) if s.kind == Story.Kind.PHOTO), None
             )
             thumb = (
-                request.build_absolute_uri(latest_photo.file.url)
+                StorySerializer(latest_photo, context={"request": request}).data["file_url"]
                 if latest_photo else avatar_fallback(p)
             )
             out.append({
@@ -194,7 +235,13 @@ class StoryReportView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, pk):
-        story = get_object_or_404(Story, pk=pk, expires_at__gt=timezone.now())
+        story = get_object_or_404(
+            Story.objects.filter(
+                profile__in=ModelProfile.objects.publicly_visible(),
+                expires_at__gt=timezone.now(),
+            ),
+            pk=pk,
+        )
         reason = (request.data.get("reason") or "")[:200].strip()
         StoryReport.objects.create(story=story, reason=reason)
         return Response({"detail": "Gracias por el reporte."}, status=status.HTTP_201_CREATED)
@@ -230,7 +277,7 @@ class AdminStoryReportSerializer(drf_serializers.ModelSerializer):
         request = self.context.get("request")
         if not obj.story.file:
             return None
-        url = obj.story.file.url
+        url = reverse("api:stories:admin-file", args=[obj.story.pk])
         return request.build_absolute_uri(url) if request else url
 
 
@@ -242,6 +289,16 @@ class AdminStoryReportQueueView(generics.ListAPIView):
         return StoryReport.objects.select_related(
             "story", "story__profile"
         ).order_by("-created_at")
+
+
+class AdminStoryFileView(generics.GenericAPIView):
+    """Sirve stories reportadas solo a moderadores/admins."""
+
+    permission_classes = [IsModerator]
+    queryset = Story.objects.all()
+
+    def get(self, request, pk):
+        return _story_file_response(self.get_object())
 
 
 class AdminStoryReportActionView(generics.GenericAPIView):

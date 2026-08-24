@@ -31,6 +31,11 @@ urlpatterns = [
     # Admin / moderación.
     path("admin/room-payments/", views.AdminRoomPaymentQueueView.as_view(), name="admin-room-payments"),
     path(
+        "admin/room-payments/<int:pk>/image/",
+        views.AdminRoomPaymentReceiptImageView.as_view(),
+        name="admin-room-payment-image",
+    ),
+    path(
         "admin/room-payments/<int:pk>/action/",
         views.AdminRoomPaymentActionView.as_view(),
         name="admin-room-payment-action",

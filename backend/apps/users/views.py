@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.settings import api_settings as jwt_api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.audit.models import log_action
@@ -22,6 +23,7 @@ from apps.notifications.models import notify_user
 from core.pagination import AdminPagination
 from core.permissions import IsModerator
 
+from .authentication import enforce_csrf
 from .serializers import ChangePasswordSerializer, RegisterSerializer, UserSerializer
 
 User = get_user_model()
@@ -41,6 +43,23 @@ def _set_jwt_cookies(response, access: str, refresh: str | None = None):
         refresh_max = int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
         response.set_cookie(settings.JWT_REFRESH_COOKIE, refresh, max_age=refresh_max, **common)
     return response
+
+
+def _new_refresh_for(user) -> RefreshToken:
+    refresh = RefreshToken.for_user(user)
+    refresh["session_version"] = user.session_version
+    return refresh
+
+
+def _blacklist_refresh(raw: str | None) -> None:
+    if not raw:
+        return
+    try:
+        RefreshToken(raw).blacklist()
+    except TokenError:
+        # Logout debe ser idempotente aunque la cookie ya haya expirado o sido
+        # revocada. No filtramos información sobre el token al cliente.
+        pass
 
 
 @method_decorator(ensure_csrf_cookie, name="get")
@@ -82,15 +101,19 @@ class LoginView(APIView):
                 {"detail": "Credenciales inválidas."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        refresh = RefreshToken.for_user(user)
+        refresh = _new_refresh_for(user)
         response = Response(UserSerializer(user).data)
         return _set_jwt_cookies(response, str(refresh.access_token), str(refresh))
 
 
 class RefreshView(APIView):
     permission_classes = [AllowAny]
+    # El access token puede estar expirado y CookieJWTAuthentication intentaría
+    # validarlo antes de llegar aquí. El refresh se valida explícitamente abajo.
+    authentication_classes = []
 
     def post(self, request):
+        enforce_csrf(request)
         raw = request.COOKIES.get(settings.JWT_REFRESH_COOKIE)
         if not raw:
             return Response(
@@ -98,8 +121,24 @@ class RefreshView(APIView):
             )
         try:
             refresh = RefreshToken(raw)
+            user = User.objects.filter(
+                pk=refresh.get("user_id"), is_active=True
+            ).first()
+            try:
+                token_version = int(refresh.get("session_version", 0))
+            except (TypeError, ValueError):
+                raise TokenError("Sesión revocada")
+            if user is None or token_version != user.session_version:
+                raise TokenError("Sesión revocada")
             access = str(refresh.access_token)
-            new_refresh = str(refresh) if settings.SIMPLE_JWT["ROTATE_REFRESH_TOKENS"] else None
+            new_refresh = None
+            if jwt_api_settings.ROTATE_REFRESH_TOKENS:
+                if jwt_api_settings.BLACKLIST_AFTER_ROTATION:
+                    refresh.blacklist()
+                refresh.set_jti()
+                refresh.set_exp()
+                refresh.set_iat()
+                new_refresh = str(refresh)
         except TokenError:
             return Response(
                 {"detail": "Refresh token inválido."}, status=status.HTTP_401_UNAUTHORIZED
@@ -110,8 +149,13 @@ class RefreshView(APIView):
 
 class LogoutView(APIView):
     permission_classes = [AllowAny]
+    # Igual que refresh: debe poder limpiar la sesión aunque el access token
+    # haya expirado. La protección CSRF se aplica explícitamente abajo.
+    authentication_classes = []
 
     def post(self, request):
+        enforce_csrf(request)
+        _blacklist_refresh(request.COOKIES.get(settings.JWT_REFRESH_COOKIE))
         response = Response(status=status.HTTP_204_NO_CONTENT)
         # Sobrescribir con valor vacío y MISMAS flags (samesite/secure) con que
         # se setearon. Si no coinciden, en contextos cross-site (SameSite=None;
@@ -144,8 +188,12 @@ class ChangePasswordView(APIView):
     def post(self, request):
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({"detail": "Contraseña actualizada."})
+        user = serializer.save()
+        # La sesión actual continúa activa con tokens nuevos; cualquier otra
+        # sesión queda invalidada por session_version.
+        refresh = _new_refresh_for(user)
+        response = Response({"detail": "Contraseña actualizada."})
+        return _set_jwt_cookies(response, str(refresh.access_token), str(refresh))
 
 
 class ForgotPasswordView(APIView):
@@ -218,7 +266,8 @@ class ResetPasswordView(APIView):
             return Response({"password": e.messages}, status=status.HTTP_400_BAD_REQUEST)
 
         user.set_password(password)
-        user.save(update_fields=["password"])
+        user.session_version += 1
+        user.save(update_fields=["password", "session_version"])
         return Response({"detail": "Contraseña actualizada."})
 
 

@@ -1,9 +1,9 @@
-"""Expira anuncios de habitación vencidos. Pensado para ejecutarse vía Cron:
+"""Expira anuncios de habitación vencidos.
 
-    */15 * * * *  cd /ruta/backend && .venv/bin/python manage.py expire_rooms
+En producción lo ejecuta el contenedor `vip-scheduler` cada 15 minutos. También
+se puede invocar manualmente y soporta `--dry-run` para inspeccionar sin escribir.
 
 Busca anuncios ACTIVE cuyo expires_at ya pasó y los marca EXPIRED.
-Soporta --dry-run para inspeccionar sin escribir.
 """
 
 from django.core.management.base import BaseCommand

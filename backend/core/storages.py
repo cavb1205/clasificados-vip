@@ -11,7 +11,7 @@ from django.core.files.storage import FileSystemStorage
 
 
 class PrivateMediaStorage(FileSystemStorage):
-    """Almacén separado y privado para documentos sensibles (KYC).
+    """Almacén separado y privado para documentos sensibles (KYC y pagos).
 
     No se sirve desde `MEDIA_URL`; el acceso pasa siempre por una vista
     protegida que descifra y registra auditoría. Por eso `base_url=None`.

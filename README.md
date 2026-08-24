@@ -36,6 +36,7 @@ npm run dev
 Django · DRF · SimpleJWT · Pillow · cryptography · PostgreSQL · Next.js · React 19 · Tailwind.
 
 ## Estado
-Backend: 21 tests OK · Frontend: build OK · Flujo end-to-end verificado contra HTTP real
-(registro → verificación → pago → activación → visibilidad pública). Mejoras pendientes en
-los READMEs por carpeta.
+Backend: suite Django completa OK · Frontend: Vitest, TypeScript, lint y build OK · Flujo
+end-to-end verificado contra HTTP real (registro → verificación → pago → activación →
+visibilidad pública). La operación de producción incluye backups de base + volúmenes y una
+prueba aislada de restore documentada en [`backend/README.md`](./backend/README.md).

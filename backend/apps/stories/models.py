@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.core.files.storage import storages
 from django.db import models
 from django.utils import timezone
 
@@ -7,6 +8,11 @@ from apps.profiles.models import ModelProfile
 
 STORY_TTL_HOURS = 24
 MAX_STORIES_ALIVE = 5  # tope simultáneo por perfil
+
+
+def _private_storage():
+    """Las stories no deben quedar expuestas directamente bajo /media/."""
+    return storages["private"]
 
 
 def _expires_default():
@@ -29,7 +35,7 @@ class Story(models.Model):
         ModelProfile, on_delete=models.CASCADE, related_name="stories"
     )
     kind = models.CharField(max_length=5, choices=Kind.choices)
-    file = models.FileField(upload_to="stories/")
+    file = models.FileField(upload_to="stories/", storage=_private_storage)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(default=_expires_default)
 

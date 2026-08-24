@@ -124,12 +124,10 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* Plus Jakarta Sans para UI, Fraunces (serif con optical sizing) para
-     títulos y logo. Tailwind expone estas como font-sans y font-display. */
-  --font-sans: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-display: var(--font-display), ui-serif, Georgia, "Times New Roman",
-    serif;
+  /* Pila local: el build no depende de descargar fuentes externas. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-display: ui-serif, Georgia, "Times New Roman", serif;
 }
 
 body {

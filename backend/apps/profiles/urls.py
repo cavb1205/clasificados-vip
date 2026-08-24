@@ -14,7 +14,9 @@ urlpatterns = [
     path("services/", views.ServiceListView.as_view(), name="services"),
     path("profiles/", views.PublicProfileListView.as_view(), name="public-list"),
     path("profiles/slugs/", views.ProfileSlugsView.as_view(), name="public-slugs"),
+    path("me/profile/avatar/file/", views.MyProfileAvatarFileView.as_view(), name="my-profile-avatar-file"),
     path("me/favorites/", views.MyFavoritesListView.as_view(), name="my-favorites"),
+    path("profiles/<slug:slug>/avatar/file/", views.PublicProfileAvatarFileView.as_view(), name="public-avatar-file"),
     path("profiles/<slug:slug>/", views.PublicProfileDetailView.as_view(), name="public-detail"),
     path("profiles/<slug:slug>/events/", views.LogProfileEventView.as_view(), name="log-event"),
     path("profiles/<slug:slug>/favorite/", views.FavoriteToggleView.as_view(), name="favorite-toggle"),
@@ -27,6 +29,7 @@ urlpatterns = [
     ),
     path("me/profile/stats/", views.MyProfileStatsView.as_view(), name="my-profile-stats"),
     path("admin/profiles/", views.AdminModelProfileListView.as_view(), name="admin-profiles"),
+    path("admin/profiles/<int:pk>/avatar/file/", views.AdminProfileAvatarFileView.as_view(), name="admin-avatar-file"),
     path(
         "admin/profiles/<int:pk>/action/",
         views.AdminModelProfileActionView.as_view(),

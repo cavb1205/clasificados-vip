@@ -72,6 +72,62 @@ class AuthCookieTests(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class RefreshTokenTests(APITestCase):
+    def setUp(self):
+        self.client = APIClient(enforce_csrf_checks=True)
+        self.user = User.objects.create_user(
+            username="refresh", email="refresh@example.com",
+            password="Sup3rSecret!", role="client",
+        )
+
+    def _login(self):
+        response = self.client.post(
+            reverse("api:users:login"),
+            {"email": self.user.email, "password": "Sup3rSecret!"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def _csrf(self):
+        response = self.client.get(reverse("api:users:csrf"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.data["csrftoken"]
+
+    def test_refresh_rotates_and_blacklists_previous_token(self):
+        self._login()
+        csrf = self._csrf()
+        old_refresh = self.client.cookies["refresh_token"].value
+
+        response = self.client.post(
+            reverse("api:users:refresh"), {},
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        new_refresh = self.client.cookies["refresh_token"].value
+        self.assertNotEqual(old_refresh, new_refresh)
+
+        self.client.cookies["refresh_token"] = old_refresh
+        rejected = self.client.post(
+            reverse("api:users:refresh"), {},
+            HTTP_X_CSRFTOKEN=csrf,
+        )
+        self.assertEqual(rejected.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_refresh_requires_csrf(self):
+        self._login()
+        response = self.client.post(reverse("api:users:refresh"), {})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_session_version_invalidates_old_access_tokens(self):
+        self._login()
+        self.user.session_version += 1
+        self.user.save(update_fields=["session_version"])
+
+        response = self.client.get(reverse("api:users:me"))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 class LogoutTests(APITestCase):
     def test_logout_expires_cookies_and_ends_session(self):
         User.objects.create_user(
@@ -83,7 +139,8 @@ class LogoutTests(APITestCase):
             format="json",
         )
         self.assertEqual(self.client.get(reverse("api:users:me")).status_code, status.HTTP_200_OK)
-        r = self.client.post(reverse("api:users:logout"))
+        csrf = self.client.get(reverse("api:users:csrf")).data["csrftoken"]
+        r = self.client.post(reverse("api:users:logout"), HTTP_X_CSRFTOKEN=csrf)
         self.assertEqual(r.status_code, status.HTTP_204_NO_CONTENT)
         # La cookie de acceso quedó vacía y expirada.
         self.assertEqual(r.cookies["access_token"].value, "")
