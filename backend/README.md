@@ -117,6 +117,8 @@ en la red `easypanel`) + tar de los volúmenes `private_media` (KYC cifrado) y `
 Los artefactos se validan (`gzip -t`/`tar -tzf`) y se publican atómicamente con permisos
 restringidos. Rotación: últimos 14 de cada tipo en `/opt/vip/backups`. La copia operativa vive
 en `/opt/vip/backup.sh`; este archivo es la versión versionada.
+Durante cada deploy, `deploy.sh` sincroniza también `backup.sh` y `restore-test.sh` al
+directorio operativo `/opt/vip/`, que es el que usa el cron del VPS.
 
 **Off-site pendiente:** hoy los backups quedan en el mismo droplet (protege contra borrados/
 migraciones malas, NO contra pérdida del droplet). El script ya trae el hook `rclone` (remote

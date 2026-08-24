@@ -16,6 +16,11 @@ git fetch --quiet origin main
 git reset --hard origin/main
 
 echo "→ desplegando $(git rev-parse --short HEAD): $(git log -1 --format=%s)"
+
+echo "→ sincronizando herramientas operativas…"
+sudo install -m 700 backend/backup.sh /opt/vip/backup.sh
+sudo install -m 700 backend/restore-test.sh /opt/vip/restore-test.sh
+
 cd backend
 sudo docker compose -f docker-compose.production.yml up -d --build
 
