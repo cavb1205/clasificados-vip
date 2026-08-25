@@ -1,18 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { SITE_URL } from "@/lib/site";
 
 /**
  * Programa de referidos: la modelo invita a otras con su link. Cuando la
  * invitada se verifica, ambas reciben un mes gratis. La oferta crece sola.
  */
 export function ReferralPanel({ code, count, days }: { code: string; count: number; days: number }) {
-  const [url, setUrl] = useState("");
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    setUrl(`${window.location.origin}/publica?ref=${code}`);
-  }, [code]);
+  const url = `${SITE_URL}/publica?ref=${encodeURIComponent(code)}`;
 
   const msg = `Te invito a PortalVip Chile (anuncios verificados). Si entras con mi link, tenemos un mes gratis las dos 🎁 ${url}`;
   const wa = `https://wa.me/?text=${encodeURIComponent(msg)}`;
@@ -43,11 +40,12 @@ export function ReferralPanel({ code, count, days }: { code: string; count: numb
 
       <div className="mt-3 flex items-center gap-2">
         <input
+          aria-label="Enlace de referido"
           readOnly
           value={url}
           className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-xs text-neutral-300"
         />
-        <button onClick={copy} className="shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-xs hover:border-pink-500">
+        <button type="button" onClick={copy} className="shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-xs hover:border-pink-500">
           {copied ? "✓" : "Copiar"}
         </button>
         <a href={wa} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-500">

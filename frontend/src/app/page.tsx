@@ -3,12 +3,13 @@ import { getAllPopulatedCities } from "@/lib/api";
 import { CityPicker } from "@/components/CityPicker";
 import { DEFAULT_GENDER_SLUG } from "@/lib/types";
 
-// Renderiza por request (no pre-render en build): evita que el build falle si
-// el backend está reiniciándose, y mantiene el listado siempre fresco.
-export const dynamic = "force-dynamic";
+// La portada se regenera periódicamente; si el backend no está disponible
+// durante el build o una regeneración, mostramos el estado vacío y reintentamos
+// en la siguiente ventana de ISR.
+export const revalidate = 300;
 
 export default async function HomePage() {
-  const cities = await getAllPopulatedCities();
+  const cities = await getAllPopulatedCities().catch(() => []);
 
   // Orden por región y luego nombre: las comunas de una misma región quedan
   // juntas en la nube de pastillas, sin necesidad de encabezados.

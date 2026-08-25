@@ -10,6 +10,7 @@ import { ProfileTracker } from "@/components/ProfileTracker";
 import { AvatarView } from "@/components/AvatarView";
 import { ReviewForm } from "@/components/ReviewForm";
 import { DEFAULT_GENDER_SLUG } from "@/lib/types";
+import { serializeJsonLd } from "@/lib/seo";
 
 const GENDER_LABEL: Record<string, string> = { female: "Mujer", trans: "Trans", male: "Hombre" };
 
@@ -95,7 +96,11 @@ export default async function ProfilePage({ params }: { params: Params }) {
 
   return (
     <article className="pb-28 lg:pb-0">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script
+        id="profile-jsonld"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
 
       {/* Back + breadcrumb. En móvil predomina el "Volver", en desktop el rastro. */}
       <nav className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -255,8 +260,7 @@ export default async function ProfilePage({ params }: { params: Params }) {
               <ContactPanel
                 slug={slug}
                 stageName={profile.stage_name}
-                whatsapp={profile.whatsapp}
-                telegram={profile.telegram}
+                hasContact={profile.has_contact}
               />
             </div>
           </div>

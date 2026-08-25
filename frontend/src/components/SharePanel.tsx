@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
+import { SITE_URL } from "@/lib/site";
 
 /**
  * Panel para que la modelo difunda su perfil: link, copiar, compartir por
@@ -9,13 +10,9 @@ import { QRCodeCanvas } from "qrcode.react";
  * propios clientes, que de paso descubren el resto del catálogo).
  */
 export function SharePanel({ slug, stageName }: { slug: string; stageName: string }) {
-  const [url, setUrl] = useState("");
   const [copied, setCopied] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setUrl(`${window.location.origin}/perfil/${slug}`);
-  }, [slug]);
+  const url = `${SITE_URL}/perfil/${encodeURIComponent(slug)}`;
 
   const msg = `Mírame en PortalVip Chile ✨ ${url}`;
   const wa = `https://wa.me/?text=${encodeURIComponent(msg)}`;
@@ -55,11 +52,12 @@ export function SharePanel({ slug, stageName }: { slug: string; stageName: strin
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2">
             <input
+              aria-label="Enlace público del perfil"
               readOnly
               value={url}
               className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-xs text-neutral-300"
             />
-            <button onClick={copy} className="shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-xs hover:border-pink-500">
+            <button type="button" onClick={copy} className="shrink-0 rounded-lg border border-neutral-700 px-3 py-2 text-xs hover:border-pink-500">
               {copied ? "✓" : "Copiar"}
             </button>
           </div>
@@ -70,7 +68,7 @@ export function SharePanel({ slug, stageName }: { slug: string; stageName: strin
             <a href={x} target="_blank" rel="noopener noreferrer" className="rounded-full bg-neutral-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700">
               X (Twitter)
             </a>
-            <button onClick={downloadQR} className="rounded-full border border-neutral-700 px-3 py-1.5 text-xs hover:border-pink-500">
+            <button type="button" onClick={downloadQR} className="rounded-full border border-neutral-700 px-3 py-1.5 text-xs hover:border-pink-500">
               Descargar QR
             </button>
           </div>

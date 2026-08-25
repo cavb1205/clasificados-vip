@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { Story } from "@/lib/types";
 
@@ -71,6 +71,9 @@ export function Viewer({
 }) {
   const [idx, setIdx] = useState(startAt);
   const [progress, setProgress] = useState(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousActive = useRef<HTMLElement | null>(null);
+  const [reportStatus, setReportStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const current = stories[idx];
   const finish = onComplete ?? onClose;
 
@@ -90,35 +93,68 @@ export function Viewer({
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [idx, current, stories.length, onClose]);
+  }, [idx, current, finish, onClose, stories.length]);
 
   useEffect(() => {
+    previousActive.current = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const close = dialogRef.current?.querySelector<HTMLElement>("[aria-label='Cerrar']");
+    close?.focus();
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowRight") setIdx((i) => (i + 1 < stories.length ? i + 1 : i));
       if (e.key === "ArrowLeft") setIdx((i) => (i > 0 ? i - 1 : 0));
+      if (e.key === "Tab" && dialogRef.current) {
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>("button, video[controls]")
+        );
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [stories.length, onClose]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      previousActive.current?.focus?.();
+    };
+  }, [onClose, stories.length]);
 
   async function report() {
-    if (!confirm("¿Reportar esta historia como inapropiada?")) return;
+    if (reportStatus === "sending" || reportStatus === "sent") return;
+    setReportStatus("sending");
     try {
-      await fetch(`${API}/stories/${current.id}/report/`, {
+      const response = await fetch(`${API}/stories/${current.id}/report/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: "" }),
         credentials: "omit",
       });
-      alert("Reporte enviado. El admin la revisará.");
+      if (!response.ok) throw new Error(`Story report failed: ${response.status}`);
+      setReportStatus("sent");
     } catch {
-      // silencioso
+      setReportStatus("error");
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black">
+    <div
+      ref={dialogRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="story-viewer-title"
+    >
+      <h2 id="story-viewer-title" className="sr-only">Historia de {stageName}</h2>
       {/* Barras de progreso arriba */}
       <div className="absolute inset-x-0 top-0 z-10 flex gap-1 p-2">
         {stories.map((_, i) => (
@@ -144,7 +180,7 @@ export function Viewer({
             className="text-xs text-white/70 hover:text-white"
             aria-label="Reportar"
           >
-            Reportar
+            {reportStatus === "sending" ? "Enviando…" : reportStatus === "sent" ? "Reportada" : "Reportar"}
           </button>
           <button
             type="button"
@@ -155,6 +191,11 @@ export function Viewer({
             ✕
           </button>
         </div>
+        {reportStatus === "error" && (
+          <p className="absolute right-4 top-14 text-xs text-red-300" role="alert">
+            No se pudo enviar el reporte.
+          </p>
+        )}
       </div>
 
       {/* Tap zones */}
@@ -180,7 +221,7 @@ export function Viewer({
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={current.file_url}
-            alt=""
+            alt={`${stageName} historia ${idx + 1}`}
             className="max-h-screen w-full object-contain"
           />
         ) : (
@@ -189,7 +230,8 @@ export function Viewer({
             src={current.file_url}
             autoPlay
             playsInline
-            controls={false}
+            controls
+            aria-label={`${stageName} historia en video`}
             onEnded={() => {
               if (idx + 1 < stories.length) setIdx(idx + 1);
               else finish();

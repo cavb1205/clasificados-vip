@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { dashboard } from "@/lib/client-api";
 
@@ -25,15 +25,20 @@ function errorMessage(error: unknown) {
 
 /** Grilla de fotos con drag-and-drop y controles accesibles para touch/teclado. */
 export function MediaReorderGrid({ photos, onChange }: MediaReorderGridProps) {
-  const [items, setItems] = useState(() => sortedPhotos(photos));
+  const externalItems = sortedPhotos(photos);
+  const externalSignature = externalItems.map((item) => `${item.id}:${item.order}`).join(",");
+  const [local, setLocal] = useState(() => ({
+    signature: externalSignature,
+    items: externalItems,
+  }));
+  // Si el padre recibió un upload/delete nuevo, la fuente externa gana sin
+  // necesitar un efecto que copie props a state. Durante un reorder local,
+  // conservamos la versión optimista hasta que el servidor confirme.
+  const items = local.signature === externalSignature ? local.items : externalItems;
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [overId, setOverId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-
-  useEffect(() => {
-    setItems(sortedPhotos(photos));
-  }, [photos]);
 
   function onDragStart(e: React.DragEvent<HTMLDivElement>, id: number) {
     if (busy) {
@@ -65,13 +70,13 @@ export function MediaReorderGrid({ photos, onChange }: MediaReorderGridProps) {
     );
 
     setErr("");
-    setItems(withNewOrder);
+    setLocal({ signature: externalSignature, items: withNewOrder });
     setBusy(true);
     try {
       await Promise.all(changed.map((item) => dashboard.updateMediaOrder(item.id, item.order)));
       await onChange();
     } catch (error) {
-      setItems(previous);
+      setLocal({ signature: externalSignature, items: previous });
       setErr(errorMessage(error));
     } finally {
       setBusy(false);

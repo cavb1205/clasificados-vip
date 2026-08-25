@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { City } from "@/lib/types";
 import { DEFAULT_GENDER_SLUG } from "@/lib/types";
@@ -23,6 +23,31 @@ export function CityPicker({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+  const pickerId = `city-picker-${currentCitySlug ?? "global"}`;
+
+  useEffect(() => {
+    if (open) {
+      wasOpen.current = true;
+    } else if (wasOpen.current) {
+      wasOpen.current = false;
+      triggerRef.current?.focus();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        setQ("");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -44,9 +69,12 @@ export function CityPicker({
     <div className="relative">
       <button
         type="button"
+        ref={triggerRef}
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-3 rounded-full border border-neutral-700 bg-neutral-900 px-4 py-2.5 text-sm hover:border-pink-500"
         aria-expanded={open}
+        aria-controls={pickerId}
+        aria-haspopup="listbox"
       >
         <span className="truncate">
           <span className="text-neutral-500">📍 </span>
@@ -56,9 +84,11 @@ export function CityPicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 z-30 mt-2 max-h-80 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950 shadow-xl">
+        <div id={pickerId} className="absolute left-0 right-0 z-30 mt-2 max-h-80 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950 shadow-xl">
           <div className="border-b border-neutral-800 p-2">
+            <label htmlFor={`${pickerId}-search`} className="sr-only">Buscar comuna o región</label>
             <input
+              id={`${pickerId}-search`}
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -66,7 +96,7 @@ export function CityPicker({
               className="w-full rounded-lg bg-neutral-900 px-3 py-2 text-sm outline-none placeholder:text-neutral-500"
             />
           </div>
-          <ul className="max-h-64 overflow-y-auto py-1">
+          <ul className="max-h-64 overflow-y-auto py-1" role="listbox" aria-label="Comunas y regiones">
             {filtered.length === 0 ? (
               <li className="px-4 py-3 text-sm text-neutral-500">
                 Sin resultados.
@@ -78,6 +108,8 @@ export function CityPicker({
                   <li key={c.id}>
                     <button
                       type="button"
+                      role="option"
+                      aria-selected={active}
                       onClick={() => go(c)}
                       className={`flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm hover:bg-neutral-900 ${
                         active ? "bg-neutral-900 text-pink-300" : ""

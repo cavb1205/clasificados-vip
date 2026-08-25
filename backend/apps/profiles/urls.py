@@ -18,6 +18,7 @@ urlpatterns = [
     path("me/favorites/", views.MyFavoritesListView.as_view(), name="my-favorites"),
     path("profiles/<slug:slug>/avatar/file/", views.PublicProfileAvatarFileView.as_view(), name="public-avatar-file"),
     path("profiles/<slug:slug>/", views.PublicProfileDetailView.as_view(), name="public-detail"),
+    path("profiles/<slug:slug>/contact/", views.PublicProfileContactView.as_view(), name="public-contact"),
     path("profiles/<slug:slug>/events/", views.LogProfileEventView.as_view(), name="log-event"),
     path("profiles/<slug:slug>/favorite/", views.FavoriteToggleView.as_view(), name="favorite-toggle"),
     path("profiles/<slug:slug>/report/", views.ProfileReportView.as_view(), name="report"),

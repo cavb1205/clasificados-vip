@@ -5,8 +5,8 @@ GPS) que podría exponer la ubicación. Con ffmpeg remuxeamos el archivo
 descartando toda la metadata (`-map_metadata -1`) sin re-codificar (`-c copy`),
 así es rápido y sin pérdida de calidad.
 
-Si ffmpeg no está disponible o falla, devolvemos el archivo original (no rompe
-la subida); en producción ffmpeg se instala en el Dockerfile.
+Si ffmpeg no está disponible o falla, rechazamos la subida para no guardar un
+archivo que todavía pueda contener metadata privada.
 """
 
 import logging
@@ -37,8 +37,8 @@ def strip_video_metadata(upload) -> ContentFile:
     data = upload.read()
 
     if shutil.which("ffmpeg") is None:
-        logger.warning("ffmpeg no disponible: el video se guarda sin limpiar metadata.")
-        return ContentFile(data, name=f"{stem}{ext}")
+        logger.error("ffmpeg no disponible: se rechaza el video para no guardar metadata privada.")
+        raise RuntimeError("El procesamiento seguro de videos no está disponible.")
 
     with tempfile.TemporaryDirectory() as tmp:
         src = os.path.join(tmp, f"in{ext}")
@@ -53,15 +53,15 @@ def strip_video_metadata(upload) -> ContentFile:
             )
             with open(dst, "rb") as f:
                 return ContentFile(f.read(), name=f"{stem}{ext}")
-        except Exception as e:  # noqa: BLE001 — nunca romper la subida por esto
-            logger.warning("strip_video_metadata falló (%s); se guarda el original.", e)
-            return ContentFile(data, name=f"{stem}{ext}")
+        except Exception as e:  # noqa: BLE001 — nunca guardar el original sin limpiar
+            logger.exception("strip_video_metadata falló; se rechaza el video: %s", e)
+            raise RuntimeError("No se pudo limpiar la metadata del video.") from e
 
 
 def add_video_watermark(data: bytes, ext: str = ".mp4") -> "ContentFile | None":
     """Re-codifica el video con el watermark de marca (abajo a la derecha) y lo
-    escala a máx 1280px de alto. Devuelve None si ffmpeg falla o no está. Es
-    LENTO (re-encode) → llamar en segundo plano, no en el request."""
+    escala a máx 1280px de alto. Devuelve None si el watermark opcional falla.
+    Es LENTO (re-encode) → llamar en segundo plano, no en el request."""
     if shutil.which("ffmpeg") is None:
         return None
     stem = f"video-{uuid.uuid4().hex}"

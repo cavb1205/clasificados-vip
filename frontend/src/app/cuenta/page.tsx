@@ -139,15 +139,18 @@ function ChangePasswordForm() {
     <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
       <h2 className="mb-3 text-lg font-semibold">Cambiar contraseña</h2>
       <form onSubmit={submit} className="space-y-3">
-        <input type="password" placeholder="Contraseña actual" autoComplete="current-password"
+        <label htmlFor="current-password" className="sr-only">Contraseña actual</label>
+        <input id="current-password" name="current_password" type="password" placeholder="Contraseña actual" autoComplete="current-password"
           className={inputCls} value={cur} onChange={(e) => setCur(e.target.value)} required />
-        <input type="password" placeholder="Nueva contraseña" autoComplete="new-password"
+        <label htmlFor="account-new-password" className="sr-only">Nueva contraseña</label>
+        <input id="account-new-password" name="new_password" type="password" placeholder="Nueva contraseña" autoComplete="new-password"
           className={inputCls} value={next} onChange={(e) => setNext(e.target.value)} required />
-        <input type="password" placeholder="Repetir nueva contraseña" autoComplete="new-password"
+        <label htmlFor="account-confirm-password" className="sr-only">Repetir nueva contraseña</label>
+        <input id="account-confirm-password" name="new_password_confirmation" type="password" placeholder="Repetir nueva contraseña" autoComplete="new-password"
           className={inputCls} value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
-        {err && <p className="text-sm text-red-400">{err}</p>}
-        {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-        <button disabled={busy}
+        {err && <p className="text-sm text-red-400" role="alert">{err}</p>}
+        {msg && <p className="text-sm text-emerald-400" role="status">{msg}</p>}
+        <button type="submit" disabled={busy}
           className="rounded-full bg-pink-600 px-5 py-2 text-sm font-medium hover:bg-pink-500 disabled:opacity-50">
           {busy ? "Guardando…" : "Actualizar contraseña"}
         </button>

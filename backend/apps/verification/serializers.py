@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.profiles.models import ModelProfile
+from core.upload_validation import UploadValidationError, validate_image_upload, validate_video_upload
 from .models import VerificationChallenge, VerificationRequest
 
 
@@ -35,10 +36,23 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Código de desafío expirado o ya usado.")
         return value
 
+    def validate_id_document(self, value):
+        try:
+            return validate_image_upload(value)
+        except UploadValidationError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
+    def validate_selfie(self, value):
+        try:
+            return validate_image_upload(value)
+        except UploadValidationError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
     def validate_consent_video(self, value):
-        if not value.content_type or not value.content_type.startswith("video/"):
-            raise serializers.ValidationError("El consentimiento debe ser un video.")
-        return value
+        try:
+            return validate_video_upload(value)
+        except UploadValidationError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
 
     def create(self, validated_data):
         id_doc = validated_data.pop("id_document")

@@ -9,11 +9,13 @@ from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import ScopedRateThrottle
 
 from apps.profiles.models import ModelProfile
 from apps.publications.models import Publication
 from core.image_processing import process_image
 from core.permissions import IsModel, IsModerator
+from core.upload_validation import UploadValidationError, validate_image_upload, validate_video_upload
 from core.video_processing import strip_video_metadata, watermark_story_async
 
 from .models import MAX_STORIES_ALIVE, Story, StoryReport
@@ -97,15 +99,22 @@ class MyStoriesView(generics.ListCreateAPIView):
             )
 
         story = Story(profile=profile, kind=kind)
-        if kind == "photo":
-            # Pipeline: strip EXIF/GPS + watermark + JPEG optimizado.
-            processed = process_image(upload.read(), filename_stem="story")
-            story.file.save(processed.name, processed, save=False)
-        else:
-            # El video también debe perder metadata/GPS. El watermark requiere
-            # re-encode y se ejecuta en segundo plano, igual que MediaContent.
-            cleaned = strip_video_metadata(upload)
-            story.file.save(cleaned.name, cleaned, save=False)
+        try:
+            if kind == "photo":
+                validate_image_upload(upload, max_bytes=MAX_PHOTO_BYTES)
+                # Pipeline: strip EXIF/GPS + watermark + JPEG optimizado.
+                processed = process_image(upload.read(), filename_stem="story")
+                story.file.save(processed.name, processed, save=False)
+            else:
+                validate_video_upload(upload, max_bytes=MAX_VIDEO_BYTES)
+                # El video también debe perder metadata/GPS. El watermark requiere
+                # re-encode y se ejecuta en segundo plano, igual que MediaContent.
+                cleaned = strip_video_metadata(upload)
+                story.file.save(cleaned.name, cleaned, save=False)
+        except UploadValidationError as exc:
+            return Response({"upload": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except RuntimeError as exc:
+            return Response({"upload": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         story.save()
         if kind == "video":
             watermark_story_async(story.pk)
@@ -198,12 +207,20 @@ class CityStoriesView(APIView):
 
         def avatar_fallback(p):
             if getattr(p, "avatar", None):
-                return request.build_absolute_uri(p.avatar.url)
+                return request.build_absolute_uri(
+                    reverse("api:profiles:public-avatar-file", args=[p.slug])
+                )
             photo = next(
                 (m for m in p.media.all() if m.media_type == "photo" and not m.is_hidden),
                 None,
             )
-            return request.build_absolute_uri(photo.file.url) if photo else None
+            return (
+                request.build_absolute_uri(
+                    reverse("api:media_content:public-file", args=[photo.pk])
+                )
+                if photo
+                else None
+            )
 
         out = []
         for p in profiles:
@@ -233,6 +250,8 @@ class StoryReportView(APIView):
     """Cualquiera (sin login) puede reportar una story como problemática."""
 
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "story_report"
 
     def post(self, request, pk):
         story = get_object_or_404(

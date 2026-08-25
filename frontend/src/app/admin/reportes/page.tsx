@@ -148,7 +148,7 @@ export default function AdminReportesPage() {
         <ul className="space-y-4">
           {Array.from(grouped.values()).map(({ story, reports }) => {
             const expired =
-              new Date(story.story_expires_at).getTime() < Date.now();
+              new Date(story.story_expires_at).getTime() < new Date().getTime();
             return (
               <li
                 key={story.story_id}

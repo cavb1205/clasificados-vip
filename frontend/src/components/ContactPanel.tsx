@@ -2,22 +2,44 @@
 
 import { useState } from "react";
 import { logContactClick } from "./ProfileTracker";
+import { publicProfiles } from "@/lib/client-api";
 
 interface Props {
   slug: string;
   stageName: string;
-  whatsapp: string;
-  telegram: string;
+  hasContact: boolean;
 }
 
 /**
  * Botón "Contactar" que oculta los canales hasta el click.
  * Frena scraping casual y refuerza el call-to-action principal del perfil.
  */
-export function ContactPanel({ slug, stageName, whatsapp, telegram }: Props) {
-  const [revealed, setRevealed] = useState(false);
-  const hasAny = Boolean(whatsapp) || Boolean(telegram);
-  if (!hasAny) return null;
+export function ContactPanel({ slug, stageName, hasContact }: Props) {
+  const [contacts, setContacts] = useState<{ whatsapp: string; telegram: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  if (!hasContact) return null;
+
+  async function reveal() {
+    setLoading(true);
+    setError("");
+    logContactClick(slug);
+    try {
+      const data = await publicProfiles.revealContact(slug);
+      if (!data.whatsapp && !data.telegram) {
+        setError("Este perfil ya no tiene canales de contacto disponibles.");
+        return;
+      }
+      setContacts(data);
+    } catch {
+      setError("No se pudieron cargar los canales de contacto. Inténtalo nuevamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const whatsapp = contacts?.whatsapp ?? "";
+  const telegram = contacts?.telegram ?? "";
 
   const greeting = encodeURIComponent(`Hola ${stageName}, te vi en PortalVip Chile.`);
   // El número de WhatsApp viene en formato internacional sin "+" (ej. 56912345678).
@@ -27,17 +49,24 @@ export function ContactPanel({ slug, stageName, whatsapp, telegram }: Props) {
   const waUrl = whatsapp ? `https://wa.me/${whatsapp}?text=${greeting}` : null;
   const tgUrl = telegram ? `https://t.me/${telegram}` : null;
 
-  if (!revealed) {
+  if (!contacts) {
     return (
-      <button
-        onClick={() => {
-          logContactClick(slug);
-          setRevealed(true);
-        }}
-        className="w-full rounded-2xl btn-gold px-5 py-4 text-base font-semibold"
-      >
-        Contactar a {stageName}
-      </button>
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={reveal}
+          disabled={loading}
+          aria-busy={loading}
+          className="w-full rounded-2xl btn-gold px-5 py-4 text-base font-semibold disabled:opacity-60"
+        >
+          {loading ? "Cargando contacto…" : `Contactar a ${stageName}`}
+        </button>
+        {error && (
+          <p className="text-center text-xs text-red-300" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
     );
   }
 

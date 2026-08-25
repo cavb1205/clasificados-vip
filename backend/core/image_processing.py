@@ -16,6 +16,8 @@ from io import BytesIO
 from django.core.files.base import ContentFile
 from PIL import Image, ImageDraw, ImageFont
 
+from .upload_validation import validate_image_bytes
+
 JPEG_QUALITY = 82
 MAX_DIMENSION = 1600  # lado máximo en px tras redimensionar
 WATERMARK_TEXT = "PortalVip"
@@ -48,6 +50,7 @@ def _apply_watermark(image: Image.Image) -> Image.Image:
 
 def process_image(raw: bytes, *, filename_stem: str = "image") -> ContentFile:
     """Procesa bytes de imagen y devuelve un ContentFile JPEG listo para guardar."""
+    validate_image_bytes(raw)
     with Image.open(BytesIO(raw)) as opened:
         opened.load()
         image = opened.convert("RGB")

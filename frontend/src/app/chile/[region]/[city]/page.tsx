@@ -7,7 +7,7 @@ type Search = Promise<Record<string, string | string[] | undefined>>;
 export const dynamic = "force-dynamic";
 
 /**
- * Redirige al gender por defecto (mujeres) preservando los query params.
+ * Redirige al gender por defecto preservando los query params.
  * La página real con tabs vive en /chile/[region]/[city]/[gender].
  */
 export default async function CityRedirect({

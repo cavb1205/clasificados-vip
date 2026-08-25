@@ -78,7 +78,7 @@ export default function AdminModelosPage() {
       })
       .then(() => setReady(true))
       .catch(() => router.replace("/login?next=/admin/modelos"));
-  }, [router, reload]);
+  }, [router, reload, tab]);
 
   // Debounce simple del buscador.
   useEffect(() => {

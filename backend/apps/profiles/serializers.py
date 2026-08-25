@@ -190,6 +190,7 @@ class PublicProfileSerializer(serializers.ModelSerializer):
 
     is_available_now = serializers.BooleanField(read_only=True)
     available_until = serializers.DateTimeField(read_only=True)
+    has_contact = serializers.SerializerMethodField()
 
     class Meta:
         model = ModelProfile
@@ -197,13 +198,16 @@ class PublicProfileSerializer(serializers.ModelSerializer):
             "stage_name", "slug", "gender", "description", "age", "services",
             "base_rate", "city", "avatar", "photos", "videos", "cover_photo",
             "is_featured", "rating_average", "rating_count", "photo_authenticity",
-            "whatsapp", "telegram",
+            "has_contact",
             "is_available_now", "available_until",
         ]
 
     def _abs(self, url: str) -> str:
         request = self.context.get("request")
         return request.build_absolute_uri(url) if request else url
+
+    def get_has_contact(self, obj):
+        return bool(obj.whatsapp or obj.telegram)
 
     def _photo_qs(self, obj):
         return obj.media.filter(media_type="photo", is_hidden=False)

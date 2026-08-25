@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.urls import reverse
 
 from core.image_processing import process_image
+from core.upload_validation import UploadValidationError, validate_image_upload, validate_video_upload
 from core.video_processing import strip_video_metadata, watermark_media_async
 from .models import MediaContent, profile_media_limits
 
@@ -45,6 +46,15 @@ class MediaContentSerializer(serializers.ModelSerializer):
             )
         return attrs
 
+    def validate_upload(self, value):
+        media_type = self.initial_data.get("media_type")
+        try:
+            if media_type == MediaContent.MediaType.PHOTO:
+                return validate_image_upload(value)
+            return validate_video_upload(value)
+        except UploadValidationError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
     def create(self, validated_data):
         upload = validated_data.pop("upload")
         profile = self.context["profile"]
@@ -57,7 +67,10 @@ class MediaContentSerializer(serializers.ModelSerializer):
         else:
             # Video: quitar metadata/GPS (ffmpeg, rápido) ahora; el watermark
             # (re-encode lento) se aplica en segundo plano para no bloquear.
-            cleaned = strip_video_metadata(upload)
+            try:
+                cleaned = strip_video_metadata(upload)
+            except RuntimeError as exc:
+                raise serializers.ValidationError({"upload": str(exc)}) from exc
             media.file.save(cleaned.name, cleaned, save=False)
             media.save()
             watermark_media_async(media.pk)

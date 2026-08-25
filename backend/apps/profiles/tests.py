@@ -44,6 +44,28 @@ class PublicVisibilityTests(APITestCase):
         self.assertEqual(resp.data["count"], 1)
         self.assertEqual(resp.data["results"][0]["stage_name"], "Luna")
 
+    def test_public_payload_only_exposes_contact_presence(self):
+        profile = self._make_profile(ModelProfile.VerificationStatus.VERIFIED)
+        profile.whatsapp = "56912345678"
+        profile.telegram = "luna_chile"
+        profile.save(update_fields=["whatsapp", "telegram"])
+
+        response = self.client.get(
+            reverse("api:profiles:public-detail", args=[profile.slug]),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["has_contact"])
+        self.assertNotIn("whatsapp", response.data)
+        self.assertNotIn("telegram", response.data)
+
+        reveal = self.client.post(
+            reverse("api:profiles:public-contact", args=[profile.slug])
+        )
+        self.assertEqual(reveal.status_code, status.HTTP_200_OK)
+        self.assertEqual(reveal.data, {"whatsapp": "56912345678", "telegram": "luna_chile"})
+        self.assertEqual(reveal["Cache-Control"], "private, no-store, max-age=0")
+
 
 class FilterAndPaginationTests(APITestCase):
     def setUp(self):

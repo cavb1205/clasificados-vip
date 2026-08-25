@@ -198,7 +198,6 @@ function ProfileStep({ profile, regions, onSaved }: { profile: ProfileLite | nul
 
   useEffect(() => {
     if (region) dashboard.cities(region).then((c) => setCities(c as Opt[]));
-    else setCities([]);
   }, [region]);
 
   async function save(form: FormData) {
@@ -234,31 +233,40 @@ function ProfileStep({ profile, regions, onSaved }: { profile: ProfileLite | nul
   return (
     <Card title="Tu perfil" intro="Así te van a ver y contactar. Puedes editarlo cuando quieras.">
       <form action={save} className="space-y-3">
-        <input name="stage_name" defaultValue={profile?.stage_name} placeholder="Nombre artístico" required className={inputCls} />
+        <label htmlFor="inicio-stage-name" className="sr-only">Nombre artístico</label>
+        <input id="inicio-stage-name" name="stage_name" defaultValue={profile?.stage_name} placeholder="Nombre artístico" required className={inputCls} />
         <div className="grid grid-cols-2 gap-3">
-          <select name="gender" defaultValue={profile?.gender ?? "female"} className={inputCls}>
+          <label htmlFor="inicio-gender" className="sr-only">Identidad de género</label>
+          <select id="inicio-gender" name="gender" defaultValue={profile?.gender ?? "female"} className={inputCls}>
             <option value="female">Mujer</option>
             <option value="trans">Trans</option>
             <option value="male">Hombre</option>
           </select>
-          <input name="age" type="number" min={18} defaultValue={profile?.age} placeholder="Edad" required className={inputCls} />
+          <label htmlFor="inicio-age" className="sr-only">Edad</label>
+          <input id="inicio-age" name="age" type="number" min={18} defaultValue={profile?.age} placeholder="Edad" required className={inputCls} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <select value={region} onChange={(e) => setRegion(e.target.value)} className={inputCls}>
+          <label htmlFor="inicio-region" className="sr-only">Región</label>
+          <select id="inicio-region" value={region} onChange={(e) => setRegion(e.target.value)} className={inputCls}>
             <option value="">Región…</option>
             {regions.map((r) => <option key={r.id} value={r.slug}>{r.name}</option>)}
           </select>
-          <select name="city_id" defaultValue={profile?.city?.id} className={inputCls} disabled={!region}>
+          <label htmlFor="inicio-city" className="sr-only">Comuna</label>
+          <select id="inicio-city" name="city_id" defaultValue={profile?.city?.id} className={inputCls} disabled={!region}>
             <option value="">Comuna…</option>
-            {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {(region ? cities : []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
-        <input name="whatsapp" defaultValue={profile?.whatsapp} placeholder="WhatsApp (ej: 56912345678)" inputMode="tel" className={inputCls} />
-        <input name="telegram" defaultValue={profile?.telegram} placeholder="Telegram (opcional, sin @)" className={inputCls} />
-        <input name="base_rate" type="number" min={0} step={1000} defaultValue={profile?.base_rate ?? ""} placeholder="Tarifa base (CLP, opcional)" inputMode="numeric" className={inputCls} />
-        <textarea name="description" defaultValue={profile?.description} placeholder="Cuéntales sobre ti (opcional)" rows={3} className={inputCls} />
-        {err && <p className="text-sm text-red-400">{err}</p>}
-        <button disabled={busy} className="btn-gold w-full rounded-full py-2.5 font-medium disabled:opacity-50">
+        <label htmlFor="inicio-whatsapp" className="sr-only">WhatsApp</label>
+        <input id="inicio-whatsapp" name="whatsapp" defaultValue={profile?.whatsapp} placeholder="WhatsApp (ej: 56912345678)" inputMode="tel" className={inputCls} />
+        <label htmlFor="inicio-telegram" className="sr-only">Telegram</label>
+        <input id="inicio-telegram" name="telegram" defaultValue={profile?.telegram} placeholder="Telegram (opcional, sin @)" className={inputCls} />
+        <label htmlFor="inicio-rate" className="sr-only">Tarifa base en pesos chilenos</label>
+        <input id="inicio-rate" name="base_rate" type="number" min={0} step={1000} defaultValue={profile?.base_rate ?? ""} placeholder="Tarifa base (CLP, opcional)" inputMode="numeric" className={inputCls} />
+        <label htmlFor="inicio-description" className="sr-only">Descripción del perfil</label>
+        <textarea id="inicio-description" name="description" defaultValue={profile?.description} placeholder="Cuéntales sobre ti (opcional)" rows={3} className={inputCls} />
+        {err && <p role="alert" className="text-sm text-red-400">{err}</p>}
+        <button type="submit" disabled={busy} className="btn-gold w-full rounded-full py-2.5 font-medium disabled:opacity-50">
           {busy ? "Guardando…" : "Guardar y continuar →"}
         </button>
       </form>
@@ -340,7 +348,7 @@ function KycStep({ submitted, status, onDone, onSkip }: { submitted: boolean; st
         <Field label="Selfie sosteniendo tu cédula"><input name="selfie" type="file" accept="image/*" required className="text-neutral-300" /></Field>
         <Field label="Video corto leyendo la frase de arriba"><input name="consent_video" type="file" accept="video/*" required className="text-neutral-300" /></Field>
         {err && <p className="text-red-400">{err}</p>}
-        <button disabled={busy} className="btn-gold w-full rounded-full py-2.5 font-medium disabled:opacity-50">
+        <button type="submit" disabled={busy} className="btn-gold w-full rounded-full py-2.5 font-medium disabled:opacity-50">
           {busy ? "Enviando…" : "Enviar y continuar →"}
         </button>
       </form>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
 
 /** Normaliza lo que el admin escriba (@user, user, o t.me/user) a un enlace. */
@@ -19,9 +20,17 @@ function telegramLink(raw: string): string | null {
 const ROLE_LABEL: Record<string, string> = { model: "modelo", host: "anfitrión" };
 
 export function SupportButton() {
+  const pathname = usePathname();
   const [href, setHref] = useState<string | null>(null);
+  const isPrivateArea =
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/") ||
+    pathname === "/anfitrion" ||
+    pathname.startsWith("/anfitrion/");
 
   useEffect(() => {
+    if (!isPrivateArea) return;
+
     let alive = true;
     auth
       .me()
@@ -46,9 +55,9 @@ export function SupportButton() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [isPrivateArea, pathname]);
 
-  if (!href) return null;
+  if (!isPrivateArea || !href) return null;
 
   return (
     <a

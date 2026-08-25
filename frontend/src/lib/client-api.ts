@@ -6,6 +6,17 @@
 "use client";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+const CLIENT_REQUEST_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CLIENT_REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 /**
  * Token CSRF en memoria. No lo leemos desde document.cookie porque cuando
@@ -22,7 +33,7 @@ let refreshPromise: Promise<boolean> | null = null;
 async function ensureCsrf(): Promise<string> {
   if (cachedCsrf) return cachedCsrf;
   try {
-    const res = await fetch(`${API}/auth/csrf/`, { credentials: "include" });
+    const res = await fetchWithTimeout(`${API}/auth/csrf/`, { credentials: "include" });
     const data = (await res.json()) as { csrftoken?: string };
     cachedCsrf = data.csrftoken ?? null;
   } catch {
@@ -53,7 +64,7 @@ async function rawFetch(
   if (isWrite) headers["X-CSRFToken"] = await ensureCsrf();
   if (body && !isForm) headers["Content-Type"] = "application/json";
 
-  return fetch(`${API}${path}`, {
+  return fetchWithTimeout(`${API}${path}`, {
     method,
     credentials: "include",
     headers,
@@ -151,6 +162,14 @@ export const auth = {
     return { detail: "ok" };
   },
   me: () => apiFetch("/auth/me/"),
+};
+
+export const publicProfiles = {
+  revealContact: (slug: string) =>
+    apiFetch<{ whatsapp: string; telegram: string }>(
+      `/profiles/${encodeURIComponent(slug)}/contact/`,
+      { method: "POST" },
+    ),
 };
 
 /** Path al panel apropiado según rol/permisos. */
@@ -343,9 +362,9 @@ export const dashboard = {
   // Favoritos (clientes) y reportes de perfiles
   myFavorites: () => apiFetch<unknown[]>("/me/favorites/"),
   favoriteToggle: (slug: string) =>
-    apiFetch<{ favorited: boolean }>(`/profiles/${slug}/favorite/`, { method: "POST" }),
+    apiFetch<{ favorited: boolean }>(`/profiles/${encodeURIComponent(slug)}/favorite/`, { method: "POST" }),
   reportProfile: (slug: string, reason: string) =>
-    apiFetch(`/profiles/${slug}/report/`, { method: "POST", body: { reason } }),
+    apiFetch(`/profiles/${encodeURIComponent(slug)}/report/`, { method: "POST", body: { reason } }),
   createReview: (data: { profile_slug: string; rating: number; comment: string }) =>
     apiFetch("/reviews/", { method: "POST", body: data }),
   myReviews: () => apiFetch<MyReview[]>("/me/reviews/"),

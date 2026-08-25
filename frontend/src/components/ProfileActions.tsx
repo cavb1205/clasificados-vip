@@ -11,6 +11,7 @@ export function ProfileActions({ slug }: { slug: string }) {
   const [fav, setFav] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reportMsg, setReportMsg] = useState("");
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -34,9 +35,12 @@ export function ProfileActions({ slug }: { slug: string }) {
       return;
     }
     setBusy(true);
+    setActionError("");
     try {
       const r = await dashboard.favoriteToggle(slug);
       setFav(r.favorited);
+    } catch {
+      setActionError("No se pudo actualizar favoritos.");
     } finally {
       setBusy(false);
     }
@@ -48,14 +52,16 @@ export function ProfileActions({ slug }: { slug: string }) {
     try {
       await dashboard.reportProfile(slug, reason);
       setReportMsg("Gracias, recibimos tu reporte.");
+      setActionError("");
     } catch {
-      setReportMsg("No se pudo enviar el reporte.");
+      setActionError("No se pudo enviar el reporte.");
     }
   }
 
   return (
     <div className="flex items-center gap-2">
       <button
+        type="button"
         onClick={toggleFav}
         disabled={busy}
         aria-pressed={fav}
@@ -68,10 +74,12 @@ export function ProfileActions({ slug }: { slug: string }) {
       >
         {fav ? "♥ Guardado" : "♡ Guardar"}
       </button>
+      {actionError && <span role="alert" className="text-xs text-red-400">{actionError}</span>}
       {reportMsg ? (
         <span className="text-xs text-emerald-400">{reportMsg}</span>
       ) : (
         <button
+          type="button"
           onClick={report}
           className="rounded-full border border-neutral-800 px-3 py-2 text-xs text-neutral-500 hover:border-red-500 hover:text-red-400"
         >

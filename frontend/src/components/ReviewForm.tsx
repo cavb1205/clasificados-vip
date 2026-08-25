@@ -37,6 +37,7 @@ export function ReviewForm({ slug }: { slug: string }) {
   if (me === null) {
     return (
       <button
+        type="button"
         onClick={() => router.push(`/login?next=/perfil/${slug}`)}
         className="mt-4 rounded-full border border-neutral-700 px-5 py-2.5 text-sm text-neutral-300 hover:border-pink-500 hover:text-pink-300"
       >
@@ -78,16 +79,19 @@ export function ReviewForm({ slug }: { slug: string }) {
             onMouseEnter={() => setHover(n)}
             onMouseLeave={() => setHover(0)}
             aria-label={`${n} estrella${n > 1 ? "s" : ""}`}
-            aria-pressed={rating === n}
+            role="radio"
+            aria-checked={rating === n}
             className={`text-2xl leading-none transition ${
               n <= (hover || rating) ? "text-amber-400" : "text-neutral-600 hover:text-amber-300"
             }`}
           >
-            ★
+            <span aria-hidden>★</span>
           </button>
         ))}
       </div>
+      <label htmlFor="review-comment" className="sr-only">Comentario de la reseña</label>
       <textarea
+        id="review-comment"
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         rows={3}
@@ -95,8 +99,9 @@ export function ReviewForm({ slug }: { slug: string }) {
         placeholder="Cuéntanos tu experiencia (opcional)"
         className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm"
       />
-      {err && <p className="text-sm text-red-400">{err}</p>}
+      {err && <p className="text-sm text-red-400" role="alert">{err}</p>}
       <button
+        type="submit"
         disabled={busy}
         className="rounded-full bg-pink-600 px-5 py-2 text-sm font-medium hover:bg-pink-500 disabled:opacity-50"
       >

@@ -136,3 +136,37 @@ body {
   font-family: var(--font-sans);
   font-feature-settings: "ss01", "cv11";
 }
+
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 100;
+  transform: translateY(-200%);
+  border-radius: 9999px;
+  background: #f3dccd;
+  color: #2a1610;
+  padding: 0.65rem 1rem;
+  font-weight: 700;
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #e9c15c;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

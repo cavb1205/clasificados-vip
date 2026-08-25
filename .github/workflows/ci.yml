@@ -23,6 +23,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
+      - name: Dependency audit
+        run: pip install pip-audit && pip-audit -r requirements.txt
       - name: Run tests
         run: python manage.py test --verbosity 1
         env:
@@ -30,6 +32,7 @@ jobs:
           # (NO son las de producción): solo para que settings arranque.
           DJANGO_SECRET_KEY: ci-insecure-test-key
           KYC_ENCRYPTION_KEY: HAjBiEa8QCdkP7eiTzVTxScO7XNf_Asc7ZaHhSzMNRc=
+          DJANGO_DEBUG: "True"
 
   frontend:
     name: Frontend · Next build
@@ -45,6 +48,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
       - name: Lint (ESLint)
         run: npm run lint
       - name: Unit tests (Vitest)

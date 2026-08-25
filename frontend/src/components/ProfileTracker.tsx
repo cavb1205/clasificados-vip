@@ -8,9 +8,13 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 export function ProfileTracker({ slug }: { slug: string }) {
   useEffect(() => {
     const key = `viewed_${slug}`;
-    if (sessionStorage.getItem(key)) return;
-    sessionStorage.setItem(key, "1");
-    fetch(`${API}/profiles/${slug}/events/`, {
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      // El registro sigue siendo anónimo aunque el navegador bloquee storage.
+    }
+    fetch(`${API}/profiles/${encodeURIComponent(slug)}/events/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind: "view" }),
@@ -24,7 +28,7 @@ export function ProfileTracker({ slug }: { slug: string }) {
 
 /** Helper para registrar un click de contacto desde el ContactPanel. */
 export function logContactClick(slug: string) {
-  fetch(`${API}/profiles/${slug}/events/`, {
+  fetch(`${API}/profiles/${encodeURIComponent(slug)}/events/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ kind: "contact" }),

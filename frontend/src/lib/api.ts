@@ -16,13 +16,23 @@ import type {
 } from "./types";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000/api/v1";
+const SERVER_REQUEST_TIMEOUT_MS = 10_000;
 
 async function getJSON<T>(path: string, revalidate = 60): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, { next: { revalidate } });
-  if (!res.ok) {
-    throw new Error(`API ${path} -> ${res.status}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SERVER_REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      next: { revalidate },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`API ${path} -> ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timeout);
   }
-  return res.json() as Promise<T>;
 }
 
 export const getRegions = (opts?: { onlyPopulated?: boolean }) =>
@@ -106,17 +116,26 @@ export const searchProfiles = (query: ProfileQuery) =>
   getJSON<Paginated<PublicProfile>>(`/profiles/?${buildQuery(query)}`, 60);
 
 export async function getProfile(slug: string): Promise<PublicProfile | null> {
-  const res = await fetch(`${API_URL}/profiles/${slug}/`, { next: { revalidate: 60 } });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`API profile -> ${res.status}`);
-  return res.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SERVER_REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_URL}/profiles/${encodeURIComponent(slug)}/`, {
+      next: { revalidate: 60 },
+      signal: controller.signal,
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`API profile -> ${res.status}`);
+    return res.json();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export const getProfileStories = (slug: string) =>
-  getJSON<Story[]>(`/profiles/${slug}/stories/`, 60);
+  getJSON<Story[]>(`/profiles/${encodeURIComponent(slug)}/stories/`, 60);
 
 export const getProfileReviews = (slug: string) =>
-  getJSON<Review[]>(`/profiles/${slug}/reviews/`, 60);
+  getJSON<Review[]>(`/profiles/${encodeURIComponent(slug)}/reviews/`, 60);
 
 export const getProfileRating = (slug: string) =>
-  getJSON<Rating>(`/profiles/${slug}/rating/`, 60);
+  getJSON<Rating>(`/profiles/${encodeURIComponent(slug)}/rating/`, 60);

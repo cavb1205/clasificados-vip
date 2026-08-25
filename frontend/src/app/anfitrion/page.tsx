@@ -138,14 +138,17 @@ function HostProfileForm({ onCreated }: { onCreated: (h: HostProfile) => void })
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
       <h2 className="font-medium">Completa tu perfil de anfitrión</h2>
-      <input required placeholder="Nombre para mostrar" className={inputCls}
+      <label htmlFor="host-display-name" className="sr-only">Nombre para mostrar</label>
+      <input id="host-display-name" required placeholder="Nombre para mostrar" className={inputCls}
         value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
-      <input placeholder="WhatsApp (ej: 56912345678)" className={inputCls}
+      <label htmlFor="host-whatsapp" className="sr-only">WhatsApp</label>
+      <input id="host-whatsapp" placeholder="WhatsApp (ej: 56912345678)" className={inputCls}
         value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
-      <input placeholder="Teléfono (opcional)" className={inputCls}
+      <label htmlFor="host-phone" className="sr-only">Teléfono opcional</label>
+      <input id="host-phone" placeholder="Teléfono (opcional)" className={inputCls}
         value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-      {err && <p className="text-sm text-red-400">{err}</p>}
-      <button disabled={busy} className="rounded-full bg-pink-600 px-5 py-2 text-sm font-medium hover:bg-pink-500 disabled:opacity-50">
+      {err && <p role="alert" className="text-sm text-red-400">{err}</p>}
+      <button type="submit" disabled={busy} className="rounded-full bg-pink-600 px-5 py-2 text-sm font-medium hover:bg-pink-500 disabled:opacity-50">
         {busy ? "Guardando…" : "Guardar perfil"}
       </button>
     </form>
@@ -183,12 +186,15 @@ function HostProfileCard({ host, onUpdated }: { host: HostProfile; onUpdated: (h
         </div>
       ) : (
         <div className="space-y-2">
-          <input className={inputCls} value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
-          <input className={inputCls} placeholder="WhatsApp" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
-          <input className={inputCls} placeholder="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <label htmlFor="edit-host-display-name" className="sr-only">Nombre para mostrar</label>
+          <input id="edit-host-display-name" className={inputCls} value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
+          <label htmlFor="edit-host-whatsapp" className="sr-only">WhatsApp</label>
+          <input id="edit-host-whatsapp" className={inputCls} placeholder="WhatsApp" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
+          <label htmlFor="edit-host-phone" className="sr-only">Teléfono</label>
+          <input id="edit-host-phone" className={inputCls} placeholder="Teléfono" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <div className="flex gap-2">
-            <button disabled={busy} onClick={save} className="rounded-full bg-pink-600 px-4 py-1.5 text-xs font-medium hover:bg-pink-500 disabled:opacity-50">Guardar</button>
-            <button onClick={() => setEditing(false)} className="rounded-full border border-neutral-700 px-4 py-1.5 text-xs">Cancelar</button>
+            <button type="button" disabled={busy} onClick={save} className="rounded-full bg-pink-600 px-4 py-1.5 text-xs font-medium hover:bg-pink-500 disabled:opacity-50">Guardar</button>
+            <button type="button" onClick={() => setEditing(false)} className="rounded-full border border-neutral-700 px-4 py-1.5 text-xs">Cancelar</button>
           </div>
         </div>
       )}
@@ -243,7 +249,8 @@ function PlanPanel({ host, plans, onChange }: { host: HostProfile; plans: RoomPl
       )}
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <select className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm"
+        <label htmlFor="host-plan" className="sr-only">Plan de habitaciones</label>
+        <select id="host-plan" className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm"
           value={planId} onChange={(e) => setPlanId(e.target.value)}>
           <option value="">{host.subscription_active ? "Renovar / cambiar plan…" : "Elegir plan…"}</option>
           {plans.map((p) => (
@@ -290,7 +297,6 @@ function NewRoomForm({ host, onCreated }: { host: HostProfile; onCreated: () => 
 
   useEffect(() => {
     if (form.region) dashboard.cities(form.region).then((c) => setCities(c as City[]));
-    else setCities([]);
   }, [form.region]);
 
   async function submit(e: React.FormEvent) {
@@ -324,43 +330,52 @@ function NewRoomForm({ host, onCreated }: { host: HostProfile; onCreated: () => 
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
       <h2 className="font-medium">Nueva habitación</h2>
-      <input required placeholder="Título (ej: Pieza amoblada, sector centro)" className={inputCls}
+      <label htmlFor="room-title" className="sr-only">Título de la habitación</label>
+      <input id="room-title" required placeholder="Título (ej: Pieza amoblada, sector centro)" className={inputCls}
         value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-      <textarea placeholder="Descripción (servicios, condiciones…)" className={inputCls} rows={3}
+      <label htmlFor="room-description" className="sr-only">Descripción de la habitación</label>
+      <textarea id="room-description" placeholder="Descripción (servicios, condiciones…)" className={inputCls} rows={3}
         value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <select required className={inputCls} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value, city_id: "" })}>
+        <label htmlFor="room-region" className="sr-only">Región</label>
+        <select id="room-region" required className={inputCls} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value, city_id: "" })}>
           <option value="">Región…</option>
           {regions.map((r) => <option key={r.id} value={r.slug}>{r.name}</option>)}
         </select>
-        <select required className={inputCls} value={form.city_id} onChange={(e) => setForm({ ...form, city_id: e.target.value })}>
+        <label htmlFor="room-city" className="sr-only">Comuna</label>
+        <select id="room-city" required className={inputCls} value={form.city_id} onChange={(e) => setForm({ ...form, city_id: e.target.value })}>
           <option value="">Comuna…</option>
           {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
-      <input placeholder="Sector (referencia general, sin dirección exacta)" className={inputCls}
+      <label htmlFor="room-sector" className="sr-only">Sector de referencia</label>
+      <input id="room-sector" placeholder="Sector (referencia general, sin dirección exacta)" className={inputCls}
         value={form.sector} onChange={(e) => setForm({ ...form, sector: e.target.value })} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <input required type="number" placeholder="Precio (CLP)" className={inputCls}
-          value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-        <select className={inputCls} value={form.price_period} onChange={(e) => setForm({ ...form, price_period: e.target.value })}>
+        <label htmlFor="room-price" className="sr-only">Precio en pesos chilenos</label>
+        <input id="room-price" required type="number" placeholder="Precio (CLP)" className={inputCls}
+        value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+        <label htmlFor="room-price-period" className="sr-only">Periodo del precio</label>
+        <select id="room-price-period" className={inputCls} value={form.price_period} onChange={(e) => setForm({ ...form, price_period: e.target.value })}>
           <option value="daily">Diario</option>
           <option value="weekly">Semanal</option>
           <option value="monthly">Mensual</option>
         </select>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <input placeholder="WhatsApp de contacto" className={inputCls}
+        <label htmlFor="room-whatsapp" className="sr-only">WhatsApp de contacto</label>
+        <input id="room-whatsapp" placeholder="WhatsApp de contacto" className={inputCls}
           value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
-        <input placeholder="Teléfono (opcional)" className={inputCls}
+        <label htmlFor="room-phone" className="sr-only">Teléfono opcional</label>
+        <input id="room-phone" placeholder="Teléfono (opcional)" className={inputCls}
           value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
       </div>
       <p className="text-xs text-neutral-500">
         Por privacidad nunca se publica la dirección exacta: solo la comuna y el sector.
       </p>
-      {err && <p className="text-sm text-red-400">{err}</p>}
+      {err && <p role="alert" className="text-sm text-red-400">{err}</p>}
       <div className="flex gap-2">
-        <button disabled={busy} className="rounded-full bg-pink-600 px-5 py-2 text-sm font-medium hover:bg-pink-500 disabled:opacity-50">
+        <button type="submit" disabled={busy} className="rounded-full bg-pink-600 px-5 py-2 text-sm font-medium hover:bg-pink-500 disabled:opacity-50">
           {busy ? "Creando…" : "Crear borrador"}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="rounded-full border border-neutral-700 px-5 py-2 text-sm">Cancelar</button>
@@ -478,14 +493,13 @@ function RoomCard({ room, host, onChange }: { room: RoomListing; host: HostProfi
 }
 
 function RoomPhotoGrid({ photos, onChange }: { photos: RoomPhoto[]; onChange: () => void }) {
-  const [items, setItems] = useState<RoomPhoto[]>(photos);
+  const externalItems = [...photos].sort((a, b) => a.order - b.order);
+  const externalSignature = externalItems.map((item) => `${item.id}:${item.order}`).join(",");
+  const [local, setLocal] = useState(() => ({ signature: externalSignature, items: externalItems }));
+  const items = local.signature === externalSignature ? local.items : externalItems;
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [overId, setOverId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    setItems([...photos].sort((a, b) => a.order - b.order));
-  }, [photos]);
 
   /** Mueve el elemento en `fromIdx` a `toIdx` y persiste el nuevo orden. */
   async function reorder(fromIdx: number, toIdx: number) {
@@ -495,7 +509,7 @@ function RoomPhotoGrid({ photos, onChange }: { photos: RoomPhoto[]; onChange: ()
     reordered.splice(toIdx, 0, moved);
     const withOrder = reordered.map((p, i) => ({ ...p, order: i * 10 }));
     const previous = items;
-    setItems(withOrder);
+    setLocal({ signature: externalSignature, items: withOrder });
     setBusy(true);
     try {
       const changed = withOrder.filter(

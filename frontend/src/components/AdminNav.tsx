@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
@@ -48,6 +48,9 @@ export function AdminNav() {
   const [stats, setStats] = useState<Stats>({});
   const [isStaff, setIsStaff] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -69,6 +72,39 @@ export function AdminNav() {
 
   // Cierra el drawer al cambiar de ruta.
   useEffect(() => setOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    previousFocus.current = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab" || !menuRef.current) return;
+      const focusable = Array.from(menuRef.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus.current?.focus();
+    };
+  }, [open]);
 
   const visibleItems = ITEMS.filter((i) => !i.adminOnly || isStaff);
 
@@ -109,14 +145,20 @@ export function AdminNav() {
           onClick={() => setOpen(false)}
         >
           <aside
+            ref={menuRef}
             onClick={(e) => e.stopPropagation()}
             className="absolute inset-y-0 left-0 w-72 max-w-[85vw] overflow-y-auto border-r border-neutral-800 bg-neutral-950 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-mobile-menu-title"
           >
             <div className="mb-4 flex items-center justify-between">
-              <p className="font-display text-lg font-semibold">
+              <p id="admin-mobile-menu-title" className="font-display text-lg font-semibold">
                 {isStaff ? "Admin" : "Moderación"}
               </p>
               <button
+                ref={closeRef}
+                type="button"
                 onClick={() => setOpen(false)}
                 className="rounded-full px-2 py-1 text-xl text-neutral-400 hover:text-pink-300"
                 aria-label="Cerrar menú"

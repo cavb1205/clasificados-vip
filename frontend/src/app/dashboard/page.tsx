@@ -225,14 +225,18 @@ export default function DashboardPage() {
           )}
         </h2>
         <form action={saveProfile} className="grid gap-3 sm:grid-cols-2">
+          <label htmlFor="profile-stage-name" className="sr-only">Nombre artístico</label>
           <input
+            id="profile-stage-name"
             name="stage_name"
             defaultValue={profile?.stage_name}
             placeholder="Nombre artístico"
             required
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
+          <label htmlFor="profile-gender" className="sr-only">Identidad de género</label>
           <select
+            id="profile-gender"
             name="gender"
             defaultValue={profile?.gender ?? "female"}
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
@@ -241,7 +245,9 @@ export default function DashboardPage() {
             <option value="trans">Trans</option>
             <option value="male">Hombre</option>
           </select>
+          <label htmlFor="profile-age" className="sr-only">Edad</label>
           <input
+            id="profile-age"
             name="age"
             type="number"
             min={18}
@@ -250,7 +256,9 @@ export default function DashboardPage() {
             required
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
+          <label htmlFor="profile-region" className="sr-only">Región</label>
           <select
+            id="profile-region"
             defaultValue={profile?.city?.region?.slug ?? ""}
             onChange={(e) => onRegion(e.target.value)}
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
@@ -262,7 +270,9 @@ export default function DashboardPage() {
               </option>
             ))}
           </select>
+          <label htmlFor="profile-city" className="sr-only">Comuna</label>
           <select
+            id="profile-city"
             name="city_id"
             defaultValue={profile?.city?.id}
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
@@ -274,20 +284,26 @@ export default function DashboardPage() {
               </option>
             ))}
           </select>
+          <label htmlFor="profile-whatsapp" className="sr-only">WhatsApp</label>
           <input
+            id="profile-whatsapp"
             name="whatsapp"
             defaultValue={profile?.whatsapp}
             placeholder="WhatsApp (ej: 56912345678)"
             inputMode="tel"
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
+          <label htmlFor="profile-telegram" className="sr-only">Telegram</label>
           <input
+            id="profile-telegram"
             name="telegram"
             defaultValue={profile?.telegram}
             placeholder="Telegram (usuario, sin @)"
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
+          <label htmlFor="profile-rate" className="sr-only">Tarifa base en pesos chilenos</label>
           <input
+            id="profile-rate"
             name="base_rate"
             type="number"
             min={0}
@@ -297,7 +313,9 @@ export default function DashboardPage() {
             inputMode="numeric"
             className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
           />
+          <label htmlFor="profile-description" className="sr-only">Descripción del perfil</label>
           <textarea
+            id="profile-description"
             name="description"
             defaultValue={profile?.description}
             placeholder="Descripción"
@@ -309,11 +327,12 @@ export default function DashboardPage() {
             selected={selectedTags}
             onToggle={(id) => {
               const next = new Set(selectedTags);
-              next.has(id) ? next.delete(id) : next.add(id);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
               setSelectedTags(next);
             }}
           />
-          <button className="w-full rounded-full bg-pink-600 px-5 py-2.5 font-medium hover:bg-pink-500 sm:w-fit">
+          <button type="submit" className="w-full rounded-full bg-pink-600 px-5 py-2.5 font-medium hover:bg-pink-500 sm:w-fit">
             Guardar perfil
           </button>
         </form>
@@ -1397,6 +1416,15 @@ interface Stats {
   contacts_total: number; contacts_30d: number; contacts_7d: number;
 }
 
+function StatsCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+      <p className="text-2xl font-bold">{value.toLocaleString("es-CL")}</p>
+      <p className="text-xs uppercase tracking-wide text-neutral-500">{label}</p>
+    </div>
+  );
+}
+
 function StatsPanel({ hasProfile }: { hasProfile: boolean }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [err, setErr] = useState("");
@@ -1414,21 +1442,14 @@ function StatsPanel({ hasProfile }: { hasProfile: boolean }) {
   if (err) return <p className="text-sm text-red-400">{err}</p>;
   if (!stats) return <p className="text-sm text-neutral-500">Cargando…</p>;
 
-  const Card = ({ label, value }: { label: string; value: number }) => (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
-      <p className="text-2xl font-bold">{value.toLocaleString("es-CL")}</p>
-      <p className="text-xs uppercase tracking-wide text-neutral-500">{label}</p>
-    </div>
-  );
-
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <Card label="Visitas (7 días)" value={stats.views_7d} />
-      <Card label="Visitas (30 días)" value={stats.views_30d} />
-      <Card label="Visitas totales" value={stats.views_total} />
-      <Card label="Contactos (7 días)" value={stats.contacts_7d} />
-      <Card label="Contactos (30 días)" value={stats.contacts_30d} />
-      <Card label="Contactos totales" value={stats.contacts_total} />
+      <StatsCard label="Visitas (7 días)" value={stats.views_7d} />
+      <StatsCard label="Visitas (30 días)" value={stats.views_30d} />
+      <StatsCard label="Visitas totales" value={stats.views_total} />
+      <StatsCard label="Contactos (7 días)" value={stats.contacts_7d} />
+      <StatsCard label="Contactos (30 días)" value={stats.contacts_30d} />
+      <StatsCard label="Contactos totales" value={stats.contacts_total} />
     </div>
   );
 }
@@ -1542,7 +1563,7 @@ function VisibilityBanner({
   }
 
   // Verificado: revisar trial y publicación activa.
-  const now = Date.now();
+  const now = new Date().getTime();
   const trialEnds = profile.trial_ends_at ? new Date(profile.trial_ends_at).getTime() : 0;
   const inTrial = trialEnds > now;
   const activePubs = publications.filter(
@@ -1600,11 +1621,11 @@ function AvailabilityPanel({
   onChange: () => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(new Date().getTime());
 
   // Tick cada 30s para refrescar el countdown.
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30_000);
+    const id = setInterval(() => setNow(new Date().getTime()), 30_000);
     return () => clearInterval(id);
   }, []);
 
@@ -1700,7 +1721,7 @@ function StoriesPanel({ publications }: { publications: Publication[] }) {
   const eligible = publications.some(
     (p) =>
       p.status === "active" && p.is_featured && p.expires_at &&
-      new Date(p.expires_at).getTime() > Date.now(),
+      new Date(p.expires_at).getTime() > new Date().getTime(),
   );
 
   const reload = useCallback(async () => {
@@ -1790,7 +1811,7 @@ function StoriesPanel({ publications }: { publications: Publication[] }) {
               </button>
               <p className="mt-1 text-center text-[10px] text-neutral-500">
                 {Math.round(
-                  (new Date(s.expires_at).getTime() - Date.now()) / 3_600_000,
+                  (new Date(s.expires_at).getTime() - new Date().getTime()) / 3_600_000,
                 )}{" "}
                 h
               </p>

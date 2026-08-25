@@ -11,6 +11,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.audit.models import log_action
@@ -179,6 +180,7 @@ class MyProfileViewSet(viewsets.ModelViewSet):
         La imagen pasa por el pipeline de privacidad (EXIF/GPS + marca + JPEG).
         """
         from core.image_processing import process_image
+        from core.upload_validation import UploadValidationError, validate_image_upload
 
         profile = ModelProfile.objects.filter(user=request.user).first()
         if not profile:
@@ -194,7 +196,11 @@ class MyProfileViewSet(viewsets.ModelViewSet):
         upload = request.FILES.get("upload") or request.FILES.get("avatar")
         if not upload:
             return Response({"detail": "Falta el archivo."}, status=400)
-        processed = process_image(upload.read(), filename_stem="avatar")
+        try:
+            validate_image_upload(upload)
+            processed = process_image(upload.read(), filename_stem="avatar")
+        except UploadValidationError as exc:
+            return Response({"upload": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         if profile.avatar:
             profile.avatar.delete(save=False)
         profile.avatar.save(processed.name, processed, save=True)
@@ -346,16 +352,33 @@ class PublicProfileDetailView(generics.RetrieveAPIView):
         )
 
 
+class PublicProfileContactView(APIView):
+    """Revela canales de contacto solo después de una acción explícita."""
+
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "contact_reveal"
+
+    def post(self, request, slug):
+        profile = get_object_or_404(ModelProfile.objects.publicly_visible(), slug=slug)
+        response = Response({"whatsapp": profile.whatsapp, "telegram": profile.telegram})
+        response["Cache-Control"] = "private, no-store, max-age=0"
+        response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        return response
+
+
 class LogProfileEventView(APIView):
     """POST público anónimo: registra una visita o click de contacto.
 
-    El throttle global de anónimos (60/min) limita el spam. Para protección más
-    fuerte, en producción habría que sumar BotID/captcha + dedup por sesión
+    Un throttle específico por IP limita el spam. Para protección más fuerte,
+    en producción habría que sumar BotID/captcha + dedup por sesión
     desde el lado servidor; por ahora la dedup se hace en el cliente vía
     sessionStorage (`viewed_<slug>`).
     """
 
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "profile_event"
 
     def post(self, request, slug):
         kind = request.data.get("kind")
@@ -586,8 +609,6 @@ class AdminProfileDetailView(APIView):
 
 
 # ─── Favoritos (clientes) ────────────────────────────────────────────────────
-from rest_framework.throttling import ScopedRateThrottle  # noqa: E402
-
 
 def _get_profile_or_404(slug):
     profile = ModelProfile.objects.filter(slug=slug).first()

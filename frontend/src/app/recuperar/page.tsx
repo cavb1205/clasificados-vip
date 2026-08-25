@@ -55,16 +55,21 @@ export default function ForgotPasswordPage() {
         Ingresa el correo de tu cuenta y te enviaremos un link para crear una nueva
         contraseña.
       </p>
+      <label htmlFor="forgot-email" className="sr-only">Correo electrónico</label>
       <input
+        id="forgot-email"
+        name="email"
         type="email"
         required
         placeholder="Correo"
+        autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
       />
-      {err && <p className="text-sm text-red-400">{err}</p>}
+      {err && <p className="text-sm text-red-400" role="alert">{err}</p>}
       <button
+        type="submit"
         disabled={busy}
         className="w-full rounded-full bg-pink-600 py-2.5 font-medium hover:bg-pink-500 disabled:opacity-50"
       >

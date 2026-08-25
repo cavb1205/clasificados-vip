@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 
 type Item = { type: "photo" | "video"; url: string };
@@ -95,30 +95,50 @@ export function Lightbox({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const prev = () => onIndex((index - 1 + items.length) % items.length);
-  const next = () => onIndex((index + 1) % items.length);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const previousActive = useRef<HTMLElement | null>(null);
+  const prev = useCallback(() => onIndex((index - 1 + items.length) % items.length), [index, items.length, onIndex]);
+  const next = useCallback(() => onIndex((index + 1) % items.length), [index, items.length, onIndex]);
   const current = items[index];
 
   // A11y: cerrar con Esc, navegar con flechas, trap de foco, bloquear scroll.
   useEffect(() => {
-    const prevActive = document.activeElement as HTMLElement | null;
-    ref.current?.focus();
+    previousActive.current = document.activeElement as HTMLElement | null;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      previousActive.current?.focus?.();
+    };
+  }, []);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
       else if (e.key === "ArrowLeft") prev();
       else if (e.key === "ArrowRight") next();
-      else if (e.key === "Tab") e.preventDefault(); // foco confinado al diálogo
+      else if (e.key === "Tab") {
+        const focusable = Array.from(
+          ref.current?.querySelectorAll<HTMLElement>("button, video[controls]") ?? []
+        ).filter((element) => !element.hasAttribute("disabled"));
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-      prevActive?.focus?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index]);
+  }, [index, items.length, next, onClose, prev]);
 
   return (
     <div
@@ -126,11 +146,16 @@ export function Lightbox({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={`${alt} — ${index + 1} de ${items.length}`}
+      aria-labelledby="lightbox-title"
       ref={ref}
       tabIndex={-1}
     >
+      <h2 id="lightbox-title" className="sr-only">
+        Galería de {alt}, imagen {index + 1} de {items.length}
+      </h2>
       <button
+        type="button"
+        ref={closeRef}
         aria-label="Cerrar"
         onClick={onClose}
         className="absolute right-3 top-3 z-10 rounded-full bg-white/10 px-3 py-1.5 text-lg text-white hover:bg-white/20"
@@ -157,6 +182,7 @@ export function Lightbox({
             key={current.url}
             src={current.url}
             controls
+            aria-label={`${alt} video ${index + 1}`}
             autoPlay
             playsInline
             controlsList="nodownload noplaybackrate"
@@ -169,6 +195,7 @@ export function Lightbox({
       {items.length > 1 && (
         <>
           <button
+            type="button"
             aria-label="Anterior"
             onClick={(e) => {
               e.stopPropagation();
@@ -179,6 +206,7 @@ export function Lightbox({
             ‹
           </button>
           <button
+            type="button"
             aria-label="Siguiente"
             onClick={(e) => {
               e.stopPropagation();

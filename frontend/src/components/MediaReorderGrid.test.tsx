@@ -1,3 +1,5 @@
+/* El mock representa la salida de un componente de imagen en jsdom. */
+/* eslint-disable @next/next/no-img-element */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

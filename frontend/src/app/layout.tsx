@@ -7,15 +7,23 @@ import { AuthNav } from "@/components/AuthNav";
 import { Toaster } from "@/components/Toaster";
 import { SupportButton } from "@/components/SupportButton";
 import { Analytics } from "@vercel/analytics/next";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://portalvip.cl"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "PortalVip Chile — Anuncios verificados",
     template: "%s · PortalVip Chile",
   },
   description:
     "Directorio de anuncios verificados por región y comuna en Chile. Perfiles con verificación de identidad.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    siteName: "PortalVip Chile",
+    locale: "es_CL",
+    type: "website",
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -29,8 +37,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <AgeGate />
         <Toaster />
         <SupportButton />
+        <a href="#main-content" className="skip-link">
+          Saltar al contenido principal
+        </a>
         <header className="gold-rule border-b border-neutral-900">
-          <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-4">
+          <nav aria-label="Navegación principal" className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-4">
             <Link href="/" className="flex items-center gap-2">
               <Image
                 src="/brand/symbol.png"
@@ -54,9 +65,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               method="get"
               className="order-3 w-full sm:order-2 sm:flex-1 sm:max-w-md"
             >
+              <label htmlFor="global-search" className="sr-only">Buscar perfiles</label>
               <input
+                id="global-search"
                 name="q"
                 placeholder="Buscar perfiles…"
+                type="search"
                 className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-1.5 text-sm focus:border-pink-600 focus:outline-none"
               />
             </form>
@@ -65,7 +79,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </div>
           </nav>
         </header>
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
+        <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
         <footer className="border-t border-neutral-800 px-4 py-6 text-center text-xs text-neutral-500">
           <p>Solo mayores de 18 años · No intermediamos transacciones · © PortalVip Chile</p>
           <p className="mt-2 flex flex-wrap justify-center gap-4">

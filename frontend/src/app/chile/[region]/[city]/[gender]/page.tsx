@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import {
   getAllPopulatedCities,
   getCityStories,
+  getCities,
   getProfiles,
   getServices,
   type ProfileQuery,
@@ -40,10 +41,17 @@ function pickArray(v: string | string[] | undefined): string[] | undefined {
   return Array.isArray(v) ? v : [v];
 }
 
-export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: Search;
+}): Promise<Metadata> {
   const { region, city, gender } = await params;
   if (!isGenderSlug(gender)) return {};
-  const cityName = titleize(city);
+  const queryParams = await searchParams;
+  const cityName = (await getCities(region).catch(() => [])).find((item) => item.slug === city)?.name ?? titleize(city);
   const title =
     gender === "todos"
       ? `Anuncios en ${cityName}`
@@ -56,6 +64,8 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     title,
     description,
     alternates: { canonical: `/chile/${region}/${city}/${gender}` },
+    // Las variantes filtradas/paginadas no deben competir con la URL canónica.
+    robots: Object.keys(queryParams).length > 0 ? { index: false, follow: true } : undefined,
   };
 }
 
@@ -93,7 +103,9 @@ export default async function CityPage({
   const page = Number(query.page ?? "1");
   const pageSize = 12;
   const totalPages = Math.max(1, Math.ceil(data.count / pageSize));
-  const cityName = titleize(city);
+  const currentCity = allCities.find((item) => item.slug === city && item.region.slug === region);
+  const cityName = currentCity?.name ?? titleize(city);
+  const regionName = currentCity?.region.name ?? titleize(region);
   const selectedTags = new Set(query.tag ?? []);
 
   const byCategory = services.reduce<Record<ServiceCategory, typeof services>>(
@@ -135,7 +147,7 @@ export default async function CityPage({
           </Link>{" "}
           /{" "}
           <Link href={`/chile/${region}`} className="hover:text-pink-400">
-            {titleize(region)}
+            {regionName}
           </Link>{" "}
           / {cityName}
         </p>

@@ -76,8 +76,7 @@ export interface PublicProfile {
   is_featured: boolean;
   rating_average: number | null;
   rating_count: number;
-  whatsapp: string;
-  telegram: string;
+  has_contact: boolean;
   is_available_now: boolean;
   available_until: string | null;
   photo_authenticity: "pending" | "none" | "light" | "heavy";

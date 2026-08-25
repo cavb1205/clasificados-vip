@@ -8,6 +8,7 @@ pero usa la API STORAGES de Django para poder migrar a S3/R2 sin tocar el códig
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 import os
 
@@ -26,8 +27,28 @@ def env_list(key: str, default: str = "") -> list[str]:
 
 # --- Seguridad base ---------------------------------------------------------
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-change-me")
-DEBUG = env_bool("DJANGO_DEBUG", True)
+# Fail closed: production debe declarar explícitamente DEBUG=False. El .env
+# local lo deja en True, mientras que CI/producción tienen que optar por el
+# modo seguro de forma deliberada.
+DEBUG = env_bool("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+
+# Clave Fernet para cifrar documentos KYC en reposo (32 bytes url-safe base64).
+KYC_ENCRYPTION_KEY = os.getenv("KYC_ENCRYPTION_KEY", "")
+
+if not DEBUG:
+    missing = [
+        name
+        for name, value in (
+            ("DJANGO_SECRET_KEY", os.getenv("DJANGO_SECRET_KEY")),
+            ("KYC_ENCRYPTION_KEY", KYC_ENCRYPTION_KEY),
+        )
+        if not value
+    ]
+    if missing:
+        raise ImproperlyConfigured(
+            "Faltan secretos obligatorios para producción: " + ", ".join(missing)
+        )
 
 # Detrás de Traefik (reverse proxy con TLS). Reconocer el header X-Forwarded-Proto
 # para que request.is_secure() devuelva True y las cookies HttpOnly+Secure funcionen.
@@ -38,6 +59,10 @@ if not DEBUG:
     # Hardening adicional cuando corremos en producción.
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # 30 días para empezar
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", True)
+    SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+    SECURE_CONTENT_TYPE_NOSNIFF = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     X_FRAME_OPTIONS = "DENY"
@@ -47,9 +72,6 @@ if not DEBUG:
     # hacia api-165-22-154-95.nip.io).
     CSRF_COOKIE_SAMESITE = "None"
     SESSION_COOKIE_SAMESITE = "None"
-
-# Clave Fernet para cifrar documentos KYC en reposo (32 bytes url-safe base64).
-KYC_ENCRYPTION_KEY = os.getenv("KYC_ENCRYPTION_KEY", "")
 
 # --- Apps -------------------------------------------------------------------
 INSTALLED_APPS = [
@@ -189,6 +211,9 @@ REST_FRAMEWORK = {
         "register": "15/hour",
         "password_reset": "5/min",
         "report": "20/hour",
+        "contact_reveal": "30/hour",
+        "story_report": "20/hour",
+        "profile_event": "120/hour",
     },
 }
 
@@ -203,7 +228,7 @@ SIMPLE_JWT = {
 JWT_ACCESS_COOKIE = "access_token"
 JWT_REFRESH_COOKIE = "refresh_token"
 JWT_COOKIE_SECURE = env_bool("JWT_COOKIE_SECURE", not DEBUG)
-JWT_COOKIE_SAMESITE = os.getenv("JWT_COOKIE_SAMESITE", "Lax")
+JWT_COOKIE_SAMESITE = os.getenv("JWT_COOKIE_SAMESITE", "None" if not DEBUG else "Lax")
 
 # --- CORS / CSRF ------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = env_list("CORS_ALLOWED_ORIGINS", "http://localhost:3000")

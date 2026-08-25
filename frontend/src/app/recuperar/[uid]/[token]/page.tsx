@@ -57,24 +57,33 @@ export default function ResetPasswordPage() {
       <p className="text-sm text-neutral-400">
         Crea una contraseña segura (mínimo 8 caracteres).
       </p>
+      <label htmlFor="reset-password" className="sr-only">Nueva contraseña</label>
       <input
+        id="reset-password"
+        name="password"
         type="password"
         required
         placeholder="Nueva contraseña"
+        autoComplete="new-password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
       />
+      <label htmlFor="reset-password-confirm" className="sr-only">Repetir contraseña</label>
       <input
+        id="reset-password-confirm"
+        name="password_confirmation"
         type="password"
         required
         placeholder="Repetir contraseña"
+        autoComplete="new-password"
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
         className="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-base"
       />
-      {err && <p className="text-sm text-red-400">{err}</p>}
+      {err && <p className="text-sm text-red-400" role="alert">{err}</p>}
       <button
+        type="submit"
         disabled={busy}
         className="w-full rounded-full bg-pink-600 py-2.5 font-medium hover:bg-pink-500 disabled:opacity-50"
       >

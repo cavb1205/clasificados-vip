@@ -1,4 +1,6 @@
 "use client";
+/* Documentos privados: deben cargar con cookies del navegador, sin optimizador de Next. */
+/* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,13 +19,6 @@ interface QueueItem {
   has_consent_video: boolean;
   status: string;
   created_at: string;
-}
-
-interface AuthMe {
-  email: string;
-  username: string;
-  role: string;
-  is_staff?: boolean;
 }
 
 export default function AdminKYCPage() {

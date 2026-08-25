@@ -4,7 +4,7 @@ Portal de clasificados premium para Chile. Cobro de tarifa plana por publicació
 **no** intermedia transacciones financieras. Fase 1 (MVP núcleo) implementada.
 
 ## Stack
-Django 4.2 · DRF · SimpleJWT (cookies HttpOnly) · PostgreSQL (SQLite fallback) ·
+Django 5.2 LTS · DRF · SimpleJWT (cookies HttpOnly) · PostgreSQL (SQLite fallback) ·
 Pillow · cryptography (Fernet).
 
 ## Puesta en marcha
@@ -54,7 +54,8 @@ descomentar las variables `POSTGRES_*`.
 | GET | `admin/media/<id>/file/` | Multimedia para moderación (admin/moderador) |
 | POST | `verification/submit/` | Subir documentos KYC |
 | GET | `profiles/?q=&region=&city=&service=&min_age=&max_age=&min_rate=&max_rate=&page=` | Listado público paginado (12/pág) con filtros y búsqueda |
-| GET | `profiles/<slug>/` | Detalle público |
+| GET | `profiles/<slug>/` | Detalle público (sin datos de contacto) |
+| POST | `profiles/<slug>/contact/` | Revela contacto tras acción explícita y con rate limit |
 | GET | `services/` | Catálogo de servicios (filtros) |
 | CRUD | `me/publications/` | Anuncios propios |
 | POST | `me/publications/<pk>/receipt/` | Subir comprobante → `pending_payment` |

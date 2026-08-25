@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from apps.profiles.models import City
 from apps.publications.models import SubscriptionPlan
+from core.upload_validation import UploadValidationError, validate_image_upload
 
 from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt
 
@@ -49,7 +50,13 @@ class RoomPhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = RoomPhoto
         fields = ["id", "upload", "image_url", "order", "created_at"]
-        read_only_fields = ["image_url", "created_at"]
+    read_only_fields = ["image_url", "created_at"]
+
+    def validate_upload(self, value):
+        try:
+            return validate_image_upload(value)
+        except UploadValidationError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
 
     def get_image_url(self, obj):
         request = self.context.get("request")
