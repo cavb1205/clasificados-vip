@@ -398,6 +398,11 @@ class AdminExpirePublicationView(generics.GenericAPIView):
         pub.status = Publication.Status.EXPIRED
         pub.expires_at = timezone.now()
         pub.save(update_fields=["status", "expires_at"])
+        from apps.audit.models import log_action
+        log_action(
+            request.user, "publication.expire",
+            target=f"{pub.profile.stage_name} · {pub.title}",
+        )
         return Response({"detail": "Publicación expirada."})
 
 

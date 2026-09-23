@@ -608,11 +608,18 @@ class AdminProfileDetailView(APIView):
             {
                 "id": r.id, "amount": r.amount, "status": r.status,
                 "publication_title": r.publication.title,
+                "plan_name": r.publication.plan.name if r.publication.plan_id else None,
+                "plan_price": r.publication.plan.price if r.publication.plan_id else None,
                 "created_at": r.created_at, "reviewed_at": r.reviewed_at,
+                "note": r.note,
+                "image_url": _abs(reverse(
+                    "api:publications:admin-payment-image", args=[r.pk]
+                )) if request.user.is_staff and r.image else None,
             }
             for r in (
                 PaymentReceipt.objects.filter(publication__profile=profile)
-                .select_related("publication").order_by("-created_at")[:15]
+                .select_related("publication", "publication__plan")
+                .order_by("-created_at")[:15]
             )
         ]
         reports = [
@@ -726,19 +733,28 @@ class AdminProfileReportQueueView(generics.ListAPIView):
 class AdminProfileReportActionView(generics.GenericAPIView):
     """POST {action: 'suspend' | 'dismiss'}."""
 
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsModerator]
     queryset = ProfileReport.objects.all()
 
     def post(self, request, pk):
         report = self.get_object()
         action = (request.data.get("action") or "").lower()
         if action == "suspend":
+            if not request.user.is_staff:
+                raise PermissionDenied("Solo administradores pueden suspender perfiles.")
             p = report.profile
             p.is_suspended = True
             p.suspension_reason = (request.data.get("reason") or "Reportada")[:200]
             p.save(update_fields=["is_suspended", "suspension_reason"])
+            log_action(
+                request.user, "profile_report.suspend",
+                target=f"{p.stage_name} (reporte #{report.pk})",
+                note=p.suspension_reason,
+            )
             return Response({"detail": "Perfil suspendido."})
         if action == "dismiss":
+            target = f"{report.profile.stage_name} (reporte #{report.pk})"
             report.delete()
+            log_action(request.user, "profile_report.dismiss", target=target)
             return Response({"detail": "Reporte descartado."})
         return Response({"detail": "action debe ser suspend|dismiss"}, status=400)

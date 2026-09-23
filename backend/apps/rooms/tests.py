@@ -15,7 +15,7 @@ from rest_framework.test import APITestCase
 from apps.profiles.models import City, ModelProfile, Region, SiteConfig
 from apps.publications.models import SubscriptionPlan
 
-from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt
+from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt, RoomReport
 
 User = get_user_model()
 
@@ -203,6 +203,34 @@ class RoomPaymentTransitionTests(_Base):
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.receipt.refresh_from_db()
         self.assertEqual(self.receipt.status, RoomReceipt.Status.APPROVED)
+
+
+class AdminRoomReportActionPermissionTests(_Base):
+    def setUp(self):
+        super().setUp()
+        self.listing = self._new_listing()
+        self.report = RoomReport.objects.create(listing=self.listing)
+        self.url = reverse(
+            "api:rooms:admin-room-report-action", args=[self.report.pk]
+        )
+        moderator = User.objects.create_user(
+            username="moderator", email="moderator@example.com", password="x",
+            role="moderator",
+        )
+        self.client.force_authenticate(moderator)
+
+    def test_moderator_can_dismiss_room_report(self):
+        response = self.client.post(self.url, {"action": "dismiss"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(RoomReport.objects.filter(pk=self.report.pk).exists())
+
+    def test_moderator_cannot_suspend_room_from_report(self):
+        response = self.client.post(self.url, {"action": "suspend"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.listing.refresh_from_db()
+        self.assertFalse(self.listing.is_suspended)
 
 
 class PrivateRoomReceiptTests(_Base):

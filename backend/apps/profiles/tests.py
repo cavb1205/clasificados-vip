@@ -7,7 +7,7 @@ from datetime import timedelta
 from django.utils import timezone
 from apps.publications.models import Publication, SubscriptionPlan
 from apps.reviews.models import Review
-from .models import ModelProfile, Service
+from .models import ModelProfile, ProfileReport, Service
 
 User = get_user_model()
 
@@ -65,6 +65,36 @@ class PublicVisibilityTests(APITestCase):
         self.assertEqual(reveal.status_code, status.HTTP_200_OK)
         self.assertEqual(reveal.data, {"whatsapp": "56912345678", "telegram": "luna_chile"})
         self.assertEqual(reveal["Cache-Control"], "private, no-store, max-age=0")
+
+
+class AdminProfileReportActionPermissionTests(APITestCase):
+    def setUp(self):
+        owner = _make_user("reported@example.com")
+        self.profile = ModelProfile.objects.create(
+            user=owner, stage_name="Reported", age=25,
+        )
+        self.report = ProfileReport.objects.create(profile=self.profile)
+        self.url = reverse(
+            "api:profiles:admin-profile-report-action", args=[self.report.pk]
+        )
+        moderator = User.objects.create_user(
+            username="moderator", email="moderator@example.com", password="x",
+            role="moderator",
+        )
+        self.client.force_authenticate(moderator)
+
+    def test_moderator_can_dismiss_profile_report(self):
+        response = self.client.post(self.url, {"action": "dismiss"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(ProfileReport.objects.filter(pk=self.report.pk).exists())
+
+    def test_moderator_cannot_suspend_reported_profile(self):
+        response = self.client.post(self.url, {"action": "suspend"}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.profile.refresh_from_db()
+        self.assertFalse(self.profile.is_suspended)
 
 
 class FilterAndPaginationTests(APITestCase):

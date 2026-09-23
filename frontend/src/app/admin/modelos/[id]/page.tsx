@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { auth, dashboard } from "@/lib/client-api";
@@ -39,6 +40,7 @@ export default function AdminModeloFichaPage() {
   const [canModerate, setCanModerate] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [openReceiptId, setOpenReceiptId] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
 
   const reload = useCallback(async () => {
@@ -134,6 +136,29 @@ export default function AdminModeloFichaPage() {
       await reload();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function decidePayment(receiptId: number, action: "approve" | "reject") {
+    let note = "";
+    if (action === "approve") {
+      if (!window.confirm("¿Aprobar este pago? Activará o extenderá el anuncio asociado.")) return;
+    } else {
+      const value = window.prompt("Motivo del rechazo (visible para la modelo):");
+      if (value === null) return;
+      note = value;
+    }
+
+    setErr("");
+    setBusy(true);
+    try {
+      await dashboard.adminPaymentAction(receiptId, action, note);
+      await reload();
+      setOpenReceiptId(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "No se pudo actualizar el pago.");
     } finally {
       setBusy(false);
     }
@@ -282,9 +307,67 @@ export default function AdminModeloFichaPage() {
         ) : (
           <ul className="space-y-1.5">
             {data.receipts.map((r) => (
-              <li key={r.id} className="flex flex-wrap justify-between gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm">
-                <span>{CLP.format(r.amount)} · {r.publication_title}</span>
-                <span className="text-xs text-neutral-500">{r.status} · {fdate(r.created_at)}</span>
+              <li key={r.id} className="rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p>{r.publication_title}</p>
+                    <p className="text-xs text-neutral-400">
+                      {r.plan_name ? `Plan ${r.plan_name} · ` : ""}
+                      {r.amount === null ? "Monto no declarado" : `Declarado ${CLP.format(r.amount)}`}
+                      {r.plan_price !== null && ` · esperado ${CLP.format(r.plan_price)}`}
+                      {r.amount !== null && r.plan_price !== null && r.amount !== r.plan_price && (
+                        <span className="ml-2 text-amber-300">⚠ monto distinto</span>
+                      )}
+                    </p>
+                  </div>
+                  <span className="text-xs text-neutral-500">{r.status} · {fdate(r.created_at)}</span>
+                </div>
+                {r.note && <p className="mt-1 text-xs text-neutral-400">Nota: {r.note}</p>}
+                {isStaff && (r.image_url || r.status === "pending") ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {isStaff && r.image_url && (
+                      <button
+                        type="button"
+                        onClick={() => setOpenReceiptId(openReceiptId === r.id ? null : r.id)}
+                        className="rounded-full border border-neutral-700 px-3 py-1 text-xs hover:border-pink-500"
+                      >
+                        {openReceiptId === r.id ? "Ocultar comprobante" : "Ver comprobante"}
+                      </button>
+                    )}
+                    {isStaff && r.status === "pending" && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => decidePayment(r.id, "approve")}
+                          className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                        >
+                          Aprobar pago
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => decidePayment(r.id, "reject")}
+                          className="rounded-full border border-red-500 px-3 py-1 text-xs text-red-300 hover:bg-red-600/20 disabled:opacity-50"
+                        >
+                          Rechazar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : null}
+                {openReceiptId === r.id && r.image_url && isStaff && (
+                  <div className="mt-3 overflow-hidden rounded-lg border border-neutral-800 bg-black">
+                    <Image
+                      src={r.image_url}
+                      alt={`Comprobante de pago ${r.id}`}
+                      width={1200}
+                      height={1600}
+                      unoptimized
+                      className="max-h-[70vh] w-full object-contain"
+                    />
+                  </div>
+                )}
               </li>
             ))}
           </ul>

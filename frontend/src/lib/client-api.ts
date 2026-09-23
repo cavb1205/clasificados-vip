@@ -315,7 +315,18 @@ export const dashboard = {
       profile: Record<string, unknown>;
       media: { id: number; media_type: "photo" | "video"; url: string | null; is_hidden: boolean }[];
       publications: { id: number; title: string; status: string; is_featured: boolean; is_live: boolean; expires_at: string | null; plan_name: string | null }[];
-      receipts: { id: number; amount: number; status: string; publication_title: string; created_at: string; reviewed_at: string | null }[];
+      receipts: {
+        id: number;
+        amount: number | null;
+        status: "pending" | "approved" | "rejected";
+        publication_title: string;
+        plan_name: string | null;
+        plan_price: number | null;
+        created_at: string;
+        reviewed_at: string | null;
+        note: string;
+        image_url: string | null;
+      }[];
       reports: { id: number; reason: string; reporter_email: string | null; created_at: string }[];
       recent_actions: { action: string; actor_email: string | null; note: string; created_at: string }[];
     }>(`/admin/profiles/${profileId}/detail/`),

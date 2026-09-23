@@ -48,25 +48,16 @@ export default function AdminPagosPage() {
   }, [router, reload]);
 
   async function decide(id: number, action: "approve" | "reject") {
+    let note = "";
     if (action === "reject") {
-      const note = window.prompt("Motivo del rechazo (visible para la modelo):") ?? "";
-      if (note === null) return;
-      setBusyId(id);
-      try {
-        await dashboard.adminPaymentAction(id, "reject", note);
-        await reload(tab);
-        setOpenId(null);
-      } catch (e) {
-        setErr(e instanceof Error ? e.message : "Error");
-      } finally {
-        setBusyId(null);
-      }
-      return;
-    }
-    if (!confirm("¿Aprobar este pago? Activará la publicación.")) return;
+      const value = window.prompt("Motivo del rechazo (visible para la modelo):");
+      if (value === null) return;
+      note = value;
+    } else if (!window.confirm("¿Aprobar este pago? Activará o extenderá la publicación.")) return;
+    setErr("");
     setBusyId(id);
     try {
-      await dashboard.adminPaymentAction(id, "approve");
+      await dashboard.adminPaymentAction(id, action, note);
       await reload(tab);
       setOpenId(null);
     } catch (e) {
@@ -96,15 +87,17 @@ export default function AdminPagosPage() {
         {(["pending", "approved", "rejected"] as const).map((t) => (
           <button
             key={t}
+            disabled={busyId !== null}
             onClick={() => {
               setTab(t);
-              reload(t);
+              setErr("");
+              void reload(t).catch((e) => setErr(e instanceof Error ? e.message : "Error"));
             }}
             className={`rounded-full border px-4 py-1.5 text-sm ${
               tab === t
                 ? "border-pink-500 bg-pink-600/20 text-pink-200"
                 : "border-neutral-700 text-neutral-400"
-            }`}
+            } disabled:opacity-50`}
           >
             {t === "pending" ? "Pendientes" : t === "approved" ? "Aprobados" : "Rechazados"}
           </button>
@@ -170,14 +163,14 @@ export default function AdminPagosPage() {
                     {p.status === "pending" && (
                       <>
                         <button
-                          disabled={busyId === p.id}
+                          disabled={busyId !== null}
                           onClick={() => decide(p.id, "approve")}
                           className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
                         >
-                          Aprobar
+                          {busyId === p.id ? "Procesando…" : "Aprobar"}
                         </button>
                         <button
-                          disabled={busyId === p.id}
+                          disabled={busyId !== null}
                           onClick={() => decide(p.id, "reject")}
                           className="rounded-full border border-red-500 px-3 py-1.5 text-xs text-red-300 hover:bg-red-600/20 disabled:opacity-50"
                         >

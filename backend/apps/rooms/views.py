@@ -623,13 +623,15 @@ class AdminRoomReportQueueView(generics.ListAPIView):
 class AdminRoomReportActionView(generics.GenericAPIView):
     """POST {action: 'suspend' | 'dismiss'}. 'suspend' oculta la habitación."""
 
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [IsModerator]
     queryset = RoomReport.objects.all()
 
     def post(self, request, pk):
         report = self.get_object()
         action_kind = (request.data.get("action") or "").lower()
         if action_kind == "suspend":
+            if not request.user.is_staff:
+                raise PermissionDenied("Solo administradores pueden suspender habitaciones.")
             listing = report.listing
             listing.is_suspended = True
             listing.suspension_reason = (request.data.get("reason") or "Reportada")[:200]
@@ -638,7 +640,9 @@ class AdminRoomReportActionView(generics.GenericAPIView):
                        target=f"{listing.title} (#{listing.id})", note="por reporte")
             return Response({"detail": "Habitación suspendida."})
         if action_kind == "dismiss":
+            target = f"{report.listing.title} (reporte #{report.pk})"
             report.delete()
+            log_action(request.user, "room_report.dismiss", target=target)
             return Response({"detail": "Reporte descartado."})
         return Response({"detail": "action debe ser suspend|dismiss"}, status=400)
 
