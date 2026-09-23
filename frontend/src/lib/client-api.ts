@@ -53,6 +53,75 @@ interface RequestOptions {
   isForm?: boolean;
 }
 
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly statusText: string,
+    readonly method: string,
+    readonly path: string,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
+}
+
+function errorDetail(value: unknown): string | null {
+  if (typeof value === "string") {
+    const text = value.trim();
+    // No exponer páginas HTML genéricas de un proxy/servidor como si fueran
+    // un mensaje útil de la API.
+    return text && !/^<(?:!doctype|html|head|body)\b/i.test(text) ? text : null;
+  }
+  if (Array.isArray(value)) {
+    const messages = value.map(errorDetail).filter((message): message is string => !!message);
+    return messages.length ? messages.join("; ") : null;
+  }
+  if (!value || typeof value !== "object") return null;
+
+  const fields = value as Record<string, unknown>;
+  for (const key of ["detail", "message", "error", "non_field_errors"]) {
+    const message = errorDetail(fields[key]);
+    if (message) return message;
+  }
+
+  const fieldErrors = Object.entries(fields)
+    .filter(([key]) => key !== "code")
+    .map(([key, detail]) => {
+      const message = errorDetail(detail);
+      return message ? `${key}: ${message}` : null;
+    })
+    .filter((message): message is string => !!message);
+  return fieldErrors.length ? fieldErrors.join("; ") : null;
+}
+
+async function buildApiError(response: Response, method: string, path: string) {
+  const body = await response.text().catch(() => "");
+  let payload: unknown = body;
+  if (body.trim()) {
+    try {
+      payload = JSON.parse(body) as unknown;
+    } catch {
+      // Conservamos texto plano; errorDetail filtra HTML genérico.
+    }
+  }
+
+  const statusLabel = [response.status, response.statusText].filter(Boolean).join(" ");
+  const detail = errorDetail(payload);
+  const fallback = `El servidor respondió HTTP ${statusLabel} al procesar ${method} ${path}.`;
+  const message = detail
+    ? `${detail} (HTTP ${statusLabel} · ${method} ${path})`
+    : fallback;
+
+  return new ApiRequestError(
+    message,
+    response.status,
+    response.statusText,
+    method,
+    path,
+  );
+}
+
 async function rawFetch(
   path: string,
   method: string,
@@ -127,8 +196,7 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!res.ok) {
-    const detail = await res.json().catch(() => ({}));
-    throw new Error(detail.detail || JSON.stringify(detail) || `Error ${res.status}`);
+    throw await buildApiError(res, method, path);
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }

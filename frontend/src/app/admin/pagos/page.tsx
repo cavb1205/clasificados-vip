@@ -33,6 +33,7 @@ export default function AdminPagosPage() {
   const [openId, setOpenId] = useState<number | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
   const [ready, setReady] = useState(false);
 
   const reload = useCallback(async (which: TabStatus) => {
@@ -55,11 +56,22 @@ export default function AdminPagosPage() {
       note = value;
     } else if (!window.confirm("¿Aprobar este pago? Activará o extenderá la publicación.")) return;
     setErr("");
+    setNotice("");
     setBusyId(id);
     try {
       await dashboard.adminPaymentAction(id, action, note);
-      await reload(tab);
+      // La acción ya quedó confirmada por el backend. Retiramos el pago de la
+      // cola pendiente antes de refrescar, para que un fallo secundario de GET
+      // no parezca que también falló la aprobación/rechazo.
+      setItems((current) => current.filter((payment) => payment.id !== id));
       setOpenId(null);
+      try {
+        await reload(tab);
+      } catch {
+        setNotice(
+          `El pago se ${action === "approve" ? "aprobó" : "rechazó"}, pero no se pudo actualizar la lista. Recarga la página para ver el estado más reciente.`,
+        );
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Error");
     } finally {
@@ -91,6 +103,7 @@ export default function AdminPagosPage() {
             onClick={() => {
               setTab(t);
               setErr("");
+              setNotice("");
               void reload(t).catch((e) => setErr(e instanceof Error ? e.message : "Error"));
             }}
             className={`rounded-full border px-4 py-1.5 text-sm ${
@@ -105,6 +118,7 @@ export default function AdminPagosPage() {
       </nav>
 
       {err && <p className="mb-3 text-sm text-red-400">{err}</p>}
+      {notice && <p role="status" className="mb-3 text-sm text-amber-300">{notice}</p>}
 
       {items.length === 0 ? (
         <p className="text-sm text-neutral-500">No hay comprobantes en este estado.</p>

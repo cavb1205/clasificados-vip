@@ -39,6 +39,7 @@ export default function AdminModeloFichaPage() {
   const [isStaff, setIsStaff] = useState(false);
   const [canModerate, setCanModerate] = useState(false);
   const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [openReceiptId, setOpenReceiptId] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
@@ -152,10 +153,31 @@ export default function AdminModeloFichaPage() {
     }
 
     setErr("");
+    setNotice("");
     setBusy(true);
     try {
       await dashboard.adminPaymentAction(receiptId, action, note);
-      await reload();
+      // Refleja el resultado confirmado aunque falle la petición de recarga.
+      setData((current) => current && ({
+        ...current,
+        receipts: current.receipts.map((receipt) =>
+          receipt.id === receiptId
+            ? {
+                ...receipt,
+                status: action === "approve" ? "approved" : "rejected",
+                reviewed_at: new Date().toISOString(),
+                ...(action === "reject" && note ? { note } : {}),
+              }
+            : receipt,
+        ),
+      }));
+      try {
+        await reload();
+      } catch {
+        setNotice(
+          `El pago se ${action === "approve" ? "aprobó" : "rechazó"}, pero no se pudo actualizar la ficha. Recarga la página para ver el estado más reciente.`,
+        );
+      }
       setOpenReceiptId(null);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "No se pudo actualizar el pago.");
@@ -187,6 +209,7 @@ export default function AdminModeloFichaPage() {
       </header>
 
       {err && <p className="text-sm text-red-400">{err}</p>}
+      {notice && <p role="status" className="text-sm text-amber-300">{notice}</p>}
 
       {canModerate && (
         <div className="flex flex-wrap gap-2">
