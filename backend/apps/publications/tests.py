@@ -65,7 +65,9 @@ class PaymentTransitionTests(_Base):
             "api:publications:admin-payment-action", args=[self.receipt.id]
         )
 
-    def test_repeated_approval_is_idempotent(self):
+    def test_repeated_approval_without_optional_plan_is_idempotent(self):
+        # El plan es nullable: en PostgreSQL la consulta con select_related
+        # debe bloquear solo el recibo, no la relación opcional.
         first = self.api.post(self.url, {"action": "approve"}, format="json")
         self.assertEqual(first.status_code, status.HTTP_200_OK)
         self.pub.refresh_from_db()

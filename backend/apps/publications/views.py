@@ -260,7 +260,11 @@ class AdminPaymentActionView(generics.GenericAPIView):
             return Response({"detail": "action debe ser approve|reject"}, status=400)
         with transaction.atomic():
             receipt = get_object_or_404(
-                PaymentReceipt.objects.select_for_update().select_related(
+                # `publication.plan` es nullable y `select_related` lo resuelve
+                # con LEFT OUTER JOIN. En PostgreSQL, el FOR UPDATE por defecto
+                # intentaría bloquear también ese lado nullable y fallaría.
+                # Solo necesitamos serializar decisiones sobre este comprobante.
+                PaymentReceipt.objects.select_for_update(of=("self",)).select_related(
                     "publication", "publication__plan", "publication__profile"
                 ),
                 pk=pk,
