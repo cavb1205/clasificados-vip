@@ -60,4 +60,17 @@ def validate_video_upload(upload, *, max_bytes: int = MAX_VIDEO_BYTES):
     content_type = getattr(upload, "content_type", "") or ""
     if content_type and content_type not in VIDEO_MIME_TYPES and content_type != "application/octet-stream":
         raise UploadValidationError("Solo se permiten videos MP4, MOV o WebM.")
+
+    # El MIME viene del cliente y se puede falsificar. Comprueba el encabezado
+    # del contenedor antes de almacenarlo o entregarlo a ffmpeg.
+    header = upload.read(12)
+    upload.seek(0)
+    is_iso_bmff = len(header) >= 8 and header[4:8] == b"ftyp"  # MP4/MOV
+    is_webm = header.startswith(b"\x1a\x45\xdf\xa3")  # EBML/WebM
+    if not (is_iso_bmff or is_webm):
+        raise UploadValidationError("El contenido no tiene un formato de video válido.")
+    if content_type == "video/webm" and not is_webm:
+        raise UploadValidationError("El contenido no coincide con el formato WebM declarado.")
+    if content_type in {"video/mp4", "video/quicktime"} and not is_iso_bmff:
+        raise UploadValidationError("El contenido no coincide con el formato MP4/MOV declarado.")
     return upload

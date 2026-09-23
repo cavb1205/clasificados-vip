@@ -1,8 +1,13 @@
+import logging
+
 from rest_framework import serializers
 
 from apps.profiles.models import ModelProfile
 from core.upload_validation import UploadValidationError, validate_image_upload, validate_video_upload
+from core.video_processing import strip_video_metadata
 from .models import VerificationChallenge, VerificationRequest
+
+logger = logging.getLogger(__name__)
 
 
 class VerificationRequestSerializer(serializers.ModelSerializer):
@@ -60,15 +65,37 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
         video = validated_data.pop("consent_video")
         code = validated_data.pop("challenge_code")
 
+        try:
+            cleaned_video = strip_video_metadata(video)
+        except RuntimeError as exc:
+            raise serializers.ValidationError(
+                {"consent_video": str(exc)}
+            ) from exc
+
         request_obj = VerificationRequest(
             user=self.context["request"].user,
             challenge_code=code,
         )
-        request_obj.store_encrypted("id_document", id_doc.read())
-        request_obj.store_encrypted("selfie", selfie.read())
-        request_obj.store_encrypted("consent_video", video.read(), ext="enc")
-        request_obj.save()
-        self._challenge.consume()
+        try:
+            request_obj.store_encrypted("id_document", id_doc.read())
+            request_obj.store_encrypted("selfie", selfie.read())
+            request_obj.store_encrypted(
+                "consent_video", cleaned_video.read(), ext="enc"
+            )
+            request_obj.save()
+            self._challenge.consume()
+        except Exception:
+            # File storage no participa en la transacción SQL: limpia cualquier
+            # archivo parcial si falla el guardado o el consumo del desafío.
+            for field_name in ("id_document", "selfie", "consent_video"):
+                field = getattr(request_obj, field_name)
+                if not field.name:
+                    continue
+                try:
+                    field.storage.delete(field.name)
+                except Exception:
+                    logger.exception("No se pudo limpiar un archivo KYC parcial")
+            raise
         return request_obj
 
 
@@ -91,8 +118,10 @@ class AdminQueueSerializer(serializers.ModelSerializer):
         ]
 
     def get_stage_name(self, obj):
-        profile = ModelProfile.objects.filter(user=obj.user).first()
-        return profile.stage_name if profile else None
+        try:
+            return obj.user.model_profile.stage_name
+        except ModelProfile.DoesNotExist:
+            return None
 
     def get_has_id_document(self, obj) -> bool:
         return bool(obj.id_document)

@@ -64,6 +64,20 @@ class RoomPhotoSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(path) if request else path
 
 
+class RoomPhotoReorderSerializer(serializers.Serializer):
+    listing_id = serializers.IntegerField(min_value=1)
+    ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        min_length=1,
+        max_length=100,
+    )
+
+    def validate_ids(self, value):
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError("No se permiten IDs repetidos.")
+        return value
+
+
 class RoomListingSerializer(serializers.ModelSerializer):
     """Gestión por el anfitrión. El estado y la vigencia los controla el backend."""
 

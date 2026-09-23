@@ -41,7 +41,6 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
           aria-label="Término de búsqueda"
           placeholder="Buscar por nombre o descripción…"
           className="w-full rounded-full border border-neutral-700 bg-neutral-900 px-4 py-2"
-          autoFocus
         />
         <button type="submit" className="rounded-full bg-pink-600 px-5 py-2 font-medium hover:bg-pink-500">
           Buscar

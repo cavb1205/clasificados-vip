@@ -39,6 +39,7 @@ export function MediaReorderGrid({ photos, onChange }: MediaReorderGridProps) {
   const [overId, setOverId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
 
   function onDragStart(e: React.DragEvent<HTMLDivElement>, id: number) {
     if (busy) {
@@ -65,19 +66,24 @@ export function MediaReorderGrid({ photos, onChange }: MediaReorderGridProps) {
     const [moved] = reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moved);
     const withNewOrder = reordered.map((item, index) => ({ ...item, order: index * 10 }));
-    const changed = withNewOrder.filter(
-      (item) => item.order !== previous.find((oldItem) => oldItem.id === item.id)?.order,
-    );
 
     setErr("");
+    setNotice("");
     setLocal({ signature: externalSignature, items: withNewOrder });
     setBusy(true);
+    let persisted = false;
     try {
-      await Promise.all(changed.map((item) => dashboard.updateMediaOrder(item.id, item.order)));
+      await dashboard.reorderMedia(withNewOrder.map((item) => item.id));
+      persisted = true;
       await onChange();
+      setNotice("Orden guardado.");
     } catch (error) {
-      setLocal({ signature: externalSignature, items: previous });
-      setErr(errorMessage(error));
+      if (!persisted) setLocal({ signature: externalSignature, items: previous });
+      setErr(
+        persisted
+          ? "El orden se guardó, pero no se pudo actualizar la lista. Recarga para sincronizarla."
+          : errorMessage(error),
+      );
     } finally {
       setBusy(false);
     }
@@ -179,7 +185,7 @@ export function MediaReorderGrid({ photos, onChange }: MediaReorderGridProps) {
         })}
       </div>
       <p className="mt-2 text-xs text-neutral-500" aria-live="polite">
-        Usa ↑ ↓ o arrastra para reordenar{busy && " · guardando…"}
+        {busy ? "Guardando…" : notice || "Usa ↑ ↓ o arrastra para reordenar."}
       </p>
       {err && (
         <p role="alert" className="mt-2 text-xs text-red-400">

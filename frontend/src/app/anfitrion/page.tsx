@@ -478,7 +478,7 @@ function RoomCard({ room, host, onChange }: { room: RoomListing; host: HostProfi
       </div>
 
       {room.photos.length > 0 && (
-        <RoomPhotoGrid photos={room.photos} onChange={onChange} />
+        <RoomPhotoGrid listingId={room.id} photos={room.photos} onChange={onChange} />
       )}
 
       <div className="mt-3">
@@ -492,7 +492,15 @@ function RoomCard({ room, host, onChange }: { room: RoomListing; host: HostProfi
   );
 }
 
-function RoomPhotoGrid({ photos, onChange }: { photos: RoomPhoto[]; onChange: () => void }) {
+function RoomPhotoGrid({
+  listingId,
+  photos,
+  onChange,
+}: {
+  listingId: number;
+  photos: RoomPhoto[];
+  onChange: () => void;
+}) {
   const externalItems = [...photos].sort((a, b) => a.order - b.order);
   const externalSignature = externalItems.map((item) => `${item.id}:${item.order}`).join(",");
   const [local, setLocal] = useState(() => ({ signature: externalSignature, items: externalItems }));
@@ -500,23 +508,34 @@ function RoomPhotoGrid({ photos, onChange }: { photos: RoomPhoto[]; onChange: ()
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [overId, setOverId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [notice, setNotice] = useState("");
 
   /** Mueve el elemento en `fromIdx` a `toIdx` y persiste el nuevo orden. */
   async function reorder(fromIdx: number, toIdx: number) {
-    if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || toIdx >= items.length) return;
+    if (busy || fromIdx === toIdx || fromIdx < 0 || toIdx < 0 || toIdx >= items.length) return;
     const reordered = [...items];
     const [moved] = reordered.splice(fromIdx, 1);
     reordered.splice(toIdx, 0, moved);
     const withOrder = reordered.map((p, i) => ({ ...p, order: i * 10 }));
     const previous = items;
+    setErr("");
+    setNotice("");
     setLocal({ signature: externalSignature, items: withOrder });
     setBusy(true);
+    let persisted = false;
     try {
-      const changed = withOrder.filter(
-        (p) => p.order !== previous.find((q) => q.id === p.id)?.order,
+      await rooms.reorderRoomPhotos(listingId, withOrder.map((photo) => photo.id));
+      persisted = true;
+      await onChange();
+      setNotice("Orden guardado.");
+    } catch (error) {
+      if (!persisted) setLocal({ signature: externalSignature, items: previous });
+      setErr(
+        persisted
+          ? "El orden se guardó, pero no se pudo actualizar la lista. Recarga para sincronizarla."
+          : error instanceof Error ? error.message : "No se pudo guardar el orden.",
       );
-      await Promise.all(changed.map((p) => rooms.updateRoomPhotoOrder(p.id, p.order)));
-      onChange();
     } finally {
       setBusy(false);
     }
@@ -535,18 +554,29 @@ function RoomPhotoGrid({ photos, onChange }: { photos: RoomPhoto[]; onChange: ()
 
   return (
     <div className="mt-3">
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div
+        role="list"
+        aria-label="Fotos de habitación"
+        className="flex gap-2 overflow-x-auto pb-1"
+      >
         {items.map((ph, idx) => {
           const isOver = overId === ph.id && draggingId !== ph.id;
           return (
             <div
               key={ph.id}
-              draggable
+              role="listitem"
+              aria-label={`Foto ${idx + 1} de ${items.length}`}
+              draggable={!busy}
               onDragStart={(e) => {
+                if (busy) {
+                  e.preventDefault();
+                  return;
+                }
                 setDraggingId(ph.id);
                 e.dataTransfer.effectAllowed = "move";
               }}
               onDragOver={(e) => {
+                if (busy) return;
                 e.preventDefault();
                 if (overId !== ph.id) setOverId(ph.id);
               }}
@@ -576,7 +606,7 @@ function RoomPhotoGrid({ photos, onChange }: { photos: RoomPhoto[]; onChange: ()
                   type="button"
                   disabled={idx === 0 || busy}
                   onClick={() => reorder(idx, idx - 1)}
-                  aria-label="Mover foto a la izquierda"
+                  aria-label={`Mover foto ${idx + 1} a la posición ${idx}`}
                   className="rounded-full bg-black/70 px-1.5 py-0.5 text-xs leading-none text-neutral-200 disabled:opacity-30"
                 >
                   ←
@@ -585,24 +615,29 @@ function RoomPhotoGrid({ photos, onChange }: { photos: RoomPhoto[]; onChange: ()
                   type="button"
                   disabled={idx === items.length - 1 || busy}
                   onClick={() => reorder(idx, idx + 1)}
-                  aria-label="Mover foto a la derecha"
+                  aria-label={`Mover foto ${idx + 1} a la posición ${idx + 2}`}
                   className="rounded-full bg-black/70 px-1.5 py-0.5 text-xs leading-none text-neutral-200 disabled:opacity-30"
                 >
                   →
                 </button>
               </div>
               <button
+                type="button"
+                disabled={busy}
                 onClick={async () => {
                   setBusy(true);
+                  setErr("");
                   try {
                     await rooms.deleteRoomPhoto(ph.id);
-                    onChange();
+                    await onChange();
+                  } catch (error) {
+                    setErr(error instanceof Error ? error.message : "No se pudo eliminar la foto.");
                   } finally {
                     setBusy(false);
                   }
                 }}
                 className="absolute right-1 top-1 rounded-full bg-black/70 px-1.5 text-xs text-red-300"
-                aria-label="Eliminar foto"
+                aria-label={`Eliminar foto ${idx + 1}`}
               >
                 ✕
               </button>
@@ -610,6 +645,10 @@ function RoomPhotoGrid({ photos, onChange }: { photos: RoomPhoto[]; onChange: ()
           );
         })}
       </div>
+      <p className="mt-2 text-xs text-neutral-400" aria-live="polite">
+        {busy ? "Guardando…" : notice || "Usa las flechas o arrastra para reordenar."}
+      </p>
+      {err && <p role="alert" className="mt-2 text-xs text-red-400">{err}</p>}
       <p className="mt-1 text-xs text-neutral-500">
         La primera foto es la portada. Usa ← → o arrastra para reordenar{busy && " · guardando…"}
       </p>

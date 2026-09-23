@@ -1,17 +1,21 @@
 from datetime import timedelta
-from io import StringIO
+from io import BytesIO, StringIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.urls import reverse
 from django.utils import timezone
+from PIL import Image
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.profiles.models import City, ModelProfile, Region, SiteConfig
 from apps.publications.models import SubscriptionPlan
 
-from .models import HostProfile, RoomListing, RoomReceipt
+from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt
 
 User = get_user_model()
 
@@ -80,6 +84,78 @@ class _Base(APITestCase):
         listing = self._new_listing(**kw)
         listing.publish()
         return listing
+
+
+class RoomPhotoReorderTests(_Base):
+    def setUp(self):
+        super().setUp()
+        self.listing = self._new_listing()
+        self.photos = [
+            RoomPhoto.objects.create(
+                listing=self.listing,
+                image=f"rooms/{index}.jpg",
+                order=index * 10,
+            )
+            for index in range(2)
+        ]
+        self.client.force_authenticate(self.host_user)
+
+    def test_bulk_reorder_updates_every_room_photo_in_one_request(self):
+        response = self.client.post(
+            "/api/v1/me/room-photos/reorder/",
+            {"listing_id": self.listing.pk, "ids": [self.photos[1].pk, self.photos[0].pk]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["updated"], 2)
+        reordered = list(
+            RoomPhoto.objects.filter(listing=self.listing).order_by("order", "pk")
+        )
+        self.assertEqual([photo.pk for photo in reordered], [self.photos[1].pk, self.photos[0].pk])
+        self.assertEqual([photo.order for photo in reordered], [0, 10])
+
+    def test_stale_room_photo_list_returns_conflict_without_partial_updates(self):
+        previous = {photo.pk: photo.order for photo in self.photos}
+        response = self.client.post(
+            "/api/v1/me/room-photos/reorder/",
+            {"listing_id": self.listing.pk, "ids": [self.photos[0].pk, 999999]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            dict(RoomPhoto.objects.filter(listing=self.listing).values_list("pk", "order")),
+            previous,
+        )
+
+    @patch(
+        "apps.rooms.views.process_image",
+        return_value=ContentFile(b"processed-room-photo", name="room.jpg"),
+    )
+    def test_new_room_photo_is_appended_after_existing_photos(self, _process_image):
+        self.photos[0].order = 40
+        self.photos[0].save(update_fields=["order"])
+        image = BytesIO()
+        Image.new("RGB", (10, 10), (10, 20, 30)).save(image, "JPEG")
+        upload = SimpleUploadedFile(
+            "new.jpg", image.getvalue(), content_type="image/jpeg"
+        )
+
+        response = self.client.post(
+            "/api/v1/me/room-photos/",
+            {
+                "listing": self.listing.pk,
+                "upload": upload,
+                "order": 0,
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            RoomPhoto.objects.filter(listing=self.listing, order=50).exists()
+        )
 
 
 class PlanApprovalTests(_Base):

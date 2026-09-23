@@ -1,6 +1,7 @@
 import re
 from datetime import timedelta
 
+from django.conf import settings
 from django.urls import reverse
 from rest_framework import serializers
 
@@ -209,8 +210,21 @@ class PublicProfileSerializer(serializers.ModelSerializer):
     def get_has_contact(self, obj):
         return bool(obj.whatsapp or obj.telegram)
 
-    def _photo_qs(self, obj):
-        return obj.media.filter(media_type="photo", is_hidden=False)
+    def _visible_media(self, obj):
+        # Las vistas públicas hacen prefetch_related("media"); filtrar el
+        # RelatedManager con .filter() ignoraba esa caché y disparaba queries
+        # adicionales por perfil. Filtramos la lista ya prefetched en memoria.
+        cached = getattr(obj, "_public_visible_media", None)
+        if cached is None:
+            cached = [media for media in obj.media.all() if not media.is_hidden]
+            obj._public_visible_media = cached
+        return cached
+
+    def _photo_media(self, obj):
+        return [media for media in self._visible_media(obj) if media.media_type == "photo"]
+
+    def _video_media(self, obj):
+        return [media for media in self._visible_media(obj) if media.media_type == "video"]
 
     def get_avatar(self, obj):
         if not obj.avatar:
@@ -223,20 +237,25 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         max_photos, _ = self._media_limits(obj)
         return [
             self._abs(reverse("api:media_content:public-file", args=[m.pk]))
-            for m in self._photo_qs(obj)[:max_photos]
+            for m in self._photo_media(obj)[:max_photos]
         ]
 
     def get_videos(self, obj):
         # Videos del muro no ocultos por moderación, hasta el cupo del plan.
         _, max_videos = self._media_limits(obj)
-        videos = obj.media.filter(media_type="video", is_hidden=False)[:max_videos]
         return [
             self._abs(reverse("api:media_content:public-file", args=[m.pk]))
-            for m in videos
+            for m in self._video_media(obj)[:max_videos]
         ]
 
     @staticmethod
     def _media_limits(obj):
+        # La consulta pública ya aporta is_featured vía annotate_public_profiles.
+        # Reutilizarlo evita un EXISTS adicional por cada perfil serializado.
+        if "is_featured" in obj.__dict__:
+            if obj.is_featured:
+                return settings.MAX_PHOTOS_FEATURED, settings.MAX_VIDEOS_FEATURED
+            return settings.MAX_PHOTOS_PER_PROFILE, settings.MAX_VIDEOS_PER_PROFILE
         from apps.media_content.models import profile_media_limits
         return profile_media_limits(obj)
 
@@ -244,7 +263,8 @@ class PublicProfileSerializer(serializers.ModelSerializer):
         # La portada (tarjetas, og:image) prioriza el avatar; si no hay, la 1ª del muro.
         if obj.avatar:
             return self._abs(reverse("api:profiles:public-avatar-file", args=[obj.slug]))
-        first = self._photo_qs(obj).first()
+        photos = self._photo_media(obj)
+        first = photos[0] if photos else None
         return (
             self._abs(reverse("api:media_content:public-file", args=[first.pk]))
             if first else None

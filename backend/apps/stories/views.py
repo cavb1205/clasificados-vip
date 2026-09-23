@@ -1,7 +1,9 @@
 """Endpoints de Stories: subir, listar propio, listar público, eliminar, reportar."""
 
+import logging
 import mimetypes
 
+from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -23,6 +25,17 @@ from .serializers import StorySerializer
 
 MAX_PHOTO_BYTES = 15 * 1024 * 1024   # 15 MB
 MAX_VIDEO_BYTES = 50 * 1024 * 1024   # 50 MB
+logger = logging.getLogger(__name__)
+
+
+def _safe_delete_storage_file(storage, name):
+    """No conviertas un fallo de limpieza posterior al commit en un fallo de API."""
+    try:
+        storage.delete(name)
+    except Exception:
+        logger.exception(
+            "No se pudo borrar el archivo de una story reemplazada: %s", name
+        )
 
 
 def _is_eligible(profile: ModelProfile) -> bool:
@@ -77,14 +90,6 @@ class MyStoriesView(generics.ListCreateAPIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Tope simultáneo: si llega al máximo, expirar la más vieja para
-        # liberar el slot.
-        live = _live_stories(profile).order_by("created_at")
-        if live.count() >= MAX_STORIES_ALIVE:
-            oldest = live.first()
-            oldest.file.delete(save=False)
-            oldest.delete()
-
         upload = request.FILES.get("upload")
         if not upload:
             return Response({"detail": "Falta el archivo."}, status=400)
@@ -104,18 +109,40 @@ class MyStoriesView(generics.ListCreateAPIView):
                 validate_image_upload(upload, max_bytes=MAX_PHOTO_BYTES)
                 # Pipeline: strip EXIF/GPS + watermark + JPEG optimizado.
                 processed = process_image(upload.read(), filename_stem="story")
-                story.file.save(processed.name, processed, save=False)
             else:
                 validate_video_upload(upload, max_bytes=MAX_VIDEO_BYTES)
                 # El video también debe perder metadata/GPS. El watermark requiere
                 # re-encode y se ejecuta en segundo plano, igual que MediaContent.
                 cleaned = strip_video_metadata(upload)
-                story.file.save(cleaned.name, cleaned, save=False)
+                processed = cleaned
         except UploadValidationError as exc:
             return Response({"upload": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except RuntimeError as exc:
             return Response({"upload": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        story.save()
+
+        # Procesar y guardar el archivo nuevo antes de tocar la story existente.
+        # Si falla cualquier paso, el contenido actual del perfil queda intacto.
+        try:
+            story.file.save(processed.name, processed, save=False)
+            with transaction.atomic():
+                # Serializa las subidas de este perfil en PostgreSQL para que dos
+                # requests simultáneos no excedan el máximo de stories activas.
+                locked_profile = ModelProfile.objects.select_for_update().get(
+                    pk=profile.pk
+                )
+                live = _live_stories(locked_profile).order_by("created_at")
+                oldest = live.first() if live.count() >= MAX_STORIES_ALIVE else None
+
+                story.profile = locked_profile
+                story.save()
+
+                if oldest is not None:
+                    oldest.delete()
+        except Exception:
+            if story.file.name:
+                _safe_delete_storage_file(story.file.storage, story.file.name)
+            raise
+
         if kind == "video":
             watermark_story_async(story.pk)
         return Response(
@@ -133,7 +160,6 @@ class MyStoryDeleteView(generics.DestroyAPIView):
         return Story.objects.filter(profile__user=self.request.user)
 
     def perform_destroy(self, instance):
-        instance.file.delete(save=False)
         instance.delete()
 
 
@@ -331,10 +357,6 @@ class AdminStoryReportActionView(generics.GenericAPIView):
         action_kind = (request.data.get("action") or "").lower()
         if action_kind == "delete_story":
             story = report.story
-            try:
-                story.file.delete(save=False)
-            except Exception:
-                pass
             story.delete()  # cascade borra el resto de reports asociados
             return Response({"detail": "Story eliminada."})
         if action_kind == "dismiss":

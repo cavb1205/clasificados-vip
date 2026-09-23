@@ -46,10 +46,15 @@ def strip_video_metadata(upload) -> ContentFile:
         with open(src, "wb") as f:
             f.write(data)
         try:
+            command = [
+                "ffmpeg", "-y", "-i", src, "-map_metadata", "-1", "-c", "copy"
+            ]
+            # faststart es una opción de contenedores ISO BMFF, no de WebM.
+            if ext in {".mp4", ".mov", ".m4v"}:
+                command.extend(["-movflags", "+faststart"])
+            command.append(dst)
             subprocess.run(
-                ["ffmpeg", "-y", "-i", src, "-map_metadata", "-1",
-                 "-c", "copy", "-movflags", "+faststart", dst],
-                check=True, capture_output=True, timeout=120,
+                command, check=True, capture_output=True, timeout=120,
             )
             with open(dst, "rb") as f:
                 return ContentFile(f.read(), name=f"{stem}{ext}")
@@ -95,7 +100,6 @@ def watermark_file_async(model, object_pk: int) -> None:
     """Aplica watermark a un modelo con `file` en segundo plano."""
 
     def _run():
-        from django.core.files.storage import default_storage
         from django.db import connection
 
         try:
@@ -109,12 +113,13 @@ def watermark_file_async(model, object_pk: int) -> None:
             wm = add_video_watermark(data, ext)
             if wm:
                 old = item.file.name
+                storage = item.file.storage
                 item.file.save(os.path.basename(wm.name), wm, save=True)
                 if old and old != item.file.name:
                     try:
-                        default_storage.delete(old)
+                        storage.delete(old)
                     except Exception:
-                        pass
+                        logger.exception("No se pudo borrar el video original: %s", old)
         except Exception as e:  # noqa: BLE001
             logger.warning("watermark_media_async falló: %s", e)
         finally:

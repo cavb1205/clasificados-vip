@@ -1,6 +1,9 @@
+import logging
 import mimetypes
 
+from django.conf import settings
 from django.db import transaction
+from django.db.models import Max
 from django.http import FileResponse, Http404, HttpResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
@@ -24,9 +27,12 @@ from .serializers import (
     PublicRoomListingSerializer,
     RoomListingSerializer,
     RoomPhotoSerializer,
+    RoomPhotoReorderSerializer,
     RoomPlanSerializer,
     RoomReceiptSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ─── Anfitrión: perfil, plan, anuncios, fotos ───────────────────────────────
@@ -203,20 +209,69 @@ class MyRoomPhotoViewSet(
         return listing
 
     def perform_create(self, serializer):
-        from django.conf import settings
-
         listing = self._get_listing()
-        if listing.photos.count() >= settings.MAX_PHOTOS_PER_ROOM:
-            raise PermissionDenied(
-                f"Límite alcanzado: máximo {settings.MAX_PHOTOS_PER_ROOM} fotos por habitación."
-            )
         upload = serializer.validated_data.pop("upload")
         # Pipeline: elimina EXIF/GPS (crítico para no filtrar ubicación) + marca + JPEG.
         processed = process_image(upload.read(), filename_stem="room")
-        photo = RoomPhoto(listing=listing, order=serializer.validated_data.get("order", 0))
-        photo.image.save(processed.name, processed, save=False)
-        photo.save()
+        photo = RoomPhoto(listing=listing)
+        saved_name = ""
+        try:
+            with transaction.atomic():
+                listing = RoomListing.objects.select_for_update().filter(
+                    pk=listing.pk, owner__user=self.request.user
+                ).first()
+                if listing is None:
+                    raise PermissionDenied("Habitación inexistente o ajena.")
+                if listing.photos.count() >= settings.MAX_PHOTOS_PER_ROOM:
+                    raise PermissionDenied(
+                        f"Límite alcanzado: máximo {settings.MAX_PHOTOS_PER_ROOM} fotos por habitación."
+                    )
+                photo.listing = listing
+                current_max = listing.photos.aggregate(value=Max("order"))["value"]
+                photo.order = 0 if current_max is None else current_max + 10
+                photo.image.save(processed.name, processed, save=False)
+                saved_name = photo.image.name
+                photo.save()
+        except Exception:
+            if saved_name:
+                try:
+                    photo.image.storage.delete(saved_name)
+                except Exception:
+                    logger.exception("No se pudo limpiar una foto de habitación parcial")
+            raise
         serializer.instance = photo
+
+    @action(detail=False, methods=["post"], url_path="reorder")
+    def reorder(self, request):
+        serializer = RoomPhotoReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        listing_id = serializer.validated_data["listing_id"]
+        ordered_ids = serializer.validated_data["ids"]
+
+        with transaction.atomic():
+            listing = RoomListing.objects.select_for_update().filter(
+                pk=listing_id, owner__user=request.user
+            ).first()
+            if listing is None:
+                raise PermissionDenied("Habitación inexistente o ajena.")
+
+            photos = list(
+                RoomPhoto.objects.select_for_update()
+                .filter(listing=listing)
+                .order_by("order", "created_at", "pk")
+            )
+            by_id = {photo.pk: photo for photo in photos}
+            if len(ordered_ids) != len(photos) or set(ordered_ids) != set(by_id):
+                return Response(
+                    {"detail": "La lista de fotos cambió. Actualiza y vuelve a ordenar."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            for index, photo_id in enumerate(ordered_ids):
+                by_id[photo_id].order = index * 10
+            RoomPhoto.objects.bulk_update(photos, ["order"])
+
+        return Response({"updated": len(ordered_ids)})
 
 
 class RoomPhotoFileView(APIView):

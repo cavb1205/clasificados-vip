@@ -1,8 +1,18 @@
-from django.db.models.signals import post_save
+import logging
+
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from core.notifications import notify_admins
+from core.file_cleanup import delete_files_after_commit
 from .models import PaymentReceipt
+
+logger = logging.getLogger(__name__)
+
+
+@receiver(post_delete, sender=PaymentReceipt)
+def delete_payment_receipt_file(sender, instance: PaymentReceipt, **kwargs):
+    delete_files_after_commit(instance, ("image",), logger)
 
 
 @receiver(post_save, sender=PaymentReceipt)

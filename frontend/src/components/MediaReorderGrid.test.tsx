@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event";
 
 const { dashboardMock } = vi.hoisted(() => ({
   dashboardMock: {
-    updateMediaOrder: vi.fn(),
+    reorderMedia: vi.fn(),
     deleteMedia: vi.fn(),
   },
 }));
@@ -26,11 +26,11 @@ const photos = [
 
 describe("MediaReorderGrid", () => {
   beforeEach(() => {
-    dashboardMock.updateMediaOrder.mockReset().mockResolvedValue({});
+    dashboardMock.reorderMedia.mockReset().mockResolvedValue({});
     dashboardMock.deleteMedia.mockReset().mockResolvedValue({});
   });
 
-  it("reordena con los controles accesibles y persiste solo las fotos cambiadas", async () => {
+  it("reordena con controles accesibles y guarda la lista en una sola operación", async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(<MediaReorderGrid photos={photos} onChange={onChange} />);
@@ -42,8 +42,8 @@ describe("MediaReorderGrid", () => {
       "/media/a.jpg",
       "/media/c.jpg",
     ]);
-    expect(dashboardMock.updateMediaOrder).toHaveBeenNthCalledWith(1, 2, 0);
-    expect(dashboardMock.updateMediaOrder).toHaveBeenNthCalledWith(2, 1, 10);
+    expect(dashboardMock.reorderMedia).toHaveBeenCalledOnce();
+    expect(dashboardMock.reorderMedia).toHaveBeenCalledWith([2, 1, 3]);
     expect(onChange).toHaveBeenCalledOnce();
   });
 
@@ -68,10 +68,11 @@ describe("MediaReorderGrid", () => {
       "/media/c.jpg",
       "/media/a.jpg",
     ]);
+    expect(dashboardMock.reorderMedia).toHaveBeenCalledWith([2, 3, 1]);
   });
 
   it("revierte el orden y muestra un error si falla la persistencia", async () => {
-    dashboardMock.updateMediaOrder.mockRejectedValueOnce(new Error("Sesión expirada"));
+    dashboardMock.reorderMedia.mockRejectedValueOnce(new Error("Sesión expirada"));
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(<MediaReorderGrid photos={photos} onChange={onChange} />);

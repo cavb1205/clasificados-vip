@@ -1,6 +1,8 @@
+import logging
 import mimetypes
 from datetime import timedelta
 
+from django.db import transaction
 from django.http import FileResponse, Http404
 from django.db.models import Avg, Count, Exists, OuterRef, Q
 from django.shortcuts import get_object_or_404
@@ -17,6 +19,7 @@ from rest_framework.views import APIView
 from apps.audit.models import log_action
 from apps.publications.models import Publication
 from apps.reviews.models import Review
+from core.file_cleanup import delete_storage_file_after_commit
 from core.pagination import AdminPagination
 from core.permissions import IsModel, IsModerator
 from .models import City, Favorite, ModelProfile, ProfileEvent, ProfileReport, Region, Service
@@ -27,6 +30,8 @@ from .serializers import (
     RegionSerializer,
     ServiceSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PublicProfilePagination(PageNumberPagination):
@@ -187,10 +192,20 @@ class MyProfileViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Primero crea tu perfil."}, status=400)
 
         if request.method == "DELETE":
-            if profile.avatar:
-                profile.avatar.delete(save=False)
-            profile.avatar = None
-            profile.save(update_fields=["avatar"])
+            with transaction.atomic():
+                profile = ModelProfile.objects.select_for_update().filter(
+                    user=request.user
+                ).first()
+                if profile is None:
+                    return Response({"detail": "Primero crea tu perfil."}, status=400)
+                old_name = profile.avatar.name if profile.avatar else ""
+                old_storage = profile.avatar.storage if profile.avatar else None
+                profile.avatar = None
+                profile.save(update_fields=["avatar"])
+                if old_name:
+                    delete_storage_file_after_commit(
+                        old_storage, old_name, "avatar", logger
+                    )
             return Response({"avatar": None})
 
         upload = request.FILES.get("upload") or request.FILES.get("avatar")
@@ -201,9 +216,31 @@ class MyProfileViewSet(viewsets.ModelViewSet):
             processed = process_image(upload.read(), filename_stem="avatar")
         except UploadValidationError as exc:
             return Response({"upload": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        if profile.avatar:
-            profile.avatar.delete(save=False)
-        profile.avatar.save(processed.name, processed, save=True)
+        new_name = ""
+        storage = profile.avatar.storage
+        try:
+            with transaction.atomic():
+                profile = ModelProfile.objects.select_for_update().filter(
+                    user=request.user
+                ).first()
+                if profile is None:
+                    return Response({"detail": "Primero crea tu perfil."}, status=400)
+                old_name = profile.avatar.name if profile.avatar else ""
+                old_storage = profile.avatar.storage if profile.avatar else None
+                profile.avatar.save(processed.name, processed, save=False)
+                new_name = profile.avatar.name
+                profile.save(update_fields=["avatar"])
+                if old_name and old_name != new_name:
+                    delete_storage_file_after_commit(
+                        old_storage, old_name, "avatar", logger
+                    )
+        except Exception:
+            if new_name:
+                try:
+                    storage.delete(new_name)
+                except Exception:
+                    logger.exception("No se pudo limpiar un avatar parcial")
+            raise
         url = reverse("api:profiles:my-profile-avatar-file")
         return Response({"avatar": request.build_absolute_uri(url)})
 

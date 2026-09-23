@@ -1,8 +1,9 @@
 import mimetypes
 
+from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
-from rest_framework import mixins, permissions, viewsets
+from rest_framework import decorators, mixins, permissions, status, viewsets
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,7 +13,7 @@ from apps.notifications.models import notify_user
 from apps.profiles.models import ModelProfile
 from core.permissions import IsModerator, IsModel
 from .models import MediaContent, profile_media_limits
-from .serializers import MediaContentSerializer
+from .serializers import MediaContentSerializer, MediaReorderSerializer
 
 
 def _private_file_response(file_field):
@@ -57,6 +58,37 @@ class MyMediaViewSet(
         if self.request.method == "POST":
             context["profile"] = self._get_profile()
         return context
+
+    @decorators.action(detail=False, methods=["post"], url_path="reorder")
+    def reorder(self, request):
+        serializer = MediaReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ordered_ids = serializer.validated_data["ids"]
+
+        with transaction.atomic():
+            profile = ModelProfile.objects.select_for_update().filter(
+                user=request.user
+            ).first()
+            if profile is None:
+                raise PermissionDenied("Primero debes crear un perfil.")
+
+            photos = list(
+                MediaContent.objects.select_for_update()
+                .filter(profile=profile, media_type=MediaContent.MediaType.PHOTO)
+                .order_by("order", "created_at", "pk")
+            )
+            by_id = {photo.pk: photo for photo in photos}
+            if len(ordered_ids) != len(photos) or set(ordered_ids) != set(by_id):
+                return Response(
+                    {"detail": "La lista de fotos cambió. Actualiza y vuelve a ordenar."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            for index, photo_id in enumerate(ordered_ids):
+                by_id[photo_id].order = index * 10
+            MediaContent.objects.bulk_update(photos, ["order"])
+
+        return Response({"updated": len(ordered_ids)})
 
 
 class PublicMediaFileView(APIView):

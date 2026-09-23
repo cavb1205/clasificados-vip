@@ -71,7 +71,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 name="q"
                 placeholder="Buscar perfiles…"
                 type="search"
-                className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-1.5 text-sm focus:border-pink-600 focus:outline-none"
+                className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-1.5 text-sm focus:border-pink-600"
               />
             </form>
             <div className="order-2 ml-auto sm:order-3 sm:ml-0">

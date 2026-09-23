@@ -467,11 +467,38 @@ class AvatarTests(APITestCase):
 
     def test_delete_avatar_clears_it(self):
         self.profile.avatar.save("x.jpg", SimpleUploadedFile("x.jpg", _jpeg_bytes()), save=True)
+        storage = self.profile.avatar.storage
+        old_name = self.profile.avatar.name
         self.client.force_authenticate(self.user)
-        r = self.client.delete(reverse("api:profiles:my-profile-avatar"))
+        with self.captureOnCommitCallbacks(execute=True):
+            r = self.client.delete(reverse("api:profiles:my-profile-avatar"))
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.profile.refresh_from_db()
         self.assertFalse(self.profile.avatar)
+        self.assertFalse(storage.exists(old_name))
+
+    def test_replacing_avatar_removes_previous_private_file(self):
+        self.profile.avatar.save(
+            "old.jpg", SimpleUploadedFile("old.jpg", _jpeg_bytes()), save=True
+        )
+        storage = self.profile.avatar.storage
+        old_name = self.profile.avatar.name
+        self.client.force_authenticate(self.user)
+        upload = SimpleUploadedFile(
+            "new.jpg", _jpeg_bytes(), content_type="image/jpeg"
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("api:profiles:my-profile-avatar"),
+                {"upload": upload},
+                format="multipart",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(storage.exists(old_name))
+        self.profile.refresh_from_db()
+        self.assertTrue(storage.exists(self.profile.avatar.name))
 
 
 class WallVideoPublicTests(APITestCase):

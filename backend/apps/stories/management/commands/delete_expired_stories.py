@@ -28,10 +28,6 @@ class Command(BaseCommand):
             return
         deleted = 0
         for s in qs:
-            try:
-                s.file.delete(save=False)
-            except Exception:
-                pass
             s.delete()
             deleted += 1
         self.stdout.write(self.style.SUCCESS(f"{deleted} story(s) eliminada(s)."))

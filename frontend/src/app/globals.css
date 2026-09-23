@@ -137,6 +137,14 @@ body {
   font-feature-settings: "ss01", "cv11";
 }
 
+/* El gris neutro 500 no alcanza contraste suficiente para texto pequeño sobre
+   las superficies oscuras usadas por las tarjetas y paneles del sitio. */
+@layer utilities {
+  .text-neutral-500 {
+    color: #a3a3a3;
+  }
+}
+
 .skip-link {
   position: fixed;
   left: 1rem;

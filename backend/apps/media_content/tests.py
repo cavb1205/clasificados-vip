@@ -1,7 +1,9 @@
 from io import BytesIO
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -67,6 +69,7 @@ class MediaLimitTests(TestCase):
         media.file.save("p.jpg", ContentFile(b"data"), save=False)
         media.full_clean()
         media.save()
+        return media
 
     def test_reorder_via_patch_only_updates_order(self):
         from rest_framework.test import APIClient
@@ -79,6 +82,50 @@ class MediaLimitTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         first.refresh_from_db()
         self.assertEqual(first.order, 9)
+
+    def test_bulk_reorder_updates_photo_positions_atomically(self):
+        self._make_photo()
+        self._make_photo()
+        photos = list(
+            MediaContent.objects.filter(
+                profile=self.profile, media_type=MediaContent.MediaType.PHOTO
+            ).order_by("order", "created_at", "pk")
+        )
+        client = APIClient()
+        client.force_authenticate(self.profile.user)
+
+        response = client.post(
+            "/api/v1/me/media/reorder/",
+            {"ids": [photos[1].pk, photos[0].pk]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["updated"], 2)
+        reordered = list(
+            MediaContent.objects.filter(profile=self.profile).order_by("order", "pk")
+        )
+        self.assertEqual([photo.pk for photo in reordered], [photos[1].pk, photos[0].pk])
+        self.assertEqual([photo.order for photo in reordered], [0, 10])
+
+    def test_bulk_reorder_rejects_stale_or_foreign_ids_without_changes(self):
+        self._make_photo()
+        self._make_photo()
+        photos = list(MediaContent.objects.filter(profile=self.profile).order_by("pk"))
+        previous_orders = {photo.pk: photo.order for photo in photos}
+        client = APIClient()
+        client.force_authenticate(self.profile.user)
+
+        response = client.post(
+            "/api/v1/me/media/reorder/",
+            {"ids": [photos[0].pk, 999999]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        for photo in photos:
+            photo.refresh_from_db()
+        self.assertEqual({photo.pk: photo.order for photo in photos}, previous_orders)
 
     def test_patch_cannot_change_type_outside_upload_pipeline(self):
         from rest_framework.test import APIClient
@@ -102,6 +149,32 @@ class MediaLimitTests(TestCase):
         self._make_photo()
         with self.assertRaises(ValidationError):
             self._make_photo()  # tercera supera el límite de 2
+
+    @patch(
+        "apps.media_content.serializers.process_image",
+        return_value=ContentFile(b"processed-photo", name="processed.jpg"),
+    )
+    def test_new_photo_is_appended_after_the_existing_order(self, _process_image):
+        existing = self._make_photo()
+        existing.order = 40
+        existing.save(update_fields=["order"])
+        client = APIClient()
+        client.force_authenticate(self.profile.user)
+        image = BytesIO()
+        Image.new("RGB", (10, 10), (10, 20, 30)).save(image, "JPEG")
+        upload = SimpleUploadedFile(
+            "new.jpg", image.getvalue(), content_type="image/jpeg"
+        )
+
+        response = client.post(
+            "/api/v1/me/media/",
+            {"media_type": "photo", "upload": upload, "order": 0},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        created = MediaContent.objects.get(profile=self.profile, order=50)
+        self.assertNotEqual(created.pk, existing.pk)
 
 
 class PrivateMediaFileTests(TestCase):

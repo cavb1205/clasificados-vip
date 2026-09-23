@@ -59,7 +59,13 @@ if not DEBUG:
     # Hardening adicional cuando corremos en producción.
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # 30 días para empezar
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", True)
+    # Preload exige al menos un año de max-age e includeSubDomains. Mientras
+    # usamos el HSTS gradual de 30 días (y un host nip.io), no lo anunciamos.
+    SECURE_HSTS_PRELOAD = (
+        env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
+        and SECURE_HSTS_SECONDS >= 60 * 60 * 24 * 365
+        and SECURE_HSTS_INCLUDE_SUBDOMAINS
+    )
     SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", True)
     SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
     SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -206,10 +212,12 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "60/min",
         "user": "240/min",
-        # Scopes estrictos por IP para endpoints sensibles (anti fuerza bruta/abuso).
+        # Scopes específicos para endpoints sensibles (KYC, acceso y reportes).
         "login": "10/min",
         "register": "15/hour",
         "password_reset": "5/min",
+        "kyc_challenge": "20/hour",
+        "kyc_submit": "5/day",
         "report": "20/hour",
         "contact_reveal": "30/hour",
         "story_report": "20/hour",

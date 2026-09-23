@@ -1,15 +1,27 @@
+from io import BytesIO
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase, override_settings
 from rest_framework.test import APITestCase
+from PIL import Image
 
 from apps.profiles.models import ModelProfile
 from .admin import VerificationRequestAdmin
-from .models import VerificationRequest
+from .models import VerificationChallenge, VerificationRequest
 from django.contrib.admin.sites import AdminSite
 
 User = get_user_model()
 SECRET_DOC = b"\x89PNG fake-cedula-bytes \x00\x01\x02"
+
+
+def _image_upload(name):
+    buffer = BytesIO()
+    Image.new("RGB", (20, 20), (20, 30, 40)).save(buffer, "JPEG")
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/jpeg")
 
 
 class KYCEncryptionTests(TestCase):
@@ -32,6 +44,22 @@ class KYCEncryptionTests(TestCase):
 
         # Pero se puede descifrar de vuelta al original.
         self.assertEqual(req.read_decrypted("id_document"), SECRET_DOC)
+
+    def test_deleting_request_removes_sensitive_files_after_commit(self):
+        req = VerificationRequest(user=self.user)
+        req.store_encrypted("id_document", b"id")
+        req.store_encrypted("selfie", b"selfie")
+        req.store_encrypted("consent_video", b"video")
+        req.save()
+        files = [
+            (getattr(req, field).storage, getattr(req, field).name)
+            for field in ("id_document", "selfie", "consent_video")
+        ]
+
+        with self.captureOnCommitCallbacks(execute=True):
+            req.delete()
+
+        self.assertTrue(all(not storage.exists(name) for storage, name in files))
 
 
 class ApprovalFlowTests(TestCase):
@@ -119,6 +147,49 @@ class KYCNotificationTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("KYC pendiente", mail.outbox[0].subject)
         self.assertIn("m@example.com", mail.outbox[0].body)
+
+
+class VerificationSubmissionTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="model", email="model@example.com", password="x", role="model"
+        )
+        self.client.force_authenticate(self.user)
+
+    def _payload(self, code):
+        return {
+            "id_document": _image_upload("id.jpg"),
+            "selfie": _image_upload("selfie.jpg"),
+            "consent_video": SimpleUploadedFile(
+                "consent.mp4",
+                b"\x00\x00\x00\x18ftypisom",
+                content_type="video/mp4",
+            ),
+            "challenge_code": code,
+        }
+
+    @patch("apps.verification.serializers.strip_video_metadata")
+    def test_only_one_pending_request_can_be_submitted_per_user(
+        self, strip_video
+    ):
+        strip_video.side_effect = lambda upload: ContentFile(b"cleaned consent video")
+        challenge = VerificationChallenge.issue(self.user)
+        url = "/api/v1/verification/submit/"
+        first = self.client.post(url, self._payload(challenge.code), format="multipart")
+        self.assertEqual(first.status_code, 201)
+        request_obj = VerificationRequest.objects.get(user=self.user)
+        self.assertEqual(
+            request_obj.read_decrypted("consent_video"), b"cleaned consent video"
+        )
+
+        next_challenge = VerificationChallenge.issue(self.user)
+        second = self.client.post(
+            url, self._payload(next_challenge.code), format="multipart"
+        )
+
+        self.assertEqual(second.status_code, 400)
+        self.assertEqual(VerificationRequest.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(strip_video.call_count, 1)
 
 
 class AdminQueueAPITests(APITestCase):

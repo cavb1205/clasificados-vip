@@ -1,9 +1,13 @@
-from django.http import HttpResponse, Http404
+from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.authentication import SessionAuthentication
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.notifications.models import Notification, notify_user
@@ -24,15 +28,51 @@ class SubmitVerificationView(generics.CreateAPIView):
 
     serializer_class = VerificationRequestSerializer
     permission_classes = [permissions.IsAuthenticated, IsModel]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "kyc_submit"
+
+    def perform_create(self, serializer):
+        # Serializa por usuario: evita que dos subidas simultáneas creen dos
+        # solicitudes pendientes y acumulen documentos sensibles innecesarios.
+        with transaction.atomic():
+            user = get_user_model().objects.select_for_update().get(
+                pk=self.request.user.pk
+            )
+            if VerificationRequest.objects.filter(
+                user=user, status=VerificationRequest.Status.PENDING
+            ).exists():
+                raise ValidationError(
+                    {"detail": "Ya tienes una solicitud KYC pendiente de revisión."}
+                )
+
+            validated_challenge = getattr(serializer, "_challenge", None)
+            challenge = None
+            if validated_challenge is not None:
+                challenge = VerificationChallenge.objects.select_for_update().filter(
+                    pk=validated_challenge.pk, user=user
+                ).first()
+            if challenge is None or not challenge.is_valid():
+                raise ValidationError(
+                    {"challenge_code": "El código expiró o ya fue utilizado."}
+                )
+            serializer._challenge = challenge
+            serializer.save()
 
 
 class IssueChallengeView(APIView):
     """Genera el código aleatorio + texto guionado para el video de consentimiento."""
 
     permission_classes = [permissions.IsAuthenticated, IsModel]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "kyc_challenge"
 
     def post(self, request):
-        challenge = VerificationChallenge.issue(request.user)
+        # Solo puede quedar un desafío vigente incluso con requests paralelos.
+        with transaction.atomic():
+            user = get_user_model().objects.select_for_update().get(
+                pk=request.user.pk
+            )
+            challenge = VerificationChallenge.issue(user)
         statement = (
             "Yo, la persona que aparece en la cédula que estoy mostrando, "
             "mayor de edad, hoy "
@@ -78,6 +118,7 @@ class KYCDocumentView(generics.GenericAPIView):
         response["Cache-Control"] = "no-store, no-cache, must-revalidate, private, max-age=0"
         response["Pragma"] = "no-cache"
         response["Expires"] = "0"
+        response["X-Content-Type-Options"] = "nosniff"
         response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
         return response
 
@@ -159,7 +200,7 @@ class AdminKYCQueueView(generics.ListAPIView):
     def get_queryset(self):
         return VerificationRequest.objects.filter(
             status=VerificationRequest.Status.PENDING
-        ).select_related("user").order_by("created_at")
+        ).select_related("user", "user__model_profile").order_by("created_at")
 
 
 class AdminKYCActionView(APIView):
@@ -168,53 +209,73 @@ class AdminKYCActionView(APIView):
     permission_classes = [permissions.IsAdminUser]
 
     def post(self, request, pk):
-        vr = get_object_or_404(VerificationRequest, pk=pk)
         decision = request.data.get("decision")
-        reason = request.data.get("reason", "").strip()
-
-        if vr.status != VerificationRequest.Status.PENDING:
+        raw_reason = request.data.get("reason", "")
+        if raw_reason is None:
+            raw_reason = ""
+        if not isinstance(raw_reason, str):
             return Response(
-                {"detail": "Esta solicitud ya fue revisada."},
-                status=status.HTTP_409_CONFLICT,
+                {"reason": "El motivo debe ser texto."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        reason = raw_reason.strip()
+        if len(reason) > 2000:
+            return Response(
+                {"reason": "El motivo no puede superar los 2000 caracteres."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if decision == "approve":
-            if not vr.consent_video:
+        with transaction.atomic():
+            vr = get_object_or_404(
+                VerificationRequest.objects.select_for_update(), pk=pk
+            )
+            # También serializa decisiones sobre solicitudes históricas distintas
+            # del mismo usuario, para que la sincronización del perfil no se cruce.
+            get_user_model().objects.select_for_update().get(pk=vr.user_id)
+
+            if vr.status != VerificationRequest.Status.PENDING:
                 return Response(
-                    {"detail": "No se puede aprobar sin video de consentimiento."},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    {"detail": "Esta solicitud ya fue revisada."},
+                    status=status.HTTP_409_CONFLICT,
                 )
-            vr.status = VerificationRequest.Status.VERIFIED
-            vr.reviewed_by = request.user
-            vr.reviewed_at = timezone.now()
-            vr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-            _sync_profile_on_decision(vr.user, ModelProfile.VerificationStatus.VERIFIED)
-            from apps.audit.models import log_action
-            log_action(request.user, "kyc.approve", target=f"{vr.user.email} (VR#{vr.id})")
-            notify_user(
-                vr.user, kind=Notification.Kind.KYC,
-                title="✅ Verificación aprobada",
-                message="Tu identidad fue verificada. Trial gratuito activo.",
-                link="/dashboard",
-            )
-            return Response({"status": "verified"})
 
-        if decision == "reject":
-            vr.status = VerificationRequest.Status.REJECTED
-            vr.reviewed_by = request.user
-            vr.reviewed_at = timezone.now()
-            vr.rejection_reason = reason
-            vr.save(update_fields=["status", "reviewed_by", "reviewed_at", "rejection_reason"])
-            _sync_profile_on_decision(vr.user, ModelProfile.VerificationStatus.REJECTED)
-            from apps.audit.models import log_action
-            log_action(request.user, "kyc.reject", target=f"{vr.user.email} (VR#{vr.id})", note=reason)
-            notify_user(
-                vr.user, kind=Notification.Kind.KYC,
-                title="Verificación rechazada",
-                message=reason or "Revisa tus documentos y vuelve a enviarlos.",
-                link="/dashboard",
-            )
-            return Response({"status": "rejected"})
+            if decision == "approve":
+                if not vr.consent_video:
+                    return Response(
+                        {"detail": "No se puede aprobar sin video de consentimiento."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                vr.status = VerificationRequest.Status.VERIFIED
+                vr.reviewed_by = request.user
+                vr.reviewed_at = timezone.now()
+                vr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+                _sync_profile_on_decision(vr.user, ModelProfile.VerificationStatus.VERIFIED)
+                from apps.audit.models import log_action
+                log_action(request.user, "kyc.approve", target=f"{vr.user.email} (VR#{vr.id})")
+                notify_user(
+                    vr.user, kind=Notification.Kind.KYC,
+                    title="✅ Verificación aprobada",
+                    message="Tu identidad fue verificada. Trial gratuito activo.",
+                    link="/dashboard",
+                )
+                return Response({"status": "verified"})
+
+            if decision == "reject":
+                vr.status = VerificationRequest.Status.REJECTED
+                vr.reviewed_by = request.user
+                vr.reviewed_at = timezone.now()
+                vr.rejection_reason = reason
+                vr.save(update_fields=["status", "reviewed_by", "reviewed_at", "rejection_reason"])
+                _sync_profile_on_decision(vr.user, ModelProfile.VerificationStatus.REJECTED)
+                from apps.audit.models import log_action
+                log_action(request.user, "kyc.reject", target=f"{vr.user.email} (VR#{vr.id})", note=reason)
+                notify_user(
+                    vr.user, kind=Notification.Kind.KYC,
+                    title="Verificación rechazada",
+                    message=reason or "Revisa tus documentos y vuelve a enviarlos.",
+                    link="/dashboard",
+                )
+                return Response({"status": "rejected"})
 
         return Response(
             {"detail": "decision debe ser 'approve' o 'reject'."},

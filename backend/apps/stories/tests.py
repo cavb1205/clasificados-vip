@@ -14,6 +14,8 @@ from rest_framework.test import APITestCase
 
 from apps.profiles.models import ModelProfile
 from apps.publications.models import Publication, SubscriptionPlan
+from core.upload_validation import UploadValidationError, validate_video_upload
+from core.video_processing import strip_video_metadata
 from .models import MAX_STORIES_ALIVE, Story
 
 User = get_user_model()
@@ -84,7 +86,7 @@ class VideoStoryPipelineTests(_Base):
         cleaned = ContentFile(b"metadata-free", name="video-clean.mp4")
         strip_metadata.return_value = cleaned
         upload = SimpleUploadedFile(
-            "raw.mp4", b"raw-video", content_type="video/mp4"
+            "raw.mp4", b"\x00\x00\x00\x18ftypisom", content_type="video/mp4"
         )
 
         response = self.client.post(
@@ -97,6 +99,48 @@ class VideoStoryPipelineTests(_Base):
         watermark.assert_called_once_with(story.pk)
         with story.file.open("rb") as stored:
             self.assertEqual(stored.read(), b"metadata-free")
+
+
+class VideoUploadValidationTests(TestCase):
+    def test_rejects_arbitrary_bytes_even_when_client_claims_video(self):
+        upload = SimpleUploadedFile(
+            "fake.mp4", b"not a video", content_type="video/mp4"
+        )
+
+        with self.assertRaises(UploadValidationError):
+            validate_video_upload(upload)
+
+    def test_accepts_supported_container_signatures(self):
+        mp4 = SimpleUploadedFile(
+            "video.mp4", b"\x00\x00\x00\x18ftypisom", content_type="video/mp4"
+        )
+        webm = SimpleUploadedFile(
+            "video.webm", b"\x1a\x45\xdf\xa3\x00\x00\x00\x00", content_type="video/webm"
+        )
+
+        self.assertIs(validate_video_upload(mp4), mp4)
+        self.assertIs(validate_video_upload(webm), webm)
+
+    @patch("core.video_processing.shutil.which", return_value="/usr/bin/ffmpeg")
+    @patch("core.video_processing.subprocess.run")
+    def test_webm_cleanup_does_not_use_mp4_only_faststart_flag(
+        self, run_ffmpeg, _which
+    ):
+        def write_output(command, **kwargs):
+            self.assertNotIn("-movflags", command)
+            with open(command[-1], "wb") as output:
+                output.write(b"metadata-free")
+
+        run_ffmpeg.side_effect = write_output
+        upload = SimpleUploadedFile(
+            "raw.webm",
+            b"\x1a\x45\xdf\xa3\x00\x00\x00\x00",
+            content_type="video/webm",
+        )
+
+        cleaned = strip_video_metadata(upload)
+
+        self.assertEqual(cleaned.read(), b"metadata-free")
 
 
 class PrivateStoryFileTests(_Base):
@@ -126,6 +170,32 @@ class PrivateStoryFileTests(_Base):
 
 
 class CapacityTests(_Base):
+    def test_failed_upload_does_not_remove_an_existing_story(self):
+        self._make_active_featured_pub()
+        existing = [self._make_story() for _ in range(MAX_STORIES_ALIVE)]
+        existing_ids = {story.pk for story in existing}
+
+        responses = [
+            self.client.post(
+                reverse("api:stories:my-list"), {}, format="multipart"
+            ),
+            self.client.post(
+                reverse("api:stories:my-list"),
+                {
+                    "upload": SimpleUploadedFile(
+                        "invalid.jpg", b"not an image", content_type="image/jpeg"
+                    )
+                },
+                format="multipart",
+            ),
+        ]
+
+        self.assertEqual([response.status_code for response in responses], [400, 400])
+        self.assertSetEqual(
+            set(Story.objects.filter(profile=self.profile).values_list("pk", flat=True)),
+            existing_ids,
+        )
+
     def test_exceeding_max_recycles_oldest(self):
         self._make_active_featured_pub()
         for _ in range(MAX_STORIES_ALIVE):

@@ -6,7 +6,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/dashboard", "/admin", "/anfitrion", "/cuenta", "/favoritos", "/login", "/registro", "/recuperar", "/buscar"],
+      // Las rutas privadas ya publican `noindex`; deben poder rastrearse para
+      // que el buscador lea esa directiva en lugar de ver una URL bloqueada.
     },
     sitemap: absoluteUrl("/sitemap.xml"),
   };

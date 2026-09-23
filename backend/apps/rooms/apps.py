@@ -5,3 +5,6 @@ class RoomsConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.rooms"
     verbose_name = "Habitaciones"
+
+    def ready(self):
+        from . import signals  # noqa: F401

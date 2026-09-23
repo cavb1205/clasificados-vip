@@ -207,8 +207,8 @@ export const dashboard = {
   uploadMedia: (form: FormData) =>
     apiFetch("/me/media/", { method: "POST", body: form, isForm: true }),
   deleteMedia: (id: number) => apiFetch(`/me/media/${id}/`, { method: "DELETE" }),
-  updateMediaOrder: (id: number, order: number) =>
-    apiFetch(`/me/media/${id}/`, { method: "PATCH", body: { order } }),
+  reorderMedia: (ids: number[]) =>
+    apiFetch<{ updated: number }>("/me/media/reorder/", { method: "POST", body: { ids } }),
   // Publicaciones y pagos
   listPublications: () => apiFetch<unknown[]>("/me/publications/"),
   createPublication: (data: Record<string, unknown>) =>
@@ -426,8 +426,11 @@ export const rooms = {
     apiFetch("/me/room-photos/", { method: "POST", body: form, isForm: true }),
   deleteRoomPhoto: (id: number) =>
     apiFetch(`/me/room-photos/${id}/`, { method: "DELETE" }),
-  updateRoomPhotoOrder: (id: number, order: number) =>
-    apiFetch(`/me/room-photos/${id}/`, { method: "PATCH", body: { order } }),
+  reorderRoomPhotos: (listingId: number, ids: number[]) =>
+    apiFetch<{ updated: number }>("/me/room-photos/reorder/", {
+      method: "POST",
+      body: { listing_id: listingId, ids },
+    }),
   publishRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/publish/`, { method: "POST" }),
   unpublishRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/unpublish/`, { method: "POST" }),
   pauseRoom: (id: number) => apiFetch<RoomListing>(`/me/rooms/${id}/pause/`, { method: "POST" }),

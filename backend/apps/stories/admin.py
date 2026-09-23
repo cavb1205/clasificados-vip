@@ -18,7 +18,6 @@ class StoryAdmin(admin.ModelAdmin):
     def delete_now(self, request, queryset):
         n = 0
         for s in queryset:
-            s.file.delete(save=False)
             s.delete()
             n += 1
         self.message_user(request, f"{n} story(s) eliminada(s).")
