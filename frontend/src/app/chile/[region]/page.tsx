@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const name = found?.name ?? region;
   return {
     title: `Anuncios en ${name}`,
-    description: `Comunas de la región de ${name} con anuncios verificados.`,
+    description: `Comunas de la región de ${name} con perfiles publicados por anunciantes con identidad revisada.`,
     alternates: { canonical: `/chile/${region}` },
   };
 }

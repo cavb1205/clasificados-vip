@@ -6,17 +6,18 @@ import { AgeGate } from "@/components/AgeGate";
 import { AuthNav } from "@/components/AuthNav";
 import { Toaster } from "@/components/Toaster";
 import { SupportButton } from "@/components/SupportButton";
+import { LegalAcceptanceRedirect } from "@/components/LegalAcceptanceRedirect";
 import { Analytics } from "@vercel/analytics/next";
 import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "PortalVip Chile — Anuncios verificados",
+    default: "PortalVip Chile — Directorio de anuncios",
     template: "%s · PortalVip Chile",
   },
   description:
-    "Directorio de anuncios verificados por región y comuna en Chile. Perfiles con verificación de identidad.",
+    "Directorio de anuncios para adultos y habitaciones en Chile. Contacto directo entre usuarios.",
   alternates: { canonical: "/" },
   openGraph: {
     siteName: "PortalVip Chile",
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     >
       <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-100">
         <AgeGate />
+        <LegalAcceptanceRedirect />
         <Toaster />
         <SupportButton />
         <a href="#main-content" className="skip-link">
@@ -81,7 +83,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </header>
         <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
         <footer className="border-t border-neutral-800 px-4 py-6 text-center text-xs text-neutral-500">
-          <p>Solo mayores de 18 años · No intermediamos transacciones · © PortalVip Chile</p>
+          <p>Solo mayores de 18 años · Contacto directo entre usuarios · © PortalVip Chile</p>
           <p className="mt-2 flex flex-wrap justify-center gap-4">
             <Link href="/publica" className="text-[#e9c15c] hover:text-[#f5d98a]">
               Publica con nosotras

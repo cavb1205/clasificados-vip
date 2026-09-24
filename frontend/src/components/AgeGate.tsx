@@ -57,8 +57,7 @@ export function AgeGate() {
       >
         <h2 id="age-gate-title" className="text-xl font-semibold">Contenido para mayores de 18 años</h2>
         <p className="mt-3 text-sm text-neutral-400">
-          Este sitio contiene anuncios para adultos. Al ingresar declaras ser mayor de edad
-          y aceptar los <Link href="/terminos" className="text-pink-300 underline">términos de uso</Link>.
+          Este sitio contiene anuncios para adultos. Al continuar declaras ser mayor de edad. Esta confirmación se guarda en este navegador y no verifica tu identidad. Lee los <Link href="/terminos" className="text-pink-300 underline">términos de uso</Link>.
         </p>
         {confirmed === null ? (
           <p className="mt-6 text-sm text-neutral-500" role="status">Comprobando la confirmación de edad…</p>

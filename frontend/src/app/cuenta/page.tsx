@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { auth, dashboard, type MyReview } from "@/lib/client-api";
+import { auth, dashboard, privacyRequests, type MyReview, type PrivacyRequestRecord } from "@/lib/client-api";
 
 interface Me {
   email?: string;
@@ -64,6 +64,9 @@ export default function AccountPage() {
         </dl>
       </section>
 
+      <LegalDocumentsAcceptance />
+      <PrivacyRequestsPanel />
+
       <ChangePasswordForm />
 
       {me?.role === "client" && (
@@ -95,6 +98,163 @@ export default function AccountPage() {
         </section>
       )}
     </div>
+  );
+}
+
+function LegalDocumentsAcceptance() {
+  const [current, setCurrent] = useState<boolean | null>(null);
+  const [enforcementActive, setEnforcementActive] = useState(false);
+  const [terms, setTerms] = useState(false);
+  const [privacy, setPrivacy] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    auth.legalAcceptance()
+      .then((result) => {
+        setCurrent(result.current);
+        setEnforcementActive(result.enforcement_active);
+      })
+      .catch(() => setError("No se pudo consultar la versión de los documentos."));
+  }, []);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage("");
+    setError("");
+    if (!terms || !privacy) {
+      setError("Debes aceptar los Términos y confirmar por separado que leíste la Política de privacidad.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await auth.acceptCurrentLegalDocuments();
+      setCurrent(true);
+      setMessage("La aceptación de la versión vigente quedó registrada en tu cuenta.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "No se pudo guardar la aceptación.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (current === true) {
+    return (
+      <section className="rounded-xl border border-emerald-800/60 bg-emerald-950/20 p-4 text-sm">
+        <h2 className="font-semibold">Documentos vigentes</h2>
+        <p className="mt-1 text-neutral-400">La última aceptación registrada coincide con las versiones vigentes.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-amber-700/60 bg-amber-950/20 p-4">
+      <h2 className="font-semibold">Revisar documentos legales</h2>
+      <p className="mt-1 text-sm text-neutral-400">
+        {enforcementActive
+          ? "Esta cuenta aún no tiene registradas las versiones vigentes, o los documentos cambiaron. Las funciones protegidas requieren una aceptación vigente de los Términos y confirmación de lectura de Privacidad."
+          : "Esta cuenta aún no tiene registradas las versiones vigentes, o los documentos cambiaron. El control obligatorio aún no está activado; puedes revisar los Términos y confirmar la lectura de Privacidad ahora."}
+      </p>
+      <form onSubmit={submit} className="mt-4 space-y-3 text-sm">
+        <label htmlFor="account-accept-terms" className="flex items-start gap-2">
+          <input id="account-accept-terms" type="checkbox" required checked={terms} onChange={(e) => setTerms(e.target.checked)} className="mt-1 accent-pink-500" />
+          <span>Acepto los <Link href="/terminos" target="_blank" className="text-pink-300 underline">Términos y condiciones</Link>.</span>
+        </label>
+        <label htmlFor="account-accept-privacy" className="flex items-start gap-2">
+          <input id="account-accept-privacy" type="checkbox" required checked={privacy} onChange={(e) => setPrivacy(e.target.checked)} className="mt-1 accent-pink-500" />
+          <span>Confirmo que leí la <Link href="/privacidad" target="_blank" className="text-pink-300 underline">Política de privacidad</Link>. Las autorizaciones específicas se solicitan por separado.</span>
+        </label>
+        {error && <p role="alert" className="text-red-400">{error}</p>}
+        {message && <p role="status" className="text-emerald-400">{message}</p>}
+        <button type="submit" disabled={busy} className="rounded-full bg-pink-600 px-4 py-2 font-medium disabled:opacity-50">
+          {busy ? "Guardando…" : enforcementActive ? "Aceptar versión vigente" : "Registrar aceptación"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+const PRIVACY_REQUEST_LABELS: Record<PrivacyRequestRecord["request_type"], string> = {
+  access: "Acceso o copia de mis datos",
+  rectification: "Rectificar mis datos",
+  erasure: "Eliminar/cancelar mis datos",
+  opposition: "Oposición o retiro de consentimiento",
+  other: "Otra solicitud de privacidad",
+};
+
+const PRIVACY_REQUEST_STATUS: Record<PrivacyRequestRecord["status"], string> = {
+  open: "Recibida",
+  in_review: "En revisión",
+  completed: "Resuelta",
+  denied: "No procede",
+};
+
+function PrivacyRequestsPanel() {
+  const [items, setItems] = useState<PrivacyRequestRecord[]>([]);
+  const [type, setType] = useState<PrivacyRequestRecord["request_type"]>("access");
+  const [details, setDetails] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    privacyRequests.list().then(setItems).catch(() => setError("No se pudieron cargar tus solicitudes."));
+  }, []);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    setBusy(true);
+    try {
+      const item = await privacyRequests.submit({ request_type: type, details });
+      setItems((existing) => [item, ...existing]);
+      setDetails("");
+      setMessage("Solicitud recibida. El equipo la revisará; puedes consultar su estado aquí.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "No se pudo enviar la solicitud.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-neutral-800 bg-neutral-900 p-4">
+      <h2 className="mb-2 text-lg font-semibold">Privacidad y datos de tu cuenta</h2>
+      <p className="mb-4 text-sm text-neutral-400">Envía una solicitud autenticada de acceso, rectificación o eliminación. No incluyas contraseñas ni adjuntes documentos de identidad.</p>
+      <form onSubmit={submit} className="space-y-3">
+        <label htmlFor="privacy-request-type" className="sr-only">Tipo de solicitud</label>
+        <select id="privacy-request-type" value={type} onChange={(e) => setType(e.target.value as PrivacyRequestRecord["request_type"])} className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm">
+          {Object.entries(PRIVACY_REQUEST_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <label htmlFor="privacy-request-details" className="sr-only">Detalles opcionales</label>
+        <textarea id="privacy-request-details" value={details} onChange={(e) => setDetails(e.target.value)} maxLength={3000} rows={3} placeholder="Detalles necesarios para tramitarla (opcional)" className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm" />
+        {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
+        {message && <p role="status" className="text-sm text-emerald-400">{message}</p>}
+        <button type="submit" disabled={busy} className="rounded-full border border-neutral-700 px-4 py-2 text-sm font-medium disabled:opacity-50">
+          {busy ? "Enviando…" : "Enviar solicitud"}
+        </button>
+      </form>
+      {items.length > 0 && (
+        <ul className="mt-4 space-y-2">
+          {items.map((item) => (
+            <li key={item.id} className="rounded-lg border border-neutral-800 p-3 text-sm">
+              <div className="flex flex-wrap justify-between gap-2">
+                <span>{PRIVACY_REQUEST_LABELS[item.request_type]}</span>
+                <span className="text-neutral-400">{PRIVACY_REQUEST_STATUS[item.status]}</span>
+              </div>
+              <time className="mt-1 block text-xs text-neutral-500" dateTime={item.created_at}>{new Date(item.created_at).toLocaleDateString("es-CL")}</time>
+              {item.resolution_notes && (
+                <p className="mt-2 border-t border-neutral-800 pt-2 text-neutral-300">
+                  Respuesta del equipo: {item.resolution_notes}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

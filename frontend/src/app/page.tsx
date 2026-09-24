@@ -23,12 +23,12 @@ export default async function HomePage() {
       <section className="mb-8 text-center sm:text-left">
         <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
           <span className="mr-2 align-middle text-vip" aria-hidden>✦</span>
-          Anuncios{" "}
-          <span className="text-gold">verificados</span>{" "}
+          Directorio{" "}
+          <span className="text-gold">de anuncios</span>{" "}
           en Chile
         </h1>
         <p className="mx-auto mt-3 max-w-2xl text-lg text-neutral-400 sm:mx-0">
-          Elige tu comuna y explora perfiles con identidad verificada.
+          Elige tu comuna y explora perfiles de anunciantes cuya identidad fue revisada.
         </p>
       </section>
 

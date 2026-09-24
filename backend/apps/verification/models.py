@@ -41,6 +41,9 @@ class VerificationRequest(models.Model):
     )
     # Código de desafío que se mostró al momento de grabar (auditoría).
     challenge_code = models.CharField(max_length=10, blank=True)
+    # Autorización independiente y versionada para tratar documentos KYC.
+    kyc_consent_at = models.DateTimeField(null=True, blank=True)
+    kyc_consent_version = models.CharField(max_length=40, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

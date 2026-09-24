@@ -1,8 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
+
+from .models import LegalAcceptance, PrivacyRequest
 
 User = get_user_model()
 
@@ -290,3 +294,113 @@ class AdminUserManagementTests(APITestCase):
             {"message": "Hola"}, format="json",
         )
         self.assertEqual(r.status_code, status.HTTP_200_OK)
+
+
+class LegalAcceptanceTests(APITestCase):
+    def test_registration_requires_separate_acceptance_and_records_versions(self):
+        response = self.client.post(
+            reverse("api:users:register"),
+            {
+                "email": "new@example.com",
+                "username": "new-user",
+                "password": "StrongPass!12345",
+                "role": "host",
+                "terms_accepted": True,
+                "privacy_accepted": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        acceptance = LegalAcceptance.objects.get(user__email="new@example.com")
+        self.assertEqual(acceptance.role, "host")
+        self.assertEqual(acceptance.source, LegalAcceptance.Source.REGISTRATION)
+        self.assertEqual(acceptance.terms_version, "2026-09-24-v1")
+        self.assertEqual(acceptance.privacy_version, "2026-09-24-v1")
+
+    def test_registration_rejects_missing_privacy_acceptance(self):
+        response = self.client.post(
+            reverse("api:users:register"),
+            {
+                "email": "new@example.com",
+                "username": "new-user",
+                "password": "StrongPass!12345",
+                "role": "model",
+                "terms_accepted": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="new@example.com").exists())
+
+    def test_existing_user_can_read_and_record_current_acceptance(self):
+        user = User.objects.create_user(
+            username="existing", email="existing@example.com", password="x", role="client"
+        )
+        self.client.force_authenticate(user)
+        url = reverse("api:users:legal-acceptance")
+        self.assertFalse(self.client.get(url).data["current"])
+        rejected = self.client.post(url, {"terms_accepted": True, "privacy_accepted": False}, format="json")
+        self.assertEqual(rejected.status_code, status.HTTP_400_BAD_REQUEST)
+        accepted = self.client.post(url, {"terms_accepted": True, "privacy_accepted": True}, format="json")
+        self.assertEqual(accepted.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(accepted.data["current"])
+        repeated = self.client.post(url, {"terms_accepted": True, "privacy_accepted": True}, format="json")
+        self.assertEqual(repeated.status_code, status.HTTP_200_OK)
+        self.assertEqual(LegalAcceptance.objects.filter(user=user).count(), 1)
+
+    @override_settings(LEGAL_ACCEPTANCE_ENFORCEMENT=True)
+    def test_enforcement_blocks_role_actions_until_documents_are_accepted(self):
+        user = User.objects.create_user(
+            username="model-gated", email="model-gated@example.com", password="x", role="model"
+        )
+        self.client.force_authenticate(user)
+        profile_url = reverse("api:profiles:my-profile-list")
+        self.assertEqual(self.client.get(profile_url).status_code, status.HTTP_403_FORBIDDEN)
+        self.client.post(
+            reverse("api:users:legal-acceptance"),
+            {"terms_accepted": True, "privacy_accepted": True},
+            format="json",
+        )
+        self.assertEqual(self.client.get(profile_url).status_code, status.HTTP_200_OK)
+
+
+class PrivacyRequestTests(APITestCase):
+    def test_closing_a_request_requires_an_outcome_note(self):
+        owner = User.objects.create_user(
+            username="privacy-owner", email="privacy-owner@example.com", password="x"
+        )
+        request = PrivacyRequest(
+            user=owner,
+            request_type=PrivacyRequest.RequestType.ERASURE,
+            status=PrivacyRequest.Status.COMPLETED,
+        )
+
+        with self.assertRaises(ValidationError):
+            request.full_clean()
+
+        request.resolution_notes = "Se eliminó el perfil público; se conservará el comprobante por el plazo aplicable."
+        request.full_clean()
+
+    def test_only_authenticated_user_can_submit_and_view_own_requests(self):
+        url = reverse("api:users:privacy-requests")
+        self.assertEqual(
+            self.client.post(url, {"request_type": "erasure"}, format="json").status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+        owner = User.objects.create_user(
+            username="owner", email="owner@example.com", password="x", role="model"
+        )
+        other = User.objects.create_user(
+            username="other", email="other@example.com", password="x", role="client"
+        )
+        self.client.force_authenticate(owner)
+        created = self.client.post(
+            url,
+            {"request_type": "erasure", "details": "Eliminar datos de mi cuenta"},
+            format="json",
+        )
+        self.assertEqual(created.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(created.data["status"], PrivacyRequest.Status.OPEN)
+        self.assertEqual(self.client.get(url).data[0]["id"], created.data["id"])
+        self.client.force_authenticate(other)
+        self.assertEqual(self.client.get(url).data, [])

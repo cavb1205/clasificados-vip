@@ -10,6 +10,7 @@ from rest_framework.test import APITestCase
 from PIL import Image
 
 from apps.profiles.models import ModelProfile
+from apps.users.models import LegalAcceptance
 from .admin import VerificationRequestAdmin
 from .models import VerificationChallenge, VerificationRequest
 from django.contrib.admin.sites import AdminSite
@@ -154,6 +155,13 @@ class VerificationSubmissionTests(APITestCase):
         self.user = User.objects.create_user(
             username="model", email="model@example.com", password="x", role="model"
         )
+        LegalAcceptance.objects.create(
+            user=self.user,
+            role=self.user.role,
+            terms_version="2026-09-24-v1",
+            privacy_version="2026-09-24-v1",
+            source=LegalAcceptance.Source.REGISTRATION,
+        )
         self.client.force_authenticate(self.user)
 
     def _payload(self, code):
@@ -166,7 +174,23 @@ class VerificationSubmissionTests(APITestCase):
                 content_type="video/mp4",
             ),
             "challenge_code": code,
+            "kyc_consent": True,
         }
+
+    @patch("apps.verification.serializers.strip_video_metadata")
+    def test_kyc_submission_requires_explicit_consent(self, strip_video):
+        challenge = VerificationChallenge.issue(self.user)
+        payload = self._payload(challenge.code)
+        payload.pop("kyc_consent")
+
+        response = self.client.post(
+            "/api/v1/verification/submit/", payload, format="multipart"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("kyc_consent", response.data)
+        self.assertEqual(VerificationRequest.objects.filter(user=self.user).count(), 0)
+        strip_video.assert_not_called()
 
     @patch("apps.verification.serializers.strip_video_metadata")
     def test_only_one_pending_request_can_be_submitted_per_user(
@@ -181,6 +205,8 @@ class VerificationSubmissionTests(APITestCase):
         self.assertEqual(
             request_obj.read_decrypted("consent_video"), b"cleaned consent video"
         )
+        self.assertIsNotNone(request_obj.kyc_consent_at)
+        self.assertEqual(request_obj.kyc_consent_version, "2026-09-24-v1")
 
         next_challenge = VerificationChallenge.issue(self.user)
         second = self.client.post(

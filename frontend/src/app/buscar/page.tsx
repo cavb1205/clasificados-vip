@@ -7,7 +7,7 @@ type Search = Promise<Record<string, string | string[] | undefined>>;
 
 export const metadata: Metadata = {
   title: "Buscar",
-  description: "Busca perfiles verificados por nombre o descripción.",
+  description: "Busca perfiles por nombre o descripción.",
   robots: { index: false },
 };
 

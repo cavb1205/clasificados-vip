@@ -11,7 +11,7 @@ export function ReferralPanel({ code, count, days }: { code: string; count: numb
   const [copied, setCopied] = useState(false);
   const url = `${SITE_URL}/publica?ref=${encodeURIComponent(code)}`;
 
-  const msg = `Te invito a PortalVip Chile (anuncios verificados). Si entras con mi link, tenemos un mes gratis las dos 🎁 ${url}`;
+  const msg = `Te invito a PortalVip Chile, un directorio de perfiles con identidad revisada. Si entras con mi link, tenemos un mes gratis las dos 🎁 ${url}`;
   const wa = `https://wa.me/?text=${encodeURIComponent(msg)}`;
 
   async function copy() {

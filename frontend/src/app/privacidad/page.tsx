@@ -1,169 +1,105 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LegalOperatorDisclosure } from "@/components/LegalOperatorDisclosure";
+import { legalProfile } from "@/lib/legal-profile";
 
 export const metadata: Metadata = {
   title: "Política de privacidad",
-  description: "Tratamiento de datos personales en PortalVip Chile.",
+  description: "Información sobre el tratamiento de datos en PortalVip Chile.",
   alternates: { canonical: "/privacidad" },
 };
 
-const LAST_UPDATED = "2026-05-28";
+const LAST_UPDATED = "2026-09-24";
 
 export default function PrivacyPage() {
   return (
     <article className="prose prose-invert max-w-3xl space-y-4 text-neutral-300">
       <header>
         <h1 className="text-3xl font-bold text-neutral-100">Política de privacidad</h1>
-        <p className="text-sm text-neutral-500">Vigente desde {LAST_UPDATED}</p>
+        <p className="text-sm text-neutral-500">Borrador operativo · actualizado el {LAST_UPDATED}</p>
+        <p>
+          Este documento resume datos y usos observados en el producto. La identidad del responsable, la lista completa de proveedores y el calendario de conservación deben completarse antes de considerar esta política final.
+        </p>
       </header>
 
-      <h2 id="responsable" className="mt-8 text-xl font-semibold text-neutral-100">1. Responsable del tratamiento</h2>
-      <p>
-        PortalVip Chile (en adelante &quot;la Plataforma&quot;) es responsable del
-        tratamiento de los datos personales descritos en esta Política, conforme a la
-        Ley 19.628 sobre protección de la vida privada.
-      </p>
+      <LegalOperatorDisclosure />
 
-      <h2 id="datos-recolectados" className="mt-6 text-xl font-semibold text-neutral-100">2. Datos que recolectamos</h2>
-      <p>De los <strong>usuarios anunciantes (modelos)</strong>:</p>
+      <h2 id="datos" className="mt-8 text-xl font-semibold text-neutral-100">1. Datos que puede tratar el servicio</h2>
       <ul className="ml-6 list-disc space-y-1">
-        <li>Email y nombre de usuario (registro).</li>
-        <li>Contraseña (almacenada con hash; nunca se guarda en texto plano).</li>
-        <li>Nombre artístico, edad, descripción, ciudad, tarifa base (perfil público).</li>
-        <li>Servicios y características declarados (etiquetas).</li>
-        <li>Fotos y video del perfil (público, una vez verificado y publicado).</li>
-        <li>WhatsApp y/o Telegram para contacto (visible bajo botón &quot;Contactar&quot;).</li>
-        <li>
-          <strong>Documentos de verificación (KYC)</strong>: cédula de identidad o
-          pasaporte, selfie con documento y video de consentimiento. Se almacenan{" "}
-          <strong>cifrados con Fernet</strong> en almacenamiento privado y solo son
-          accesibles por personal autorizado para revisión, dejando registro auditado de
-          cada acceso.
-        </li>
-      </ul>
-      <p>De los <strong>visitantes y clientes</strong>:</p>
-      <ul className="ml-6 list-disc space-y-1">
-        <li>
-          Eventos anónimos de visita y click en &quot;Contactar&quot; (sin IP ni
-          identificadores persistentes; solo timestamp + tipo de evento, para que la
-          anunciante vea estadísticas agregadas).
-        </li>
-        <li>Cookies técnicas necesarias para autenticación (no de tracking).</li>
-      </ul>
-
-      <h2 id="finalidades" className="mt-6 text-xl font-semibold text-neutral-100">3. Finalidades</h2>
-      <ul className="ml-6 list-disc space-y-1">
-        <li>Operar el servicio: alojar y mostrar anuncios verificados.</li>
-        <li>Verificar identidad y mayoría de edad de las anunciantes.</li>
-        <li>Prevenir suplantación, trata y publicación de menores.</li>
-        <li>Notificar a las anunciantes sobre el estado de su KYC, pagos y reseñas.</li>
-        <li>Generar estadísticas agregadas de visitas y contactos.</li>
-        <li>Cumplir obligaciones legales y responder a requerimientos judiciales.</li>
-      </ul>
-
-      <h2 id="base-legal" className="mt-6 text-xl font-semibold text-neutral-100">4. Base legal</h2>
-      <p>
-        El tratamiento se basa en (a) el <strong>consentimiento expreso</strong> de la
-        usuaria al registrarse y completar el proceso de KYC (video de consentimiento
-        documentado), y (b) la ejecución del contrato de servicio que se materializa al
-        usar la Plataforma.
-      </p>
-
-      <h2 id="cifrado" className="mt-6 text-xl font-semibold text-neutral-100">5. Seguridad</h2>
-      <ul className="ml-6 list-disc space-y-1">
-        <li>Toda comunicación con la Plataforma se realiza sobre <strong>HTTPS</strong> (TLS).</li>
-        <li>
-          Los documentos de KYC (cédula, selfie, video) se almacenan{" "}
-          <strong>cifrados simétricamente</strong> (Fernet) y se descifran en memoria
-          únicamente al ser revisados por personal autorizado.
-        </li>
-        <li>Contraseñas con hash criptográfico (no recuperables en texto plano).</li>
-        <li>Cookies de sesión <strong>HttpOnly + Secure</strong>.</li>
-        <li>Auditoría: cada acceso a documentos KYC queda registrado.</li>
-        <li>Acceso restringido a personal autorizado.</li>
-      </ul>
-
-      <h2 id="comparticion" className="mt-6 text-xl font-semibold text-neutral-100">6. Con quién compartimos</h2>
-      <p>
-        La Plataforma <strong>no comparte ni vende datos personales a terceros</strong>{" "}
-        con fines comerciales. Solo se entregan datos a las autoridades cuando exista una
-        orden judicial debidamente notificada, en cumplimiento del Código Procesal Penal
-        y la Ley 19.628.
-      </p>
-
-      <h2 id="retencion" className="mt-6 text-xl font-semibold text-neutral-100">7. Retención</h2>
-      <ul className="ml-6 list-disc space-y-1">
-        <li>
-          Datos de cuenta y perfil: mientras la cuenta esté activa o exista una obligación
-          legal de conservarlos.
-        </li>
-        <li>
-          Documentos de KYC: se conservan{" "}
-          <strong>encriptados durante toda la vida de la cuenta</strong>, como prueba del
-          consentimiento informado y la mayoría de edad. Al cierre de la cuenta, se
-          conservan por <strong>5 años adicionales</strong> para fines de defensa legal,
-          y luego se destruyen criptográficamente.
-        </li>
-        <li>
-          Eventos de visita/contacto agregados: 24 meses para análisis histórico, luego
-          se anonimizan totalmente.
-        </li>
-      </ul>
-
-      <h2 id="derechos" className="mt-6 text-xl font-semibold text-neutral-100">8. Tus derechos</h2>
-      <p>Conforme a la Ley 19.628, toda usuaria tiene derecho a:</p>
-      <ul className="ml-6 list-disc space-y-1">
-        <li><strong>Acceso</strong>: solicitar copia de los datos que tenemos sobre ti.</li>
-        <li><strong>Rectificación</strong>: corregir datos inexactos.</li>
-        <li>
-          <strong>Cancelación</strong>: solicitar la eliminación de tu cuenta y datos,
-          salvo aquellos que debamos conservar por obligación legal.
-        </li>
-        <li><strong>Oposición</strong>: oponerte a tratamientos no esenciales.</li>
+        <li><strong>Cuenta:</strong> correo, nombre de usuario, credenciales protegidas, rol y preferencias necesarias para operar.</li>
+        <li><strong>Perfiles para adultos:</strong> nombre artístico, edad declarada/verificada, descripción, ciudad, categorías de servicio, tarifas, fotos y videos públicos, y canales de contacto.</li>
+        <li><strong>Habitaciones:</strong> datos del anfitrión y anuncios, comuna/sector, descripción, precio, fotos, teléfono y WhatsApp; el formulario indica que la dirección exacta no se publica.</li>
+        <li><strong>Verificación de identidad:</strong> imagen de cédula o pasaporte, selfie y video de desafío/consentimiento. Se guardan en almacenamiento privado cifrado y el acceso administrativo queda auditado.</li>
+        <li><strong>Pagos de publicación:</strong> plan contratado, estado, monto cuando se registra y comprobante de transferencia que la persona usuaria sube. Evita incluir datos bancarios de terceros que no sean necesarios.</li>
+        <li><strong>Uso y seguridad:</strong> reportes, solicitudes de soporte, accesos a documentos KYC, acciones administrativas y eventos de visita/contacto vinculados al aviso para mostrar estadísticas. La infraestructura también puede procesar registros técnicos necesarios para seguridad y diagnóstico.</li>
       </ul>
       <p>
-        Para ejercer estos derechos, escribir a{" "}
-        <span className="text-pink-400">privacidad@portalvip.cl</span> con copia de
-        tu cédula para acreditar tu identidad.
+        Algunos datos del perfil, imágenes y categorías de servicio pueden revelar aspectos íntimos de una persona. No son datos de acceso público por el solo hecho de que el sitio los solicite: la publicación requiere una acción consciente de quien anuncia y se limita a los campos que muestra el perfil.
       </p>
 
-      <h2 id="cookies" className="mt-6 text-xl font-semibold text-neutral-100">9. Cookies y analítica</h2>
+      <h2 id="finalidades" className="mt-6 text-xl font-semibold text-neutral-100">2. Finalidades y autorizaciones</h2>
+      <ul className="ml-6 list-disc space-y-1">
+        <li>Crear y proteger cuentas, prestar los directorios de anuncios y gestionar planes y comprobantes.</li>
+        <li>Verificar identidad y mayoría de edad de quienes publican en la sección para adultos y prevenir suplantaciones en el servicio.</li>
+        <li>Mostrar al público los datos y contenidos que la persona eligió publicar, y revelar sus canales de contacto cuando se solicita esa función.</li>
+        <li>Atender solicitudes, prevenir fraude, mantener seguridad, cumplir obligaciones legales y responder requerimientos válidos.</li>
+        <li>Contabilizar visitas y acciones de contacto para las estadísticas del aviso y mejorar el servicio.</li>
+      </ul>
       <p>
-        Usamos cookies <strong>técnicas estrictamente necesarias</strong> para la
-        autenticación y la seguridad (token JWT HttpOnly, token CSRF). Para medir el
-        tráfico del sitio de forma <strong>agregada y anónima</strong> usamos Vercel Web
-        Analytics, que <strong>no usa cookies</strong> ni recolecta datos personales
-        identificables. No usamos cookies de seguimiento publicitario ni elaboramos
-        perfiles de usuarios.
+        El registro pide aceptar los Términos y confirmar por separado la lectura de esta Política. Esa confirmación no sustituye autorizaciones específicas: la subida de documentos KYC requiere una autorización adicional cuya versión y momento se registran. Si no se autorizan los datos indispensables para verificar una cuenta anunciante, no será posible completar esa verificación ni publicar en esa línea.
       </p>
 
-      <h2 id="menores" className="mt-6 text-xl font-semibold text-neutral-100">10. Menores de edad</h2>
+      <h2 id="visibilidad" className="mt-6 text-xl font-semibold text-neutral-100">3. Qué se publica</h2>
       <p>
-        La Plataforma no recolecta datos de menores de 18 años. Cualquier sospecha de
-        perfil de menor será reportada inmediatamente a la Brigada de Cibercrimen de la
-        PDI y Carabineros de Chile, y los datos asociados se entregarán bajo
-        requerimiento judicial.
+        Los datos marcados como públicos en el perfil o anuncio pueden ser vistos por cualquier visitante. Los documentos KYC, credenciales y comprobantes de pago no se muestran públicamente y su acceso está restringido al personal autorizado que los necesite. Los canales de contacto se muestran conforme a la acción indicada en la interfaz y a la configuración del aviso.
       </p>
 
-      <h2 id="cambios" className="mt-6 text-xl font-semibold text-neutral-100">11. Modificaciones</h2>
+      <h2 id="proveedores" className="mt-6 text-xl font-semibold text-neutral-100">4. Proveedores y comunicaciones</h2>
       <p>
-        Esta política puede modificarse. La fecha de última actualización figura al
-        inicio. Los cambios sustantivos se comunicarán por correo y notificación
-        in-dashboard.
+        Para prestar el servicio se utilizan proveedores técnicos de alojamiento, infraestructura, almacenamiento, analítica y, cuando esté habilitado, correo. No se venden datos personales. Los proveedores pueden procesar datos bajo instrucciones del operador y con las salvaguardas contractuales que correspondan. Los datos podrán comunicarse a autoridades cuando exista una obligación o requerimiento válido, o cuando otra base legal permita actuar para proteger derechos o seguridad.
       </p>
+      {legalProfile.processors ? (
+        <p><strong>Proveedores, funciones y ubicaciones informadas por el operador:</strong> {legalProfile.processors}</p>
+      ) : (
+        <p className="rounded-lg border border-amber-700/50 bg-amber-950/30 p-3 text-amber-100" role="status">
+          Pendiente antes del lanzamiento: identificar cada proveedor que pueda recibir datos, su finalidad, país/región de tratamiento y salvaguardas aplicables. La lista debe reflejar la configuración real de producción.
+        </p>
+      )}
 
-      <h2 id="contacto" className="mt-6 text-xl font-semibold text-neutral-100">12. Contacto</h2>
+      <h2 id="seguridad" className="mt-6 text-xl font-semibold text-neutral-100">5. Seguridad</h2>
       <p>
-        Encargado de privacidad:{" "}
-        <span className="text-pink-400">privacidad@portalvip.cl</span>.
+        El servicio usa conexiones HTTPS, credenciales almacenadas con hash, cookies de autenticación protegidas y almacenamiento privado cifrado para documentos KYC; el acceso a estos documentos deja un registro. Estas medidas reducen riesgos, pero ningún sistema conectado a Internet puede garantizar seguridad absoluta. Ante un incidente se aplicará el procedimiento interno y las notificaciones que exija la normativa.
       </p>
 
+      <h2 id="retencion" className="mt-6 text-xl font-semibold text-neutral-100">6. Conservación y eliminación</h2>
+      <p>
+        Los datos deben conservarse solo durante el tiempo necesario para la finalidad informada o para cumplir una obligación legal. Los avisos y datos públicos deben dejar de mostrarse cuando termine su publicación o se tramite una solicitud válida de retiro. Los documentos KYC y comprobantes requieren plazos diferenciados, acceso restringido y eliminación segura al dejar de ser necesarios, salvo conservación legal o preservación documentada por un incidente o reclamo.
+      </p>
+      <p>
+        El calendario exacto de conservación por categoría y su automatización siguen pendientes de aprobación del operador y revisión profesional. No se adopta aquí un plazo genérico de cinco años para todos los documentos.
+      </p>
+
+      <h2 id="derechos" className="mt-6 text-xl font-semibold text-neutral-100">7. Solicitudes y derechos</h2>
+      <p>
+        Desde <Link href="/cuenta" className="text-pink-400 hover:underline">Mi cuenta</Link> puedes pedir acceso o copia, rectificación, eliminación/cancelación, oposición o retiro de consentimiento. La solicitud queda registrada para que el equipo la revise; algunos datos pueden conservarse cuando exista una obligación legal o sea necesario resolver una controversia. No adjuntes una copia de tu cédula salvo que el responsable te explique por qué es necesaria y ofrezca un canal seguro. Las personas sin cuenta pueden usar el contacto de privacidad informado arriba.
+      </p>
+
+      <h2 id="cookies" className="mt-6 text-xl font-semibold text-neutral-100">8. Cookies y analítica</h2>
+      <p>
+        Se usan cookies técnicas necesarias para sesión y protección CSRF. El proyecto integra Vercel Web Analytics para visitas y métricas agregadas; según la documentación del proveedor, no utiliza cookies de seguimiento y calcula un hash de corta duración a partir de la solicitud para contar visitantes. No se configuran eventos analíticos personalizados en el código actual. La lista de proveedores y la región efectiva de tratamiento deben confirmarse para producción; esta Política debe actualizarse si se incorporan otras herramientas o tecnologías de medición.
+      </p>
+
+      <h2 id="menores" className="mt-6 text-xl font-semibold text-neutral-100">9. Menores y reportes urgentes</h2>
+      <p>
+        No se permite crear ni publicar anuncios de menores. Si detectas contenido que pueda involucrar a una persona menor de edad, explotación, coacción o imágenes íntimas no consentidas, usa la función de reportar y aporta solo la información necesaria. El equipo debe restringir el acceso al contenido y escalar el caso conforme al procedimiento interno y a las obligaciones legales; no envíes ni redistribuyas copias del contenido.
+      </p>
+
+      <h2 id="cambios" className="mt-6 text-xl font-semibold text-neutral-100">10. Cambios y contacto</h2>
+      <p>
+        La versión y fecha de esta Política se muestran al inicio. Cuando un cambio requiera nueva autorización, se solicitará de forma separada y quedará registrada. Para consultas o solicitudes, utiliza el contacto de privacidad que figure en la identificación del operador.
+      </p>
       <p className="mt-8 text-sm text-neutral-500">
-        Ver también:{" "}
-        <Link href="/terminos" className="text-pink-400 hover:underline">
-          Términos y condiciones
-        </Link>
-        .
+        Ver también: <Link href="/terminos" className="text-pink-400 hover:underline">Términos y condiciones</Link>.
       </p>
     </article>
   );

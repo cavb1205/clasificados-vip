@@ -48,8 +48,7 @@ export default async function PublicaPage({
           Publica en <span className="text-gold">PortalVip</span> Chile
         </h1>
         <p className="mx-auto mt-3 max-w-2xl text-lg text-neutral-400">
-          El portal de anuncios <strong className="text-neutral-200">verificados</strong>. Más
-          confianza, mejores clientes y precio justo — sin las tarifas abusivas de la competencia.
+          Publica tu perfil con revisión de identidad y elige un plan con precio y duración informados antes de pagar.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link href="/registro" className="btn-gold rounded-full px-6 py-3 font-medium">

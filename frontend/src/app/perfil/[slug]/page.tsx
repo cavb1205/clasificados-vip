@@ -49,7 +49,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const place = profile.city ? `${profile.city.name}, ${profile.city.region.name}` : "Chile";
   return {
     title: `${profile.stage_name} — ${place}`,
-    description: profile.description?.slice(0, 155) || `Perfil verificado en ${place}.`,
+    description: profile.description?.slice(0, 155) || `Perfil publicado en ${place}; identidad de la anunciante revisada.`,
     alternates: { canonical: `/perfil/${slug}` },
     openGraph: {
       title: profile.stage_name,

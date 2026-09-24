@@ -222,6 +222,8 @@ REST_FRAMEWORK = {
         "contact_reveal": "30/hour",
         "story_report": "20/hour",
         "profile_event": "120/hour",
+        "privacy_request": "5/day",
+        "legal_acceptance": "10/day",
     },
 }
 
@@ -246,6 +248,14 @@ CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "http://localhost:3000")
 # URL pública del frontend (para componer links absolutos en emails como el de
 # recuperación de contraseña).
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+# Versiones de los avisos presentados y aceptados en el registro/KYC.
+# Al cambiar los textos legales se debe incrementar la versión correspondiente.
+LEGAL_TERMS_VERSION = os.getenv("LEGAL_TERMS_VERSION", "2026-09-24-v1")
+LEGAL_PRIVACY_VERSION = os.getenv("LEGAL_PRIVACY_VERSION", "2026-09-24-v1")
+# Se habilita explícitamente en producción tras desplegar y probar el flujo de
+# reaceptación para no dejar bloqueadas por accidente las cuentas existentes.
+LEGAL_ACCEPTANCE_ENFORCEMENT = env_bool("LEGAL_ACCEPTANCE_ENFORCEMENT", False)
 
 # Límites de multimedia por perfil (validados en backend).
 MAX_PHOTOS_PER_PROFILE = int(os.getenv("MAX_PHOTOS_PER_PROFILE", "6"))

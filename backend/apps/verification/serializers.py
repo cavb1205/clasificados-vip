@@ -1,5 +1,7 @@
 import logging
 
+from django.conf import settings
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.profiles.models import ModelProfile
@@ -22,12 +24,13 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
     selfie = serializers.FileField(write_only=True)
     consent_video = serializers.FileField(write_only=True)
     challenge_code = serializers.CharField(write_only=True, max_length=10)
+    kyc_consent = serializers.BooleanField(write_only=True, required=True)
 
     class Meta:
         model = VerificationRequest
         fields = [
             "id", "id_document", "selfie", "consent_video", "challenge_code",
-            "status", "created_at",
+            "kyc_consent", "status", "created_at",
         ]
         read_only_fields = ["status", "created_at"]
 
@@ -39,6 +42,13 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Código de desafío inválido.")
         if not self._challenge.is_valid():
             raise serializers.ValidationError("Código de desafío expirado o ya usado.")
+        return value
+
+    def validate_kyc_consent(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                "Debes autorizar expresamente el tratamiento de los documentos de verificación."
+            )
         return value
 
     def validate_id_document(self, value):
@@ -64,6 +74,7 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
         selfie = validated_data.pop("selfie")
         video = validated_data.pop("consent_video")
         code = validated_data.pop("challenge_code")
+        validated_data.pop("kyc_consent")
 
         try:
             cleaned_video = strip_video_metadata(video)
@@ -75,6 +86,8 @@ class VerificationRequestSerializer(serializers.ModelSerializer):
         request_obj = VerificationRequest(
             user=self.context["request"].user,
             challenge_code=code,
+            kyc_consent_at=timezone.now(),
+            kyc_consent_version=settings.LEGAL_PRIVACY_VERSION,
         )
         try:
             request_obj.store_encrypted("id_document", id_doc.read())

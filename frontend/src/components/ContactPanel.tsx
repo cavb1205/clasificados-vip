@@ -105,8 +105,7 @@ export function ContactPanel({ slug, stageName, hasContact }: Props) {
         </a>
       )}
       <p className="text-center text-xs text-neutral-500">
-        El acuerdo es directo con la modelo. PortalVip Chile no intermedia ni cobra
-        por transacciones.
+        El acuerdo es directo entre las partes. PortalVip Chile no procesa pagos ni reservas relacionadas con este anuncio.
       </p>
     </div>
   );

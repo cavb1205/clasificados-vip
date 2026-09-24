@@ -24,7 +24,13 @@ from core.pagination import AdminPagination
 from core.permissions import IsModerator
 
 from .authentication import enforce_csrf
-from .serializers import ChangePasswordSerializer, RegisterSerializer, UserSerializer
+from .models import LegalAcceptance
+from .serializers import (
+    ChangePasswordSerializer,
+    PrivacyRequestSerializer,
+    RegisterSerializer,
+    UserSerializer,
+)
 
 User = get_user_model()
 
@@ -178,6 +184,76 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+
+class LegalAcceptanceView(APIView):
+    """Reports current document versions and records explicit re-acceptance."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "legal_acceptance"
+
+    def _payload(self, user):
+        latest = user.legal_acceptances.first()
+        current = bool(
+            latest
+            and latest.terms_version == settings.LEGAL_TERMS_VERSION
+            and latest.privacy_version == settings.LEGAL_PRIVACY_VERSION
+        )
+        return {
+            "current": current,
+            "enforcement_active": settings.LEGAL_ACCEPTANCE_ENFORCEMENT,
+            "required": {
+                "terms_version": settings.LEGAL_TERMS_VERSION,
+                "privacy_version": settings.LEGAL_PRIVACY_VERSION,
+            },
+            "accepted": ({
+                "terms_version": latest.terms_version,
+                "privacy_version": latest.privacy_version,
+                "accepted_at": latest.accepted_at,
+            } if latest else None),
+        }
+
+    def get(self, request):
+        return Response(self._payload(request.user))
+
+    def post(self, request):
+        if request.data.get("terms_accepted") is not True:
+            return Response(
+                {"terms_accepted": "Debes aceptar los Términos y condiciones."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if request.data.get("privacy_accepted") is not True:
+            return Response(
+                {"privacy_accepted": "Debes confirmar que leíste la Política de privacidad."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        current_payload = self._payload(request.user)
+        if current_payload["current"]:
+            return Response(current_payload, status=status.HTTP_200_OK)
+        LegalAcceptance.objects.create(
+            user=request.user,
+            role=request.user.role,
+            terms_version=settings.LEGAL_TERMS_VERSION,
+            privacy_version=settings.LEGAL_PRIVACY_VERSION,
+            source=LegalAcceptance.Source.ACCOUNT,
+        )
+        return Response(self._payload(request.user), status=status.HTTP_201_CREATED)
+
+
+class PrivacyRequestsView(generics.ListCreateAPIView):
+    """Private, authenticated channel for data access/correction/deletion requests."""
+
+    serializer_class = PrivacyRequestSerializer
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "privacy_request"
+
+    def get_queryset(self):
+        return self.request.user.privacy_requests.all()
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 class ChangePasswordView(APIView):

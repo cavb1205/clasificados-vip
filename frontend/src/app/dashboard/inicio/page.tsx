@@ -295,6 +295,10 @@ function KycStep({ submitted, status, onDone, onSkip }: { submitted: boolean; st
     if (!challenge) { setErr("Espera el código de validación."); return; }
     const fd = new FormData(e.currentTarget);
     fd.append("challenge_code", challenge.code);
+    if (fd.get("kyc_consent") !== "on") {
+      setErr("Debes leer y aceptar el tratamiento de los documentos de verificación.");
+      return;
+    }
     const id = fd.get("id_document"), selfie = fd.get("selfie"), video = fd.get("consent_video");
     if (![id, selfie, video].every((f) => f instanceof File && f.size > 0)) {
       setErr("Selecciona los tres archivos: cédula, selfie y video."); return;
@@ -347,6 +351,12 @@ function KycStep({ submitted, status, onDone, onSkip }: { submitted: boolean; st
         <Field label="Foto de tu cédula"><input name="id_document" type="file" accept="image/*" required className="text-neutral-300" /></Field>
         <Field label="Selfie sosteniendo tu cédula"><input name="selfie" type="file" accept="image/*" required className="text-neutral-300" /></Field>
         <Field label="Video corto leyendo la frase de arriba"><input name="consent_video" type="file" accept="video/*" required className="text-neutral-300" /></Field>
+        <label htmlFor="kyc-consent" className="flex items-start gap-2 rounded-lg border border-neutral-700 p-3 text-xs text-neutral-300">
+          <input id="kyc-consent" name="kyc_consent" type="checkbox" required className="mt-0.5 accent-pink-500" />
+          <span>
+            Autorizo expresamente el tratamiento de mi documento, selfie y video para verificar mi identidad y mayoría de edad, y prevenir suplantaciones en el servicio, conforme a la <a href="/privacidad" target="_blank" rel="noreferrer" className="text-pink-300 underline">Política de privacidad</a>. Entiendo que sin esta autorización no se puede completar el KYC ni publicar en esta sección.
+          </span>
+        </label>
         {err && <p className="text-red-400">{err}</p>}
         <button type="submit" disabled={busy} className="btn-gold w-full rounded-full py-2.5 font-medium disabled:opacity-50">
           {busy ? "Enviando…" : "Enviar y continuar →"}

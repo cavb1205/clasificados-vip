@@ -196,6 +196,17 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!res.ok) {
+    if (res.status === 403) {
+      const payload = await res.clone().json().catch(() => null) as { detail?: unknown } | null;
+      if (
+        typeof payload?.detail === "string" &&
+        payload.detail.startsWith("Revisa y acepta los Términos") &&
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/cuenta"
+      ) {
+        window.dispatchEvent(new Event("legal-acceptance-required"));
+      }
+    }
     throw await buildApiError(res, method, path);
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
@@ -230,6 +241,33 @@ export const auth = {
     return { detail: "ok" };
   },
   me: () => apiFetch("/auth/me/"),
+  legalAcceptance: () => apiFetch<{
+    current: boolean;
+    enforcement_active: boolean;
+    required: { terms_version: string; privacy_version: string };
+    accepted: { terms_version: string; privacy_version: string; accepted_at: string } | null;
+  }>("/auth/legal-acceptance/"),
+  acceptCurrentLegalDocuments: () =>
+    apiFetch("/auth/legal-acceptance/", {
+      method: "POST",
+      body: { terms_accepted: true, privacy_accepted: true },
+    }),
+};
+
+export interface PrivacyRequestRecord {
+  id: number;
+  request_type: "access" | "rectification" | "erasure" | "opposition" | "other";
+  details: string;
+  resolution_notes: string;
+  status: "open" | "in_review" | "completed" | "denied";
+  created_at: string;
+  updated_at: string;
+}
+
+export const privacyRequests = {
+  list: () => apiFetch<PrivacyRequestRecord[]>("/auth/privacy-requests/"),
+  submit: (data: { request_type: PrivacyRequestRecord["request_type"]; details: string }) =>
+    apiFetch<PrivacyRequestRecord>("/auth/privacy-requests/", { method: "POST", body: data }),
 };
 
 export const publicProfiles = {

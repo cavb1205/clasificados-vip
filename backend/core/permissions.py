@@ -1,20 +1,59 @@
 """Permisos DRF reutilizables basados en el rol del usuario."""
 
+from django.conf import settings
 from rest_framework.permissions import BasePermission, SAFE_METHODS
+
+LEGAL_ACCEPTANCE_REQUIRED_MESSAGE = (
+    "Revisa y acepta los Términos y la Política de privacidad vigentes desde Mi cuenta para continuar."
+)
+
+
+def has_current_legal_acceptance(user) -> bool:
+    if not (user and user.is_authenticated):
+        return False
+    if user.is_staff or user.is_superuser:
+        return True
+    if not settings.LEGAL_ACCEPTANCE_ENFORCEMENT:
+        return True
+    acceptance = user.legal_acceptances.first()
+    return bool(
+        acceptance
+        and acceptance.terms_version == settings.LEGAL_TERMS_VERSION
+        and acceptance.privacy_version == settings.LEGAL_PRIVACY_VERSION
+    )
+
+
+class HasCurrentLegalAcceptance(BasePermission):
+    message = LEGAL_ACCEPTANCE_REQUIRED_MESSAGE
+
+    def has_permission(self, request, view):
+        return has_current_legal_acceptance(request.user)
 
 
 class IsModel(BasePermission):
     """Solo usuarios con rol 'model'."""
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role == "model")
+        user = request.user
+        if not (user and user.is_authenticated and user.role == "model"):
+            return False
+        if not has_current_legal_acceptance(user):
+            self.message = LEGAL_ACCEPTANCE_REQUIRED_MESSAGE
+            return False
+        return True
 
 
 class IsClient(BasePermission):
     """Solo usuarios con rol 'client'."""
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role == "client")
+        user = request.user
+        if not (user and user.is_authenticated and user.role == "client"):
+            return False
+        if not has_current_legal_acceptance(user):
+            self.message = LEGAL_ACCEPTANCE_REQUIRED_MESSAGE
+            return False
+        return True
 
 
 class IsModerator(BasePermission):
@@ -29,7 +68,12 @@ class IsModerator(BasePermission):
         u = request.user
         if not (u and u.is_authenticated):
             return False
-        return bool(u.is_staff or getattr(u, "role", "") == "moderator")
+        if not (u.is_staff or getattr(u, "role", "") == "moderator"):
+            return False
+        if not has_current_legal_acceptance(u):
+            self.message = LEGAL_ACCEPTANCE_REQUIRED_MESSAGE
+            return False
+        return True
 
 
 class IsOwnerOrReadOnly(BasePermission):

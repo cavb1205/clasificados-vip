@@ -3,6 +3,7 @@
 from rest_framework.permissions import BasePermission
 
 from apps.profiles.models import ModelProfile
+from core.permissions import LEGAL_ACCEPTANCE_REQUIRED_MESSAGE, has_current_legal_acceptance
 
 
 class IsHost(BasePermission):
@@ -12,7 +13,12 @@ class IsHost(BasePermission):
 
     def has_permission(self, request, view):
         u = request.user
-        return bool(u and u.is_authenticated and u.role == "host")
+        if not (u and u.is_authenticated and u.role == "host"):
+            return False
+        if not has_current_legal_acceptance(u):
+            self.message = LEGAL_ACCEPTANCE_REQUIRED_MESSAGE
+            return False
+        return True
 
 
 def is_active_model(user) -> bool:
@@ -21,7 +27,10 @@ def is_active_model(user) -> bool:
     Reutiliza la regla centralizada `ModelProfile.objects.publicly_visible()`,
     la misma que decide si una modelo aparece en el portal.
     """
-    if not (user and user.is_authenticated and getattr(user, "role", "") == "model"):
+    if not (
+        user and user.is_authenticated and getattr(user, "role", "") == "model"
+        and has_current_legal_acceptance(user)
+    ):
         return False
     return ModelProfile.objects.filter(user=user).publicly_visible().exists()
 
@@ -35,6 +44,14 @@ class IsActiveModel(BasePermission):
         u = request.user
         if not (u and u.is_authenticated):
             return False
-        if u.is_staff or getattr(u, "role", "") == "moderator":
+        if u.is_staff:
             return True
+        if getattr(u, "role", "") == "moderator":
+            if not has_current_legal_acceptance(u):
+                self.message = LEGAL_ACCEPTANCE_REQUIRED_MESSAGE
+                return False
+            return True
+        if getattr(u, "role", "") == "model" and not has_current_legal_acceptance(u):
+            self.message = LEGAL_ACCEPTANCE_REQUIRED_MESSAGE
+            return False
         return is_active_model(u)
