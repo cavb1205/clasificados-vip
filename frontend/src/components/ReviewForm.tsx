@@ -72,21 +72,18 @@ export function ReviewForm({ slug }: { slug: string }) {
       <p className="text-sm font-medium">Deja tu reseña</p>
       <div className="flex items-center gap-1" role="radiogroup" aria-label="Calificación">
         {[1, 2, 3, 4, 5].map((n) => (
-          <button
+          <label
             key={n}
-            type="button"
-            onClick={() => setRating(n)}
             onMouseEnter={() => setHover(n)}
             onMouseLeave={() => setHover(0)}
-            aria-label={`${n} estrella${n > 1 ? "s" : ""}`}
-            role="radio"
-            aria-checked={rating === n}
-            className={`text-2xl leading-none transition ${
+            className={`inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg text-2xl leading-none transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-pink-400 ${
               n <= (hover || rating) ? "text-amber-400" : "text-neutral-600 hover:text-amber-300"
             }`}
           >
+            <input type="radio" name="rating" value={n} checked={rating === n}
+              onChange={() => setRating(n)} aria-label={`${n} estrella${n > 1 ? "s" : ""}`} className="sr-only" />
             <span aria-hidden>★</span>
-          </button>
+          </label>
         ))}
       </div>
       <label htmlFor="review-comment" className="sr-only">Comentario de la reseña</label>

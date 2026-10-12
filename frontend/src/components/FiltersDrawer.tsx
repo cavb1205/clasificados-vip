@@ -23,22 +23,14 @@ export function FiltersDrawer({ activeCount, children }: Props) {
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
-    const update = () => setIsMobile(media.matches);
+    const update = () => {
+      setIsMobile(media.matches);
+      if (!media.matches) setOpen(false);
+    };
     update();
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
-
-  // Bloquear scroll del body cuando el drawer está abierto en mobile.
-  useEffect(() => {
-    if (open) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = prev;
-      };
-    }
-  }, [open]);
 
   // Cerrar con Escape y mantener el foco dentro del drawer en mobile.
   useEffect(() => {

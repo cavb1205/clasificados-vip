@@ -38,12 +38,14 @@ class AuthCookieTests(APITestCase):
         self.user = User.objects.create_user(
             username="modelo1", email="m1@example.com", password="Sup3rSecret!", role="model"
         )
+        self.csrf = self.client.get(reverse("api:users:csrf")).data["csrftoken"]
 
     def test_login_sets_httponly_cookies(self):
         resp = self.client.post(
             reverse("api:users:login"),
             {"email": "m1@example.com", "password": "Sup3rSecret!"},
             format="json",
+            HTTP_X_CSRFTOKEN=self.csrf,
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         access = resp.cookies.get("access_token")
@@ -55,6 +57,7 @@ class AuthCookieTests(APITestCase):
             reverse("api:users:login"),
             {"email": "m1@example.com", "password": "Sup3rSecret!"},
             format="json",
+            HTTP_X_CSRFTOKEN=self.csrf,
         )
         resp = self.client.get(reverse("api:users:me"))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
@@ -66,6 +69,7 @@ class AuthCookieTests(APITestCase):
             reverse("api:users:login"),
             {"email": "m1@example.com", "password": "Sup3rSecret!"},
             format="json",
+            HTTP_X_CSRFTOKEN=self.csrf,
         )
         # MyProfileViewSet create es escritura autenticada por cookie.
         resp = self.client.post(
@@ -89,6 +93,7 @@ class RefreshTokenTests(APITestCase):
             reverse("api:users:login"),
             {"email": self.user.email, "password": "Sup3rSecret!"},
             format="json",
+            HTTP_X_CSRFTOKEN=self._csrf(),
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 

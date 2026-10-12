@@ -10,8 +10,25 @@ on:
 
 jobs:
   backend:
-    name: Backend · Django tests
+    name: Backend · Django tests (${{ matrix.database }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: vip_ci
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: vip_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -28,8 +45,13 @@ jobs:
       - name: Run tests
         run: python manage.py test --verbosity 1
         env:
-          # Sin POSTGRES_DB los tests corren sobre SQLite. Claves de prueba
-          # (NO son las de producción): solo para que settings arranque.
+          # Ambas bases se prueban: SQLite no detecta fallos de FOR UPDATE.
+          # Credenciales exclusivas del contenedor efímero de CI.
+          POSTGRES_DB: ${{ matrix.database == 'postgres' && 'vip_ci' || '' }}
+          POSTGRES_USER: vip_ci
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: "5432"
           DJANGO_SECRET_KEY: ci-insecure-test-key
           KYC_ENCRYPTION_KEY: HAjBiEa8QCdkP7eiTzVTxScO7XNf_Asc7ZaHhSzMNRc=
           DJANGO_DEBUG: "True"
@@ -44,7 +66,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci

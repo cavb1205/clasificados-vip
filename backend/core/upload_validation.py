@@ -29,6 +29,8 @@ def validate_image_bytes(raw: bytes) -> None:
     """Comprueba formato, dimensiones y estructura antes de decodificar píxeles."""
     try:
         with Image.open(BytesIO(raw)) as image:
+            if image.format not in {"JPEG", "PNG", "WEBP"}:
+                raise UploadValidationError("Solo se permiten imágenes JPEG, PNG o WebP.")
             width, height = image.size
             if (
                 width <= 0

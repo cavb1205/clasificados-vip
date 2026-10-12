@@ -81,8 +81,8 @@ export function RoomDetail({ room }: { room: PublicRoom }) {
       </div>
 
       <div className="space-y-3 p-5">
-        <div className="flex items-start justify-between gap-2">
-          <h1 className="text-xl font-semibold">
+        <div className="flex flex-col items-start justify-between gap-2 sm:flex-row">
+          <h1 className="min-w-0 text-xl font-semibold">
             {room.is_featured && <span className="mr-1 text-amber-300">⭐</span>}
             {room.title}
           </h1>

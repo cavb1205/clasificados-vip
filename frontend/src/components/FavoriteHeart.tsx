@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import { ApiRequestError } from "@/lib/client-api";
+import { toast } from "@/components/Toaster";
 import {
   ensureLoaded,
   isAuthed,
@@ -35,6 +37,12 @@ export function FavoriteHeart({ slug, className = "" }: { slug: string; classNam
     setBusy(true);
     try {
       await toggleFavorite(slug);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.status === 401) {
+        router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      } else {
+        toast("No se pudo actualizar el favorito. Inténtalo nuevamente.", "error");
+      }
     } finally {
       setBusy(false);
     }
@@ -47,7 +55,7 @@ export function FavoriteHeart({ slug, className = "" }: { slug: string; classNam
       disabled={busy}
       aria-pressed={fav}
       aria-label={fav ? "Quitar de favoritos" : "Agregar a favoritos"}
-      className={`rounded-full bg-black/55 px-2 py-1 text-base leading-none backdrop-blur transition hover:bg-black/75 disabled:opacity-50 ${
+      className={`inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-lg leading-none backdrop-blur transition hover:bg-black/75 disabled:opacity-50 ${
         fav ? "text-pink-400" : "text-white"
       } ${className}`}
     >

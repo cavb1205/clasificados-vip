@@ -2,11 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const KEY = "age_verified";
 
 /** Verificación 18+ obligatoria. Bloquea el contenido hasta que se confirme. */
 export function AgeGate() {
+  const pathname = usePathname();
+  const isLegalPage = pathname === "/terminos" || pathname === "/privacidad";
   const [confirmed, setConfirmed] = useState<boolean | null>(null);
   const firstActionRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -20,7 +23,10 @@ export function AgeGate() {
   }, []);
 
   useEffect(() => {
-    if (confirmed !== false) return;
+    if (confirmed !== false || isLegalPage) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
     firstActionRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") event.preventDefault();
@@ -40,10 +46,14 @@ export function AgeGate() {
       }
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [confirmed]);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [confirmed, isLegalPage]);
 
-  if (confirmed === true) return null;
+  if (confirmed === true || isLegalPage) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6" role="presentation">

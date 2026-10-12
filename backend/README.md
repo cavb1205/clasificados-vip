@@ -34,11 +34,14 @@ descomentar las variables `POSTGRES_*`.
   reciben watermark asíncrono; las stories se sirven desde endpoints gateados.
   Límites 6 fotos / 1 video validados en backend.
 - **Pagos:** las transiciones parten solo de `pending`; repetir la misma decisión es
-  idempotente y una decisión opuesta devuelve conflicto sin renovar dos veces.
+  idempotente incluso con aprobaciones simultáneas en PostgreSQL; una decisión opuesta
+  devuelve conflicto sin renovar dos veces. Cada nuevo recibo conserva las condiciones
+  del plan al subirlo. Cambiar un plan en el admin no modifica ese contrato pendiente.
 - **Auth:** JWT en cookies HttpOnly; las escrituras exigen token CSRF
   (`apps/users/authentication.py`). Sembrar cookie CSRF en `GET /api/v1/auth/csrf/`.
 - **Visibilidad:** los perfiles nacen `pending` e invisibles; el endpoint público solo
-  expone `verified` (aprobación manual del admin).
+  expone perfiles `verified`, no suspendidos y con cuenta activa, dentro del periodo
+  de prueba, bono de referido o publicación pagada vigente.
 
 ## API (prefijo `/api/v1/`)
 | Método | Ruta | Descripción |
@@ -61,7 +64,7 @@ descomentar las variables `POSTGRES_*`.
 | POST | `me/publications/<pk>/receipt/` | Subir comprobante → `pending_payment` |
 | GET | `publications/?region=&city=` | Anuncios vigentes (públicos) |
 | GET | `plans/` | Planes de suscripción disponibles |
-| POST | `reviews/` | Cliente (email verificado) deja reseña (queda pendiente) |
+| POST | `reviews/` | Cliente autenticado deja reseña (queda pendiente de moderación) |
 | GET | `profiles/<slug>/reviews/` · `profiles/<slug>/rating/` | Reseñas aprobadas + rating agregado |
 
 ## Tests
@@ -87,9 +90,15 @@ las copias públicas.
 
 ## Pagos y expiración (Fase 2)
 - La modelo crea un anuncio (`draft`) con un plan, sube comprobante (`pending_payment`).
-- El admin aprueba el `PaymentReceipt` → `Publication.activate()`: pasa a `active` y fija
-  `expires_at = now + plan.duration_days` (30 días si no hay plan). Si el plan incluye
-  destacado, marca `is_featured`.
+- El admin aprueba el `PaymentReceipt`: pasa a `active` y aplica los días/destacado
+  conservados en el recibo (30 días para recibos sin plan). Una renovación vigente suma
+  días al vencimiento pagado, no a la fecha actual. Solo se admite un recibo pendiente
+  por publicación o anfitrión; el historial de anuncios con pagos no se puede borrar.
+- Habitaciones: renovar el mismo plan conserva días restantes; contratar un plan
+  diferente inicia su nueva vigencia al aprobarlo. No se aprueba un plan con menos
+  cupos que las habitaciones vigentes (las pausadas/suspendidas también ocupan cupo).
+- La migración conserva condiciones disponibles de pagos ya pendientes. No puede
+  reconstruir precios históricos de comprobantes resueltos antes de esta mejora.
 - Mantenimiento periódico: `docker-compose.production.yml` levanta `vip-scheduler`, que
   cada 15 minutos ejecuta `expire_publications`, `expire_rooms` y
   `delete_expired_stories`. Tiene timeout por tarea, heartbeat y healthcheck; si una tarea
@@ -108,7 +117,8 @@ En dev el backend de email es `console` (los mensajes salen por el stdout del
 `EMAIL_USE_TLS` y `DJANGO_ADMIN_EMAILS=foo@x,bar@y` en `.env`.
 
 ## Reseñas (Fase 3)
-- Solo clientes con `email_verified=True` pueden reseñar; 1 reseña por (cliente, perfil).
+- Solo clientes autenticados pueden reseñar perfiles visibles; 1 reseña por (cliente, perfil).
+  La verificación de correo aún no está integrada y no debe presentarse como existente.
 - Nace `pending`; el admin la aprueba/rechaza. Solo las aprobadas se muestran y cuentan en
   el rating agregado.
 

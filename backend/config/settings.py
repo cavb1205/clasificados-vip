@@ -268,7 +268,7 @@ MAX_PHOTOS_PER_ROOM = int(os.getenv("MAX_PHOTOS_PER_ROOM", "8"))
 # Límite de tamaño de uploads. 50MB acomoda el video de consentimiento KYC
 # (~30s a calidad media); el frontend valida lo mismo antes de enviar.
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
-FILE_UPLOAD_MAX_MEMORY_SIZE = DATA_UPLOAD_MAX_MEMORY_SIZE
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv("FILE_UPLOAD_MAX_MEMORY_BYTES", str(2 * 1024 * 1024)))
 
 # --- Email / notificaciones al admin ---------------------------------------
 # Dev: console (imprime en stdout). Prod: SMTP real configurado por env.

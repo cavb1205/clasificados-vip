@@ -105,6 +105,7 @@ export interface Review {
   client_username: string;
   rating: number;
   comment: string;
+  reply: string;
   created_at: string;
 }
 

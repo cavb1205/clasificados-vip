@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -19,6 +20,7 @@ class ReviewTests(APITestCase):
             stage_name="Luna",
             age=25,
             verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
         )
         self.client_user = User.objects.create_user(
             username="cliente1", email="c1@example.com", password="x",
@@ -102,6 +104,7 @@ class ModelReviewReplyReportTests(APITestCase):
         self.profile = ModelProfile.objects.create(
             user=self.model_user, stage_name="Luna", age=25,
             verification_status=ModelProfile.VerificationStatus.VERIFIED,
+            verified_at=timezone.now(),
         )
         self.client_user = User.objects.create_user(
             username="cliente1", email="c1@example.com", password="x", role="client",

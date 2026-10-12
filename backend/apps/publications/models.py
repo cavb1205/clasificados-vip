@@ -2,12 +2,13 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.core.files.storage import storages
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from django.utils.text import slugify
 
 from apps.profiles.models import ModelProfile
+from core.payment_receipts import snapshot_plan
 
 # Duración por defecto si una publicación no tiene plan asignado (compatibilidad).
 PUBLICATION_DAYS = 30
@@ -121,8 +122,7 @@ class Publication(models.Model):
             days = self.plan.duration_days if self.plan else PUBLICATION_DAYS
         self.status = self.Status.ACTIVE
         self.expires_at = timezone.now() + timedelta(days=days)
-        if self.plan and self.plan.includes_featured:
-            self.is_featured = True
+        self.is_featured = bool(self.plan and self.plan.includes_featured)
         self.save(update_fields=["status", "expires_at", "is_featured", "updated_at"])
 
     def extend(self, *, days: int):
@@ -149,6 +149,7 @@ class PaymentReceipt(models.Model):
         Publication, on_delete=models.CASCADE, related_name="receipts"
     )
     image = models.ImageField(upload_to="receipts/", storage=_private_storage)
+    plan_snapshot = models.JSONField(default=dict, blank=True, editable=False)
     amount = models.PositiveIntegerField("monto declarado (CLP)", null=True, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     reviewed_by = models.ForeignKey(
@@ -168,21 +169,37 @@ class PaymentReceipt(models.Model):
     def __str__(self) -> str:
         return f"Comprobante #{self.pk} ({self.status})"
 
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.plan_snapshot:
+            self.plan_snapshot = snapshot_plan(self.publication.plan)
+        super().save(*args, **kwargs)
+
+    @transaction.atomic
     def approve(self, *, reviewer=None):
         """Aprueba el pago y activa la publicación asociada."""
+        locked = type(self).objects.select_for_update().get(pk=self.pk)
+        self.status = locked.status
         if self.status != self.Status.PENDING:
             return self.status == self.Status.APPROVED
+        # Dos recibos distintos del mismo anuncio también deben serializarse.
+        pub = Publication.objects.select_for_update(of=("self",)).select_related(
+            "plan", "profile__user"
+        ).get(pk=locked.publication_id)
+        self.publication = pub
+        self.plan_snapshot = locked.plan_snapshot or snapshot_plan(pub.plan)
         self.status = self.Status.APPROVED
         self.reviewed_by = reviewer
         self.reviewed_at = timezone.now()
         self.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        pub = self.publication
+        days = self.plan_snapshot["duration_days"]
+        pub.is_featured = self.plan_snapshot["includes_featured"]
         if pub.is_live:
             # Renovación por adelantado: suma días al vencimiento actual.
-            days = pub.plan.duration_days if pub.plan else PUBLICATION_DAYS
             pub.extend(days=days)
         else:
-            pub.activate()
+            pub.status = Publication.Status.ACTIVE
+            pub.expires_at = timezone.now() + timedelta(days=days)
+        pub.save(update_fields=["status", "expires_at", "is_featured", "updated_at"])
         self._notify_owner(
             title="✅ Pago aprobado",
             message=f"Tu anuncio '{pub.title}' está activo "
@@ -190,7 +207,9 @@ class PaymentReceipt(models.Model):
         )
         return True
 
+    @transaction.atomic
     def reject(self, *, reviewer=None, note=""):
+        self.status = type(self).objects.select_for_update().get(pk=self.pk).status
         if self.status != self.Status.PENDING:
             return self.status == self.Status.REJECTED
         self.status = self.Status.REJECTED

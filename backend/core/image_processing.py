@@ -14,7 +14,7 @@ from __future__ import annotations
 from io import BytesIO
 
 from django.core.files.base import ContentFile
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from .upload_validation import validate_image_bytes
 
@@ -26,7 +26,7 @@ WATERMARK_TEXT = "PortalVip"
 def _strip_exif(image: Image.Image) -> Image.Image:
     """Devuelve una copia sin metadatos: nuevo objeto con solo los píxeles."""
     clean = Image.new(image.mode, image.size)
-    clean.putdata(list(image.getdata()))
+    clean.paste(image)
     return clean
 
 
@@ -48,19 +48,18 @@ def _apply_watermark(image: Image.Image) -> Image.Image:
     return Image.alpha_composite(rgba, overlay).convert("RGB")
 
 
-def process_image(raw: bytes, *, filename_stem: str = "image") -> ContentFile:
+def process_image(raw: bytes, *, filename_stem: str = "image", watermark: bool = True) -> ContentFile:
     """Procesa bytes de imagen y devuelve un ContentFile JPEG listo para guardar."""
     validate_image_bytes(raw)
     with Image.open(BytesIO(raw)) as opened:
         opened.load()
-        image = opened.convert("RGB")
+        # Respeta la orientación de las cámaras móviles antes de eliminar EXIF.
+        image = ImageOps.exif_transpose(opened)
+        image.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.Resampling.LANCZOS)
+        image = _strip_exif(image.convert("RGB"))
 
-    image = _strip_exif(image)
-
-    if max(image.size) > MAX_DIMENSION:
-        image.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.LANCZOS)
-
-    image = _apply_watermark(image)
+    if watermark:
+        image = _apply_watermark(image)
 
     buffer = BytesIO()
     # Sin parámetro `exif=`: el JPEG resultante no contiene metadatos.

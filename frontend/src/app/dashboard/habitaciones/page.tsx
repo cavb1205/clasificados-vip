@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { auth, rooms, type PublicRoom } from "@/lib/client-api";
+import { ApiRequestError, auth, rooms, type PublicRoom } from "@/lib/client-api";
 
 const CLP = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -32,55 +32,75 @@ export default function RoomsBrowsePage() {
   const [roomCities, setRoomCities] = useState<RoomCity[]>([]);
   const [cityId, setCityId] = useState("");
   const [availableNow, setAvailableNow] = useState(false);
-
-  const load = useCallback(async () => {
-    const params: Record<string, string> = {};
-    if (cityId) params.city_id = cityId;
-    if (availableNow) params.available_now = "true";
-    try {
-      setItems(await rooms.browse(params));
-      setGated(false);
-    } catch (e) {
-      // 403 = perfil no activo. El backend protege con IsActiveModel.
-      if (e instanceof Error && /activo|forbidden/i.test(e.message)) {
-        setGated(true);
-      } else {
-        throw e;
-      }
-    }
-  }, [cityId, availableNow]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
+    let alive = true;
     auth
       .me()
       .then((me) => {
+        if (!alive) return;
         const u = me as { role?: string };
         if (u.role !== "model") {
           router.replace("/");
-          return Promise.reject(new Error("redirect"));
+          return;
         }
         // Solo comunas con anuncios activos. Si el perfil no está activo, el
         // backend devuelve 403 → lo tratamos como lista vacía + estado gated.
-        return rooms.cities().catch(() => [] as RoomCity[]);
+        return rooms.cities();
       })
       .then((c) => {
+        if (!alive || !c) return;
         setRoomCities(c as RoomCity[]);
-        return load();
+        setReady(true);
+        setError("");
       })
-      .then(() => setReady(true))
       .catch((e) => {
-        if (e instanceof Error && e.message === "redirect") return;
-        router.replace("/login?next=/dashboard/habitaciones");
+        if (!alive) return;
+        if (e instanceof ApiRequestError && e.status === 401) {
+          router.replace("/login?next=/dashboard/habitaciones");
+        } else if (e instanceof ApiRequestError && e.status === 403) {
+          setGated(true);
+          setReady(true);
+        } else {
+          setError("No pudimos cargar las habitaciones. Inténtalo nuevamente.");
+        }
+        setLoading(false);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+    return () => { alive = false; };
+  }, [router, retry]);
 
   useEffect(() => {
-    if (ready) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cityId, availableNow]);
+    if (!ready || gated) return;
+    let alive = true;
+    const params: Record<string, string> = {};
+    if (cityId) params.city_id = cityId;
+    if (availableNow) params.available_now = "true";
+    // El estado se actualiza al completar la petición; el cleanup descarta
+    // respuestas antiguas si el usuario cambia rápidamente los filtros.
+    rooms.browse(params).then((data) => {
+      if (!alive) return;
+      setItems(data);
+      setError("");
+      setLoading(false);
+    }).catch((e) => {
+      if (!alive) return;
+      setItems([]);
+      setLoading(false);
+      if (e instanceof ApiRequestError && e.status === 401) {
+        router.replace("/login?next=/dashboard/habitaciones");
+      } else if (e instanceof ApiRequestError && e.status === 403) {
+        setGated(true);
+      } else {
+        setError("No pudimos cargar las habitaciones. Inténtalo nuevamente.");
+      }
+    });
+    return () => { alive = false; };
+  }, [ready, gated, cityId, availableNow, retry, router]);
 
-  if (!ready) return <p className="text-neutral-400">Cargando…</p>;
+  if (!ready && !error) return <p role="status" className="text-neutral-400">Cargando…</p>;
 
   return (
     <div className="space-y-6">
@@ -98,6 +118,11 @@ export default function RoomsBrowsePage() {
           Piezas publicadas por anfitriones en todo el país. Contacta directo por WhatsApp.
         </p>
       </header>
+
+      {error && <div role="alert" className="rounded-xl border border-red-500/40 p-4">
+        <p>{error}</p>
+        <button type="button" className="mt-2 underline" onClick={() => { setLoading(true); setRetry((v) => v + 1); }}>Reintentar</button>
+      </div>}
 
       {gated ? (
         <div className="rounded-xl border border-amber-500/40 bg-amber-600/10 p-6 text-center">
@@ -118,9 +143,10 @@ export default function RoomsBrowsePage() {
         <>
           <div className="flex flex-wrap gap-3">
             <select
+              aria-label="Filtrar por comuna"
               className="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
               value={cityId}
-              onChange={(e) => setCityId(e.target.value)}
+              onChange={(e) => { setLoading(true); setCityId(e.target.value); }}
             >
               <option value="">
                 {roomCities.length === 0
@@ -135,7 +161,7 @@ export default function RoomsBrowsePage() {
             </select>
             <button
               type="button"
-              onClick={() => setAvailableNow((v) => !v)}
+              onClick={() => { setLoading(true); setAvailableNow((v) => !v); }}
               aria-pressed={availableNow}
               className={`rounded-lg border px-3 py-2 text-sm ${
                 availableNow
@@ -147,7 +173,7 @@ export default function RoomsBrowsePage() {
             </button>
           </div>
 
-          {items.length === 0 ? (
+          {loading ? <p role="status" className="text-neutral-400">Cargando habitaciones…</p> : error ? null : items.length === 0 ? (
             <p className="text-sm text-neutral-500">
               No hay habitaciones disponibles con estos filtros.
             </p>
@@ -187,8 +213,8 @@ function RoomCard({ room }: { room: PublicRoom }) {
           )}
         </div>
         <div className="space-y-2 p-4">
-          <div className="flex items-start justify-between gap-2">
-            <p className="font-semibold">
+          <div className="flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:justify-between">
+            <p className="min-w-0 font-semibold">
               {room.is_featured && <span className="mr-1 text-amber-300">⭐</span>}
               {room.title}
             </p>

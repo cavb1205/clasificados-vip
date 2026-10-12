@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, panelHrefFor } from "@/lib/client-api";
+import { safeReturnPath } from "@/lib/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,7 +20,8 @@ export default function LoginPage() {
     try {
       // LoginView devuelve UserSerializer.data (role + is_staff).
       const me = (await auth.login(email, password)) as { role?: string; is_staff?: boolean };
-      router.push(panelHrefFor(me));
+      const returnTo = safeReturnPath(new URLSearchParams(window.location.search).get("next"));
+      router.push(returnTo ?? panelHrefFor(me));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al ingresar");
     } finally {

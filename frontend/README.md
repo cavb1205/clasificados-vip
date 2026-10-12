@@ -4,6 +4,7 @@ Interfaz SSR optimizada para SEO. Consume la API del backend Django.
 
 ## Stack
 Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4.
+Versión fijada de Next.js: 16.3.8 (parche de seguridad). CI usa Node.js 24.
 
 ## Puesta en marcha
 ```bash
@@ -42,6 +43,7 @@ src/
   `credentials: "include"` y adjunta el token CSRF (sembrado en `GET /auth/csrf/`) en
   cada escritura. El dashboard verifica sesión con `/auth/me/` y redirige a login si no hay.
 - **Gate 18+:** overlay bloqueante (localStorage) antes de mostrar contenido.
+  Términos y privacidad se pueden leer sin confirmar edad. No equivale a verificar identidad.
 
 ## Verificado
 `npm run build` compila limpio. SSR probado end-to-end contra el backend: home, región,
@@ -51,12 +53,12 @@ comuna y robots responden con datos reales.
 - `cover_photo` en las tarjetas de comuna y galería de `photos` en el perfil, vía
   `next/image` (responsive `sizes`, `priority` en la primera). OG image usa la portada.
 - `next.config.ts` declara `remotePatterns` para los endpoints gateados de perfiles, multimedia,
-  stories y habitaciones. El dashboard usa `unoptimized` para archivos privados, de modo que
-  las cookies HttpOnly lleguen al endpoint protegido; las imágenes públicas sí pueden pasar por
-  el optimizador de Next. En **dev** se activa `images.dangerouslyAllowLocalIP` porque Next 16
-  bloquea por SSRF la optimización desde IPs privadas/localhost; en producción ese guard queda
-  activo y la media debe servirse desde un dominio público (S3/R2) — actualizar `remotePatterns`
-  con ese host.
+  stories y habitaciones. La optimización de Next está deshabilitada globalmente para
+  cerrar también el acceso directo a `/_next/image`: un caché independiente no debe
+  conservar fotos cuya visibilidad fue revocada. Las cookies llegan al endpoint original,
+  que comprueba permisos y devuelve `no-store`. Pillow ya comprime los uploads a JPEG.
+  Pendiente: miniaturas de distintos tamaños, servidas con los mismos permisos; no
+  reactivar el optimizador para multimedia sensible sin un diseño de revocación probado.
 
 ## Filtros y paginación
 - `/chile/[region]/[city]/[gender]` lee `searchParams` (`service`, `min_age`, `max_age`, `min_rate`,
@@ -79,5 +81,7 @@ comuna y robots responden con datos reales.
   dimensiones y, para imágenes, el contenido real antes de procesarse.
 - El drag-and-drop de fotos ya está disponible en el panel; también tiene controles ↑/↓
   para teclado y touch.
-- Pendiente operativo: hosting backend, Postgres, dominio de media, SMTP real y backups
-  off-site.
+- Frontend en Vercel y backend/Postgres en VPS ya desplegados. Pendiente operativo:
+  dominio definitivo y autenticación same-site, SMTP real y backups off-site.
+- La separación `vercel.app` / `nip.io` sigue siendo un riesgo para sesiones en Safari;
+  `SameSite=None` por sí solo no evita el bloqueo de cookies de terceros.

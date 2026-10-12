@@ -7,10 +7,11 @@
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 const CLIENT_REQUEST_TIMEOUT_MS = 15_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
 
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeoutMs = CLIENT_REQUEST_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), CLIENT_REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } finally {
@@ -28,18 +29,21 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
  * pueda compararla con el header X-CSRFToken.
  */
 let cachedCsrf: string | null = null;
+let csrfPromise: Promise<string> | null = null;
 let refreshPromise: Promise<boolean> | null = null;
 
 async function ensureCsrf(): Promise<string> {
   if (cachedCsrf) return cachedCsrf;
-  try {
-    const res = await fetchWithTimeout(`${API}/auth/csrf/`, { credentials: "include" });
+  if (csrfPromise) return csrfPromise;
+  csrfPromise = (async () => {
+    const res = await fetchWithTimeout(`${API}/auth/csrf/`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) throw await buildApiError(res, "GET", "/auth/csrf/");
     const data = (await res.json()) as { csrftoken?: string };
-    cachedCsrf = data.csrftoken ?? null;
-  } catch {
-    cachedCsrf = null;
-  }
-  return cachedCsrf ?? "";
+    if (!data.csrftoken) throw new Error("No se pudo preparar la sesión. Inténtalo nuevamente.");
+    cachedCsrf = data.csrftoken;
+    return cachedCsrf;
+  })().finally(() => { csrfPromise = null; });
+  return csrfPromise;
 }
 
 /** Invalida el token cacheado (se llama al recibir 403 para forzar refresh). */
@@ -136,9 +140,10 @@ async function rawFetch(
   return fetchWithTimeout(`${API}${path}`, {
     method,
     credentials: "include",
+    cache: "no-store",
     headers,
     body: isForm ? (body as FormData) : body ? JSON.stringify(body) : undefined,
-  });
+  }, isForm ? UPLOAD_TIMEOUT_MS : CLIENT_REQUEST_TIMEOUT_MS);
 }
 
 async function isCsrfFailure(response: Response): Promise<boolean> {
@@ -186,12 +191,13 @@ export async function apiFetch<T = unknown>(
   }
 
   // Si expiró el access token, renovar una vez y repetir la request original.
-  // Los endpoints de auth se excluyen para evitar bucles de refresh.
-  if (res.status === 401 && !path.startsWith("/auth/")) {
+  // /auth/me/ y las escrituras de cuenta también necesitan renovar la sesión.
+  const sessionEndpoints = ["/auth/login/", "/auth/register/", "/auth/refresh/", "/auth/logout/"];
+  if (res.status === 401 && !sessionEndpoints.includes(path)) {
     if (await refreshSession()) {
       res = await rawFetch(path, method, body, isForm);
     } else {
-      emitAuthChanged();
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("auth-expired"));
     }
   }
 

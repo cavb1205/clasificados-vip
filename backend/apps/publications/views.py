@@ -12,6 +12,7 @@ from rest_framework.response import Response
 
 from apps.profiles.models import ModelProfile
 from core.permissions import IsModel, IsModerator
+from core.request_validation import request_text
 from .models import PaymentReceipt, Publication, SubscriptionPlan
 from rest_framework import serializers as drf_serializers
 
@@ -100,6 +101,22 @@ class MyPublicationViewSet(viewsets.ModelViewSet):
             title = f"Anuncio de {profile.stage_name}"
         serializer.save(profile=profile, title=title)
 
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            publication = Publication.objects.select_for_update().get(pk=serializer.instance.pk)
+            serializer.instance = publication
+            # Revalidar bajo el mismo lock que la subida/aprobación del recibo.
+            serializer.validate(serializer.validated_data)
+            serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        with transaction.atomic():
+            publication = Publication.objects.select_for_update().get(pk=self.get_object().pk)
+            if publication.is_live or publication.receipts.exists():
+                return Response({"detail": "No puedes borrar un anuncio activo o con historial de pagos."}, status=409)
+            publication.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=True, methods=["post"], serializer_class=PaymentReceiptSerializer)
     def receipt(self, request, pk=None):
         """Sube el comprobante de transferencia.
@@ -111,10 +128,14 @@ class MyPublicationViewSet(viewsets.ModelViewSet):
         publication = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(publication=publication)
-        if not publication.is_live:
-            publication.status = Publication.Status.PENDING_PAYMENT
-            publication.save(update_fields=["status", "updated_at"])
+        with transaction.atomic():
+            publication = Publication.objects.select_for_update().get(pk=publication.pk)
+            if publication.receipts.filter(status=PaymentReceipt.Status.PENDING).exists():
+                return Response({"detail": "Ya hay un comprobante pendiente para este anuncio."}, status=409)
+            serializer.save(publication=publication)
+            if not publication.is_live:
+                publication.status = Publication.Status.PENDING_PAYMENT
+                publication.save(update_fields=["status", "updated_at"])
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], serializer_class=PublicationSerializer)
@@ -152,6 +173,7 @@ class PublicPublicationListView(generics.ListAPIView):
                 expires_at__gt=timezone.now(),
                 profile__verification_status=ModelProfile.VerificationStatus.VERIFIED,
                 profile__is_suspended=False,
+                profile__user__is_active=True,
             )
             .select_related("profile", "profile__city", "profile__city__region")
         )
@@ -207,6 +229,13 @@ class AdminPaymentReceiptSerializer(drf_serializers.ModelSerializer):
         path = reverse("api:publications:admin-payment-image", args=[obj.pk])
         return request.build_absolute_uri(path) if request else path
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.plan_snapshot:
+            data["plan_name"] = instance.plan_snapshot.get("name", "")
+            data["plan_price"] = instance.plan_snapshot.get("price")
+        return data
+
 
 class AdminPaymentReceiptImageView(generics.GenericAPIView):
     """Sirve un comprobante desde storage privado solo a administradores."""
@@ -254,8 +283,8 @@ class AdminPaymentActionView(generics.GenericAPIView):
     queryset = PaymentReceipt.objects.all()
 
     def post(self, request, pk):
-        action_kind = (request.data.get("action") or "").lower()
-        note = request.data.get("note") or ""
+        action_kind = request_text(request.data, "action", max_length=30).lower()
+        note = request_text(request.data, "note")
         if action_kind not in {"approve", "reject"}:
             return Response({"detail": "action debe ser approve|reject"}, status=400)
         with transaction.atomic():
@@ -309,15 +338,19 @@ class AdminPublicationGrantView(generics.GenericAPIView):
     permission_classes = [permissions.IsAdminUser]
     queryset = Publication.objects.all()
 
+    @transaction.atomic
     def post(self, request, pk):
-        pub = self.get_object()
+        pub = get_object_or_404(Publication.objects.select_for_update(), pk=pk)
+        note = request_text(request.data, "note", max_length=2000)
+        raw_days = request.data.get("days")
+        if isinstance(raw_days, bool) or not isinstance(raw_days, (int, str)):
+            return Response({"detail": "days debe ser un entero."}, status=400)
         try:
-            days = int(request.data.get("days"))
+            days = int(raw_days)
         except (TypeError, ValueError):
             return Response({"detail": "days debe ser un entero."}, status=400)
         if not (1 <= days <= 365):
             return Response({"detail": "days fuera de rango (1-365)."}, status=400)
-        note = (request.data.get("note") or "").strip()
         pub.extend(days=days)
         from apps.audit.models import log_action
         from apps.notifications.models import notify_user
@@ -349,17 +382,30 @@ class AdminStatsView(generics.GenericAPIView):
         active_pubs = Publication.objects.filter(
             status=Publication.Status.ACTIVE, expires_at__gt=now
         )
-        first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        first_of_month = timezone.localtime(now).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         revenue_qs = PaymentReceipt.objects.filter(
             status=PaymentReceipt.Status.APPROVED,
             reviewed_at__gte=first_of_month,
         )
-        revenue_month = sum(
-            (r.amount or (r.publication.plan.price if r.publication.plan_id else 0))
-            for r in revenue_qs.select_related("publication__plan")
-        )
         from apps.rooms.models import RoomReceipt, RoomReport  # import perezoso: evita ciclo
         from apps.profiles.models import ProfileReport
+        room_revenue_qs = RoomReceipt.objects.filter(
+            status=RoomReceipt.Status.APPROVED, reviewed_at__gte=first_of_month,
+        )
+        # Los importes declarados (incluido cero) priman. Para recibos antiguos
+        # sin snapshot solo podemos usar el precio disponible actualmente.
+        def paid_amount(receipt, plan):
+            if receipt.amount is not None:
+                return receipt.amount
+            price = receipt.plan_snapshot.get("price")
+            return price if price is not None else (plan.price if plan else 0)
+
+        revenue_month = sum(
+            paid_amount(r, r.publication.plan)
+            for r in revenue_qs.select_related("publication__plan")
+        ) + sum(
+            paid_amount(r, r.plan) for r in room_revenue_qs.select_related("plan")
+        )
 
         return Response({
             "pending_kyc": VerificationRequest.objects.filter(
@@ -397,8 +443,9 @@ class AdminExpirePublicationView(generics.GenericAPIView):
     permission_classes = [permissions.IsAdminUser]
     queryset = Publication.objects.all()
 
+    @transaction.atomic
     def post(self, request, pk):
-        pub = self.get_object()
+        pub = get_object_or_404(Publication.objects.select_for_update(), pk=pk)
         pub.status = Publication.Status.EXPIRED
         pub.expires_at = timezone.now()
         pub.save(update_fields=["status", "expires_at"])
@@ -412,6 +459,8 @@ class AdminExpirePublicationView(generics.GenericAPIView):
 
 # ─── Admin: planes y configuración del sitio ────────────────────────────────
 class AdminPlanSerializer(drf_serializers.ModelSerializer):
+    duration_days = drf_serializers.IntegerField(min_value=1, max_value=3650)
+    max_listings = drf_serializers.IntegerField(min_value=1, max_value=100, required=False)
     class Meta:
         model = SubscriptionPlan
         fields = [
@@ -452,6 +501,17 @@ class AdminPlanDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class AdminSiteConfigSerializer(drf_serializers.ModelSerializer):
+    trial_days = drf_serializers.IntegerField(min_value=0, max_value=365)
+    max_active_rooms_per_host = drf_serializers.IntegerField(min_value=1, max_value=100)
+    referral_bonus_days = drf_serializers.IntegerField(min_value=0, max_value=365)
+
+    def validate_support_telegram(self, value):
+        from apps.profiles.serializers import ModelProfileSerializer
+        # El panel acepta también t.me/usuario sin protocolo.
+        if value.lower().startswith("t.me/"):
+            value = "https://" + value
+        return ModelProfileSerializer().validate_telegram(value)
+
     class Meta:
         from apps.profiles.models import SiteConfig
         model = SiteConfig

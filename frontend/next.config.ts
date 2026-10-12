@@ -36,6 +36,11 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
+    // La visibilidad de fotos puede revocarse por suspensión o borrado.
+    // Deshabilita también /_next/image: no basta con unoptimized por componente,
+    // porque alguien podría pedir directamente al optimizador una URL gateada.
+    // Pillow ya normaliza los uploads. Las miniaturas seguras son un paso aparte.
+    unoptimized: true,
     remotePatterns: [
       // Backend Django local (dev).
       { protocol: "http", hostname: "localhost", port: "8000", pathname: "/media/**" },

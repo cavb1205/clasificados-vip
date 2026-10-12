@@ -22,6 +22,7 @@ from apps.reviews.models import Review
 from core.file_cleanup import delete_storage_file_after_commit
 from core.pagination import AdminPagination
 from core.permissions import IsModel, IsModerator
+from core.request_validation import request_text
 from .models import City, Favorite, ModelProfile, ProfileEvent, ProfileReport, Region, Service
 from .serializers import (
     CitySerializer,
@@ -351,7 +352,7 @@ class PublicProfileListView(generics.ListAPIView):
         for key, lookup in (("min_age", "age__gte"), ("max_age", "age__lte"),
                             ("min_rate", "base_rate__gte"), ("max_rate", "base_rate__lte")):
             value = params.get(key)
-            if value and value.isdigit():
+            if value and value.isascii() and value.isdigit() and len(value) <= 10 and int(value) <= 2_147_483_647:
                 qs = qs.filter(**{lookup: int(value)})
 
         # Destacadas primero (mejor rating dentro de cada grupo, luego más reciente).
@@ -421,11 +422,7 @@ class LogProfileEventView(APIView):
         kind = request.data.get("kind")
         if kind not in (ProfileEvent.Kind.VIEW, ProfileEvent.Kind.CONTACT):
             return Response({"detail": "kind inválido."}, status=status.HTTP_400_BAD_REQUEST)
-        profile = ModelProfile.objects.filter(
-            slug=slug,
-            verification_status=ModelProfile.VerificationStatus.VERIFIED,
-            is_suspended=False,
-        ).first()
+        profile = ModelProfile.objects.publicly_visible().filter(slug=slug).first()
         if not profile:
             return Response(status=status.HTTP_404_NOT_FOUND)
         ProfileEvent.objects.create(profile=profile, kind=kind)
@@ -545,17 +542,17 @@ class AdminModelProfileActionView(generics.GenericAPIView):
 
     def post(self, request, pk):
         profile = self.get_object()
-        action = (request.data.get("action") or "").lower()
+        action = request_text(request.data, "action", max_length=30).lower()
         if action == "suspend":
             profile.is_suspended = True
-            profile.suspension_reason = (request.data.get("reason") or "")[:200]
+            profile.suspension_reason = request_text(request.data, "reason", max_length=200)
             profile.save(update_fields=["is_suspended", "suspension_reason"])
         elif action == "unsuspend":
             profile.is_suspended = False
             profile.suspension_reason = ""
             profile.save(update_fields=["is_suspended", "suspension_reason"])
         elif action == "set_authenticity":
-            value = (request.data.get("value") or "").lower()
+            value = request_text(request.data, "value", max_length=30).lower()
             if value not in dict(ModelProfile.PhotoAuthenticity.choices):
                 return Response({"detail": "Nivel inválido."}, status=400)
             profile.photo_authenticity = value
@@ -667,12 +664,17 @@ class FavoriteToggleView(APIView):
 
     permission_classes = [permissions.IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, slug):
+        # Serializa dobles toques y pestañas del mismo usuario.
+        type(request.user).objects.select_for_update().get(pk=request.user.pk)
         profile = _get_profile_or_404(slug)
         fav = Favorite.objects.filter(user=request.user, profile=profile).first()
         if fav:
             fav.delete()
             return Response({"favorited": False})
+        if not ModelProfile.objects.publicly_visible().filter(pk=profile.pk).exists():
+            raise Http404
         Favorite.objects.create(user=request.user, profile=profile)
         return Response({"favorited": True}, status=status.HTTP_201_CREATED)
 
@@ -687,6 +689,7 @@ class MyFavoritesListView(generics.ListAPIView):
     def get_queryset(self):
         return annotate_public_profiles(
             ModelProfile.objects.filter(favorited_by__user=self.request.user)
+            .publicly_visible()
             .select_related("city", "city__region")
             .prefetch_related("services", "media")
             .order_by("-favorited_by__created_at")
@@ -703,7 +706,7 @@ class ProfileReportView(APIView):
 
     def post(self, request, slug):
         profile = _get_profile_or_404(slug)
-        reason = (request.data.get("reason") or "")[:200].strip()
+        reason = request_text(request.data, "reason", max_length=200)
         reporter = request.user if request.user.is_authenticated else None
         ProfileReport.objects.create(profile=profile, reporter=reporter, reason=reason)
         return Response({"detail": "Gracias por el reporte."}, status=status.HTTP_201_CREATED)
@@ -738,13 +741,13 @@ class AdminProfileReportActionView(generics.GenericAPIView):
 
     def post(self, request, pk):
         report = self.get_object()
-        action = (request.data.get("action") or "").lower()
+        action = request_text(request.data, "action", max_length=30).lower()
         if action == "suspend":
             if not request.user.is_staff:
                 raise PermissionDenied("Solo administradores pueden suspender perfiles.")
             p = report.profile
             p.is_suspended = True
-            p.suspension_reason = (request.data.get("reason") or "Reportada")[:200]
+            p.suspension_reason = request_text(request.data, "reason", default="Reportada", max_length=200)
             p.save(update_fields=["is_suspended", "suspension_reason"])
             log_action(
                 request.user, "profile_report.suspend",

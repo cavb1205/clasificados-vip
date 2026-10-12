@@ -17,11 +17,12 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import storages
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from apps.profiles.models import City, SiteConfig
 from apps.publications.models import SubscriptionPlan
+from core.payment_receipts import snapshot_plan
 
 
 def _private_storage():
@@ -72,31 +73,42 @@ class HostProfile(models.Model):
         return min(self.plan_slots, SiteConfig.get().max_active_rooms_per_host)
 
     def used_slots(self) -> int:
-        """Piezas que ocupan un cupo (publicadas, incl. pausadas; no las suspendidas)."""
+        """Piezas vigentes que ocupan cupo, incluso pausadas o suspendidas."""
         return self.listings.filter(
-            status=RoomListing.Status.ACTIVE, is_suspended=False
+            status=RoomListing.Status.ACTIVE, expires_at__gt=timezone.now()
         ).count()
 
     def available_slots(self) -> int:
         return max(0, self.slots_cap() - self.used_slots())
 
-    def apply_plan(self, plan: SubscriptionPlan):
+    @transaction.atomic
+    def apply_plan(self, plan: SubscriptionPlan, *, snapshot=None):
         """Activa/renueva la suscripción del anfitrión con el plan pagado.
 
         Sincroniza la vigencia y el destacado en las piezas ya publicadas para
         que reflejen el plan recién contratado.
         """
+        locked = type(self).objects.select_for_update().get(pk=self.pk)
+        terms = snapshot or snapshot_plan(plan)
+        now = timezone.now()
+        live = self.listings.filter(status=RoomListing.Status.ACTIVE, expires_at__gt=now)
+        if live.count() > min(terms["max_listings"], SiteConfig.get().max_active_rooms_per_host):
+            raise ValidationError("El plan tiene menos cupos que las habitaciones publicadas. Despublica las sobrantes antes de aprobarlo.")
+        # Una renovación del mismo plan conserva los días ya pagados.
+        base = locked.plan_expires_at if locked.subscription_active and locked.active_plan_id == plan.pk else now
         self.active_plan = plan
-        self.plan_slots = plan.max_listings
-        self.plan_featured = plan.includes_featured
-        self.plan_expires_at = timezone.now() + timedelta(days=plan.duration_days)
+        self.plan_slots = terms["max_listings"]
+        self.plan_featured = terms["includes_featured"]
+        self.plan_expires_at = base + timedelta(days=terms["duration_days"])
         self.save(
             update_fields=[
                 "active_plan", "plan_slots", "plan_featured",
                 "plan_expires_at", "updated_at",
             ]
         )
-        self.listings.filter(status=RoomListing.Status.ACTIVE).update(
+        # Las expiradas no se reactivan por depender del momento en que corre cron.
+        self.listings.filter(status=RoomListing.Status.ACTIVE, expires_at__lte=now).update(status=RoomListing.Status.EXPIRED)
+        live.update(
             expires_at=self.plan_expires_at,
             is_featured=self.plan_featured,
             updated_at=timezone.now(),
@@ -237,6 +249,7 @@ class RoomReceipt(models.Model):
         SubscriptionPlan, on_delete=models.PROTECT, related_name="room_receipts"
     )
     image = models.ImageField(upload_to="room_receipts/", storage=_private_storage)
+    plan_snapshot = models.JSONField(default=dict, blank=True, editable=False)
     amount = models.PositiveIntegerField("monto declarado (CLP)", null=True, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     reviewed_by = models.ForeignKey(
@@ -256,14 +269,24 @@ class RoomReceipt(models.Model):
     def __str__(self) -> str:
         return f"Comprobante plan #{self.pk} ({self.status})"
 
+    def save(self, *args, **kwargs):
+        if self._state.adding and not self.plan_snapshot:
+            self.plan_snapshot = snapshot_plan(self.plan)
+        super().save(*args, **kwargs)
+
+    @transaction.atomic
     def approve(self, *, reviewer=None):
+        locked = type(self).objects.select_for_update().get(pk=self.pk)
+        self.status = locked.status
         if self.status != self.Status.PENDING:
             return self.status == self.Status.APPROVED
+        self.owner = HostProfile.objects.select_for_update().get(pk=locked.owner_id)
+        self.plan_snapshot = locked.plan_snapshot or snapshot_plan(self.plan)
+        self.owner.apply_plan(self.plan, snapshot=self.plan_snapshot)
         self.status = self.Status.APPROVED
         self.reviewed_by = reviewer
         self.reviewed_at = timezone.now()
         self.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        self.owner.apply_plan(self.plan)
         self._notify_owner(
             title="✅ Pago aprobado",
             message=f"Tu plan '{self.plan.name}' está activo hasta el "
@@ -272,7 +295,9 @@ class RoomReceipt(models.Model):
         )
         return True
 
+    @transaction.atomic
     def reject(self, *, reviewer=None, note=""):
+        self.status = type(self).objects.select_for_update().get(pk=self.pk).status
         if self.status != self.Status.PENDING:
             return self.status == self.Status.REJECTED
         self.status = self.Status.REJECTED

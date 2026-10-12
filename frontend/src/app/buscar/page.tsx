@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { searchProfiles } from "@/lib/api";
 import { ProfileCard } from "@/components/ProfileCard";
+import { positivePage } from "@/lib/navigation";
 
 type Search = Promise<Record<string, string | string[] | undefined>>;
 
@@ -18,10 +19,10 @@ function pick(v: string | string[] | undefined): string | undefined {
 export default async function SearchPage({ searchParams }: { searchParams: Search }) {
   const sp = await searchParams;
   const q = pick(sp.q) ?? "";
-  const page = pick(sp.page);
+  const pageNum = positivePage(pick(sp.page));
+  const page = String(pageNum);
 
   const data = q ? await searchProfiles({ q, page }) : null;
-  const pageNum = Number(page ?? "1");
   const totalPages = data ? Math.max(1, Math.ceil(data.count / 12)) : 0;
 
   const withPage = (n: number) => {

@@ -14,6 +14,8 @@ import type {
   Service,
   Story,
 } from "./types";
+import { cache } from "react";
+import { notFound } from "next/navigation";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000/api/v1";
 const SERVER_REQUEST_TIMEOUT_MS = 10_000;
@@ -26,6 +28,7 @@ async function getJSON<T>(path: string, revalidate = 60): Promise<T> {
       next: { revalidate },
       signal: controller.signal,
     });
+    if (res.status === 404) notFound();
     if (!res.ok) {
       throw new Error(`API ${path} -> ${res.status}`);
     }
@@ -115,12 +118,12 @@ export const getProfiles = (region: string, city: string, query: ProfileQuery = 
 export const searchProfiles = (query: ProfileQuery) =>
   getJSON<Paginated<PublicProfile>>(`/profiles/?${buildQuery(query)}`, 60);
 
-export async function getProfile(slug: string): Promise<PublicProfile | null> {
+export const getProfile = cache(async (slug: string): Promise<PublicProfile | null> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SERVER_REQUEST_TIMEOUT_MS);
   try {
     const res = await fetch(`${API_URL}/profiles/${encodeURIComponent(slug)}/`, {
-      next: { revalidate: 60 },
+      cache: "no-store",
       signal: controller.signal,
     });
     if (res.status === 404) return null;
@@ -129,7 +132,7 @@ export async function getProfile(slug: string): Promise<PublicProfile | null> {
   } finally {
     clearTimeout(timeout);
   }
-}
+});
 
 export const getProfileStories = (slug: string) =>
   getJSON<Story[]>(`/profiles/${encodeURIComponent(slug)}/stories/`, 60);

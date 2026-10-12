@@ -36,6 +36,7 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
             alt={profile.stage_name}
             width={600}
             height={800}
+            unoptimized
             sizes="(max-width: 640px) 50vw, 33vw"
             className="aspect-[3/4] w-full object-cover object-top"
           />
@@ -74,8 +75,8 @@ export function ProfileCard({ profile }: { profile: PublicProfile }) {
       </div>
 
       <div className="p-3 sm:p-4">
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="truncate font-display text-base font-semibold leading-tight tracking-tight sm:text-lg">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="min-w-0 font-display text-base font-semibold leading-tight tracking-tight sm:text-lg">
             {profile.stage_name}
           </h2>
           {profile.rating_count > 0 && profile.rating_average !== null && (

@@ -4,7 +4,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from django.middleware.csrf import get_token
+from django.db import transaction
+from django.middleware.csrf import get_token, rotate_token
 from django.utils.decorators import method_decorator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -22,6 +23,7 @@ from apps.audit.models import log_action
 from apps.notifications.models import notify_user
 from core.pagination import AdminPagination
 from core.permissions import IsModerator
+from core.request_validation import request_text
 
 from .authentication import enforce_csrf
 from .models import LegalAcceptance
@@ -73,6 +75,7 @@ class CSRFView(APIView):
     """GET para sembrar la cookie `csrftoken` antes de hacer escrituras."""
 
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def get(self, request):
         return Response({"csrftoken": get_token(request)})
@@ -80,6 +83,7 @@ class CSRFView(APIView):
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "register"
 
@@ -92,15 +96,21 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []
     # Throttle estricto por IP contra fuerza bruta de credenciales.
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "login"
 
     def post(self, request):
+        enforce_csrf(request)
+        email = request_text(request.data, "email", max_length=254)
+        password = request_text(request.data, "password", max_length=1024, strip=False)
+        # Las cuentas antiguas pueden contener mayúsculas; las nuevas se normalizan.
+        email = User.objects.filter(email__iexact=email).values_list("email", flat=True).first() or email
         user = authenticate(
             request,
-            username=request.data.get("email"),
-            password=request.data.get("password"),
+            username=email,
+            password=password,
         )
         if user is None:
             return Response(
@@ -108,6 +118,7 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         refresh = _new_refresh_for(user)
+        rotate_token(request)
         response = Response(UserSerializer(user).data)
         return _set_jwt_cookies(response, str(refresh.access_token), str(refresh))
 
@@ -280,11 +291,12 @@ class ForgotPasswordView(APIView):
     """
 
     permission_classes = [AllowAny]
+    authentication_classes = []
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "password_reset"
 
     def post(self, request):
-        email = (request.data.get("email") or "").strip().lower()
+        email = request_text(request.data, "email", max_length=254).lower()
         if email:
             user = User.objects.filter(email__iexact=email).first()
             if user and user.is_active:
@@ -313,13 +325,14 @@ class ResetPasswordView(APIView):
     """Recibe uid+token+password y resetea la contraseña."""
 
     permission_classes = [AllowAny]
+    authentication_classes = []
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "password_reset"
 
     def post(self, request):
-        uid = request.data.get("uid", "")
-        token = request.data.get("token", "")
-        password = request.data.get("password", "")
+        uid = request_text(request.data, "uid", max_length=128)
+        token = request_text(request.data, "token", max_length=128)
+        password = request_text(request.data, "password", max_length=1024, strip=False)
 
         try:
             user_id = force_str(urlsafe_base64_decode(uid))
@@ -382,8 +395,9 @@ class AdminUserActionView(APIView):
 
     permission_classes = [IsAdminUser]
 
+    @transaction.atomic
     def post(self, request, pk):
-        target = User.objects.filter(pk=pk).first()
+        target = User.objects.select_for_update().filter(pk=pk).first()
         if not target:
             return Response({"detail": "Usuario no encontrado."}, status=404)
         # Protecciones transversales: nunca sobre uno mismo ni sobre superusuarios
@@ -393,25 +407,29 @@ class AdminUserActionView(APIView):
         if target.is_superuser:
             return Response({"detail": "No puedes modificar una cuenta superusuario desde aquí."}, status=400)
 
-        action = (request.data.get("action") or "").lower()
+        action = request_text(request.data, "action", max_length=30).lower()
 
         if action in ("suspend", "unsuspend"):
             if target.is_staff:
                 return Response({"detail": "No puedes suspender a un administrador."}, status=400)
             target.is_active = action == "unsuspend"
-            target.save(update_fields=["is_active"])
+            if action == "suspend":
+                target.session_version += 1
+            target.save(update_fields=["is_active", "session_version"])
             log_action(request.user, f"user.{action}", target=f"{target.email} ({target.role})")
             return Response(AdminUserSerializer(target).data)
 
         if action == "set_role":
-            new_role = (request.data.get("role") or "").lower()
+            new_role = request_text(request.data, "role", max_length=30).lower()
             if new_role not in dict(User.Role.choices):
                 return Response({"detail": "Rol inválido."}, status=400)
             old_role = target.role
             target.role = new_role
             # 'admin' requiere is_staff para acceder al panel; los demás no.
             target.is_staff = new_role == User.Role.ADMIN
-            target.save(update_fields=["role", "is_staff"])
+            if old_role != new_role:
+                target.session_version += 1
+            target.save(update_fields=["role", "is_staff", "session_version"])
             log_action(
                 request.user, "user.set_role",
                 target=target.email, note=f"{old_role} -> {new_role}",
@@ -435,8 +453,8 @@ class AdminUserNotifyView(APIView):
         target = User.objects.filter(pk=pk).first()
         if not target:
             return Response({"detail": "Usuario no encontrado."}, status=404)
-        title = (request.data.get("title") or "").strip()
-        message = (request.data.get("message") or "").strip()
+        title = request_text(request.data, "title", max_length=140)
+        message = request_text(request.data, "message", max_length=2000)
         if not message:
             return Response({"detail": "El mensaje es obligatorio."}, status=400)
         notify_user(

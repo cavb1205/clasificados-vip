@@ -6,7 +6,7 @@ Portal de clasificados premium para Chile, con verificación de identidad, tarif
 publicación y planes configurables. **No** intermedia transacciones financieras.
 
 ## Monorepo
-- [`backend/`](./backend) — Django 4.2 + DRF + PostgreSQL (SQLite fallback en dev). Auth JWT
+- [`backend/`](./backend) — Django 5.2 LTS + DRF + PostgreSQL (SQLite fallback en dev). Auth JWT
   en cookies HttpOnly, KYC cifrado en reposo (Fernet), pipeline de imágenes (EXIF/watermark),
   planes de suscripción configurables y comando cron de expiración. Detalle en
   [`backend/README.md`](./backend/README.md).
@@ -40,3 +40,5 @@ Backend: suite Django completa OK · Frontend: Vitest, TypeScript, lint y build 
 end-to-end verificado contra HTTP real (registro → verificación → pago → activación →
 visibilidad pública). La operación de producción incluye backups de base + volúmenes y una
 prueba aislada de restore documentada en [`backend/README.md`](./backend/README.md).
+
+Auditoría técnica y prioridades de lanzamiento: [`docs/TECHNICAL_AUDIT_2026-10-12.md`](./docs/TECHNICAL_AUDIT_2026-10-12.md).

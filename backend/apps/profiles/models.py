@@ -78,9 +78,8 @@ class ModelProfileQuerySet(models.QuerySet):
     def publicly_visible(self):
         """Perfiles verificados, no suspendidos y en trial o con publicación activa.
 
-        Puede devolver duplicados por el JOIN con publications; el llamador debe
-        aplicar `.distinct()` cuando recorra los resultados (no hace falta para
-        `.exists()`).
+        Usa EXISTS para no duplicar perfiles ni multiplicar sus reseñas cuando
+        hay varias publicaciones vigentes.
         """
         from datetime import timedelta
 
@@ -90,16 +89,19 @@ class ModelProfileQuerySet(models.QuerySet):
 
         now = timezone.now()
         trial_cutoff = now - timedelta(days=SiteConfig.get().trial_days)
+        active_publication = Publication.objects.filter(
+            profile_id=models.OuterRef("pk"),
+            status=Publication.Status.ACTIVE,
+            expires_at__gt=now,
+        )
         return self.filter(
             verification_status=ModelProfile.VerificationStatus.VERIFIED,
             is_suspended=False,
+            user__is_active=True,
         ).filter(
             models.Q(verified_at__gte=trial_cutoff)
             | models.Q(referral_bonus_until__gt=now)
-            | models.Q(
-                publications__status=Publication.Status.ACTIVE,
-                publications__expires_at__gt=now,
-            )
+            | models.Q(models.Exists(active_publication))
         )
 
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { auth, panelHrefFor } from "@/lib/client-api";
+import { toast } from "@/components/Toaster";
 
 interface Me {
   email: string;
@@ -28,9 +29,10 @@ export function AuthNav() {
   async function logout() {
     try {
       await auth.logout();
-    } finally {
       setMe(null);
       router.push("/");
+    } catch {
+      toast("No se pudo cerrar la sesión. Inténtalo nuevamente.", "error");
     }
   }
 
@@ -43,16 +45,21 @@ export function AuthNav() {
 
   useEffect(() => {
     refresh();
+    const expired = () => setMe(null);
     // Re-consultar /auth/me/ cuando login/logout despachan auth-changed.
     window.addEventListener("auth-changed", refresh);
-    return () => window.removeEventListener("auth-changed", refresh);
+    window.addEventListener("auth-expired", expired);
+    return () => {
+      window.removeEventListener("auth-changed", refresh);
+      window.removeEventListener("auth-expired", expired);
+    };
   }, [refresh]);
 
   // Placeholder mientras carga: mantenemos el ancho con un par de chips
   // grises para evitar layout shift cuando se reemplaza al final.
   if (me === undefined) {
     return (
-      <div className="flex gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="h-7 w-16 animate-pulse rounded-full bg-neutral-900" />
         <span className="h-7 w-20 animate-pulse rounded-full bg-neutral-900" />
       </div>
@@ -61,7 +68,7 @@ export function AuthNav() {
 
   if (me) {
     return (
-      <div className="flex gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
         {(me.is_staff || me.role === "moderator") && (
           <Link
             href="/admin"
@@ -103,7 +110,7 @@ export function AuthNav() {
   }
 
   return (
-    <div className="flex gap-4 text-sm">
+    <div className="flex flex-wrap items-center gap-4 text-sm">
       <Link href="/login" className="hover:text-pink-400">
         Ingresar
       </Link>

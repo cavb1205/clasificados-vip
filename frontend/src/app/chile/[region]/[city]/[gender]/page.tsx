@@ -14,6 +14,7 @@ import { CityStories } from "@/components/CityStories";
 import { FiltersDrawer } from "@/components/FiltersDrawer";
 import { GenderTabs } from "@/components/GenderTabs";
 import { CityPicker } from "@/components/CityPicker";
+import { positivePage } from "@/lib/navigation";
 import {
   CATEGORY_LABEL,
   GENDER_BY_SLUG,
@@ -88,24 +89,26 @@ export default async function CityPage({
     max_age: pickString(sp.max_age),
     min_rate: pickString(sp.min_rate),
     max_rate: pickString(sp.max_rate),
-    page: pickString(sp.page),
+    page: String(positivePage(pickString(sp.page))),
     available_now: pickString(sp.available_now),
   };
   const availableNow = query.available_now === "true";
 
-  const [data, services, allCities, cityStories] = await Promise.all([
+  const [data, services, allCities, cityStories, regionCities] = await Promise.all([
     getProfiles(region, city, query),
     getServices(),
     getAllPopulatedCities(),
     getCityStories(region, city).catch(() => []),
+    getCities(region),
   ]);
 
   const page = Number(query.page ?? "1");
   const pageSize = 12;
   const totalPages = Math.max(1, Math.ceil(data.count / pageSize));
-  const currentCity = allCities.find((item) => item.slug === city && item.region.slug === region);
-  const cityName = currentCity?.name ?? titleize(city);
-  const regionName = currentCity?.region.name ?? titleize(region);
+  const currentCity = regionCities.find((item) => item.slug === city);
+  if (!currentCity) notFound();
+  const cityName = currentCity.name;
+  const regionName = currentCity.region.name;
   const selectedTags = new Set(query.tag ?? []);
 
   const byCategory = services.reduce<Record<ServiceCategory, typeof services>>(
@@ -151,7 +154,7 @@ export default async function CityPage({
           </Link>{" "}
           / {cityName}
         </p>
-        <div className="mt-1 flex items-baseline justify-between gap-2">
+        <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="font-display text-3xl font-semibold tracking-tight">
             <span className="mr-2 align-middle text-vip" aria-hidden>✦</span>
             {gender === "todos"
@@ -202,6 +205,7 @@ export default async function CityPage({
       <div className="md:grid md:grid-cols-[18rem_1fr] md:gap-8">
         <FiltersDrawer activeCount={activeCount}>
         <form method="get" className="space-y-5 text-sm">
+          {availableNow && <input type="hidden" name="available_now" value="true" />}
           {(["service", "extra", "feature"] as const).map((cat) =>
             byCategory[cat].length === 0 ? null : (
               <fieldset key={cat} className="space-y-2">
@@ -239,6 +243,7 @@ export default async function CityPage({
             <div className="mt-2 flex gap-2">
               <input
                 name="min_age"
+                aria-label="Edad mínima"
                 type="number"
                 inputMode="numeric"
                 min={18}
@@ -248,6 +253,7 @@ export default async function CityPage({
               />
               <input
                 name="max_age"
+                aria-label="Edad máxima"
                 type="number"
                 inputMode="numeric"
                 min={18}
@@ -265,6 +271,7 @@ export default async function CityPage({
             <div className="mt-2 flex gap-2">
               <input
                 name="min_rate"
+                aria-label="Tarifa mínima en pesos chilenos"
                 type="number"
                 inputMode="numeric"
                 min={0}
@@ -275,6 +282,7 @@ export default async function CityPage({
               />
               <input
                 name="max_rate"
+                aria-label="Tarifa máxima en pesos chilenos"
                 type="number"
                 inputMode="numeric"
                 min={0}

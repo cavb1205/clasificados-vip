@@ -73,15 +73,15 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 name="q"
                 placeholder="Buscar perfiles…"
                 type="search"
-                className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-1.5 text-sm focus:border-pink-600"
+                className="w-full rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2.5 text-base focus:border-pink-600"
               />
             </form>
-            <div className="order-2 ml-auto sm:order-3 sm:ml-0">
+            <div className="order-2 w-full min-w-0 sm:order-3 sm:ml-auto sm:w-auto">
               <AuthNav />
             </div>
           </nav>
         </header>
-        <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
+        <main id="main-content" tabIndex={-1} className="mx-auto w-full min-w-0 max-w-5xl flex-1 px-4 py-8 [overflow-wrap:anywhere]">{children}</main>
         <footer className="border-t border-neutral-800 px-4 py-6 text-center text-xs text-neutral-500">
           <p>Solo mayores de 18 años · Contacto directo entre usuarios · © PortalVip Chile</p>
           <p className="mt-2 flex flex-wrap justify-center gap-4">

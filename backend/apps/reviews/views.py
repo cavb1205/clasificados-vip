@@ -1,10 +1,14 @@
 from django.db.models import Avg, Count
+from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.profiles.models import ModelProfile
 from core.permissions import IsClient, IsModel, IsModerator
+from core.request_validation import request_text
+from apps.audit.models import log_action
 from .models import Review
 from .serializers import (
     MyProfileReviewSerializer,
@@ -43,8 +47,9 @@ class ProfileReviewsView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
+        profile = get_object_or_404(ModelProfile.objects.publicly_visible(), slug=self.kwargs["slug"])
         return Review.objects.filter(
-            profile__slug=self.kwargs["slug"], status=Review.Status.APPROVED
+            profile=profile, status=Review.Status.APPROVED
         ).select_related("client")
 
 
@@ -54,8 +59,9 @@ class ProfileRatingView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, slug):
+        profile = get_object_or_404(ModelProfile.objects.publicly_visible(), slug=slug)
         agg = Review.objects.filter(
-            profile__slug=slug, status=Review.Status.APPROVED
+            profile=profile, status=Review.Status.APPROVED
         ).aggregate(average=Avg("rating"), count=Count("id"))
         return Response(
             {
@@ -93,7 +99,7 @@ class MyReviewReplyView(APIView):
         ).first()
         if not review:
             return Response({"detail": "Reseña no encontrada."}, status=404)
-        review.reply = (request.data.get("reply") or "").strip()[:1000]
+        review.reply = request_text(request.data, "reply", max_length=1000)
         review.save(update_fields=["reply"])
         return Response(MyProfileReviewSerializer(review).data)
 
@@ -108,7 +114,7 @@ class MyReviewReportView(APIView):
         if not review:
             return Response({"detail": "Reseña no encontrada."}, status=404)
         review.is_flagged = True
-        review.flag_reason = (request.data.get("reason") or "").strip()[:300]
+        review.flag_reason = request_text(request.data, "reason", max_length=300)
         review.save(update_fields=["is_flagged", "flag_reason"])
         return Response({"id": review.id, "is_flagged": True})
 
@@ -152,10 +158,13 @@ class AdminReviewActionView(generics.GenericAPIView):
     permission_classes = [IsModerator]
     queryset = Review.objects.all()
 
+    @transaction.atomic
     def post(self, request, pk):
-        review = self.get_object()
-        action = (request.data.get("action") or "").lower()
+        review = get_object_or_404(Review.objects.select_for_update(), pk=pk)
+        action = request_text(request.data, "action", max_length=30).lower()
         if action == "approve":
+            if review.status == Review.Status.APPROVED:
+                return Response(AdminReviewSerializer(review).data)
             review.status = Review.Status.APPROVED
             review.save(update_fields=["status"])
             notify_user(
@@ -173,4 +182,5 @@ class AdminReviewActionView(generics.GenericAPIView):
             review.save(update_fields=["is_flagged"])
         else:
             return Response({"detail": "action debe ser approve|reject|unflag"}, status=400)
+        log_action(request.user, f"review.{action}", target=f"Reseña #{review.pk} · {review.profile.stage_name}")
         return Response(AdminReviewSerializer(review).data)

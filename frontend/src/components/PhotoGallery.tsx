@@ -41,6 +41,7 @@ export function PhotoGallery({
                 alt={`${alt} foto ${i + 1}`}
                 width={600}
                 height={800}
+                unoptimized
                 sizes="(max-width: 640px) 50vw, 33vw"
                 priority={i === 0}
                 className="aspect-[3/4] w-full cursor-zoom-in object-cover object-top transition hover:opacity-90"

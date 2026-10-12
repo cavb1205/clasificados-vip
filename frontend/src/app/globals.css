@@ -168,6 +168,24 @@ body {
   outline-offset: 3px;
 }
 
+/* Controles legibles y táctiles; evita el zoom automático de iOS al escribir. */
+@media (max-width: 767px) {
+  nav button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    font-size: 16px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  button, input:not([type="checkbox"]):not([type="radio"]), select,
+  nav a, a.btn-gold {
+    min-height: 44px;
+  }
+  nav a { display: inline-flex; align-items: center; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

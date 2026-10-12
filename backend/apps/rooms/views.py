@@ -5,6 +5,8 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Max
 from django.http import FileResponse, Http404, HttpResponse
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.utils import timezone
 from django.urls import reverse
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, mixins, permissions, status, viewsets
@@ -19,6 +21,7 @@ from apps.audit.models import log_action
 from core.image_processing import process_image
 from core.pagination import AdminPagination
 from core.permissions import IsModerator
+from core.request_validation import request_text
 
 from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt, RoomReport
 from .permissions import IsActiveModel, IsHost, is_active_model
@@ -98,7 +101,11 @@ class MyRoomSubscriptionView(APIView):
         host = _require_host(request.user)
         serializer = RoomReceiptSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(owner=host)
+        with transaction.atomic():
+            host = HostProfile.objects.select_for_update().get(pk=host.pk)
+            if host.receipts.filter(status=RoomReceipt.Status.PENDING).exists():
+                return Response({"detail": "Ya tienes un comprobante pendiente de revisión."}, status=409)
+            serializer.save(owner=host)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -126,19 +133,19 @@ class MyRoomViewSet(viewsets.ModelViewSet):
     def publish(self, request, pk=None):
         """Publica una pieza contra la suscripción del anfitrión (consume un cupo)."""
         listing = self.get_object()
-        host = listing.owner
-        if listing.status == RoomListing.Status.ACTIVE:
-            return Response({"detail": "La habitación ya está publicada."}, status=400)
-        if not host.subscription_active:
-            raise ValidationError(
-                "Necesitas un plan activo para publicar. Contrata o renueva tu plan."
-            )
-        if host.available_slots() <= 0:
-            raise ValidationError(
-                f"Alcanzaste el tope de tu plan ({host.slots_cap()} habitación(es) "
-                f"activas). Despublica otra o contrata un plan mayor."
-            )
-        listing.publish()
+        with transaction.atomic():
+            host = HostProfile.objects.select_for_update().get(pk=listing.owner_id)
+            listing = self.get_queryset().select_for_update().get(pk=listing.pk)
+            listing.owner = host
+            if host.is_suspended or listing.is_suspended:
+                raise PermissionDenied("No puedes publicar una habitación suspendida o de un anfitrión suspendido.")
+            if listing.status == RoomListing.Status.ACTIVE and listing.expires_at and listing.expires_at > timezone.now():
+                return Response({"detail": "La habitación ya está publicada."}, status=400)
+            if not host.subscription_active:
+                raise ValidationError("Necesitas un plan activo para publicar. Contrata o renueva tu plan.")
+            if host.available_slots() <= 0:
+                raise ValidationError(f"Alcanzaste el tope de tu plan ({host.slots_cap()} habitaciones activas). Despublica otra o contrata un plan mayor.")
+            listing.publish()
         return Response(RoomListingSerializer(listing, context={"request": request}).data)
 
     @action(detail=True, methods=["post"])
@@ -288,23 +295,24 @@ class RoomPhotoFileView(APIView):
             raise Http404
         u = request.user
         is_owner = photo.listing.owner.user_id == u.id
+        can_moderate = u.is_staff or getattr(u, "role", "") == "moderator"
         allowed = (
             is_owner
-            or u.is_staff
-            or getattr(u, "role", "") == "moderator"
+            or can_moderate
             or is_active_model(u)
         )
         if not allowed:
             raise PermissionDenied(
                 "Tu perfil debe estar activo para ver las habitaciones disponibles."
             )
-        photo.image.open("rb")
+        if not (is_owner or can_moderate) and not _live_rooms_qs().filter(pk=photo.listing_id).exists():
+            raise Http404
         try:
-            data = photo.image.read()
-        finally:
-            photo.image.close()
-        response = HttpResponse(data, content_type="image/jpeg")
-        response["Cache-Control"] = "private, max-age=300"
+            stream = photo.image.open("rb")
+        except (FileNotFoundError, OSError):
+            raise Http404
+        response = FileResponse(stream, content_type="image/jpeg")
+        response["Cache-Control"] = "private, no-store, max-age=0"
         response["X-Robots-Tag"] = "noindex, nofollow, noarchive"
         return response
 
@@ -318,6 +326,8 @@ def _live_rooms_qs():
         is_paused=False,
         is_suspended=False,
         owner__is_suspended=False,
+        owner__user__is_active=True,
+        owner__plan_expires_at__gt=timezone.now(),
         expires_at__gt=timezone.now(),
     )
 
@@ -355,13 +365,7 @@ class PublicRoomListView(generics.ListAPIView):
         from django.utils import timezone
 
         qs = (
-            RoomListing.objects.filter(
-                status=RoomListing.Status.ACTIVE,
-                is_paused=False,
-                is_suspended=False,
-                owner__is_suspended=False,
-                expires_at__gt=timezone.now(),
-            )
+            _live_rooms_qs()
             .select_related("city", "city__region")
             .prefetch_related("photos")
         )
@@ -371,7 +375,9 @@ class PublicRoomListView(generics.ListAPIView):
         city_id = params.get("city_id")
         period = params.get("price_period")
         if city_id:
-            qs = qs.filter(city_id=city_id)
+            if not city_id.isascii() or not city_id.isdigit() or len(city_id) > 10:
+                raise ValidationError({"city_id": "Selecciona una comuna válida."})
+            qs = qs.filter(city_id=int(city_id))
         if region:
             qs = qs.filter(city__region__slug=region)
         if city:
@@ -401,10 +407,10 @@ class RoomReportView(APIView):
     throttle_scope = "report"
 
     def post(self, request, pk):
-        listing = RoomListing.objects.filter(pk=pk).first()
+        listing = _live_rooms_qs().filter(pk=pk).first()
         if not listing:
             raise Http404
-        reason = (request.data.get("reason") or "")[:200].strip()
+        reason = request_text(request.data, "reason", max_length=200)
         RoomReport.objects.create(listing=listing, reporter=request.user, reason=reason)
         return Response({"detail": "Gracias por el reporte."}, status=status.HTTP_201_CREATED)
 
@@ -416,13 +422,7 @@ class PublicRoomDetailView(generics.RetrieveAPIView):
     def get_queryset(self):
         from django.utils import timezone
 
-        return RoomListing.objects.filter(
-            status=RoomListing.Status.ACTIVE,
-            is_paused=False,
-            is_suspended=False,
-            owner__is_suspended=False,
-            expires_at__gt=timezone.now(),
-        ).select_related("city", "city__region").prefetch_related("photos")
+        return _live_rooms_qs().select_related("city", "city__region").prefetch_related("photos")
 
 
 # ─── Admin/moderador: cola de pagos y moderación ────────────────────────────
@@ -450,6 +450,13 @@ class AdminRoomReceiptSerializer(drf_serializers.ModelSerializer):
             return None
         path = reverse("api:rooms:admin-room-payment-image", args=[obj.pk])
         return request.build_absolute_uri(path) if request else path
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.plan_snapshot:
+            for field, key in (("plan_name", "name"), ("plan_price", "price"), ("plan_slots", "max_listings")):
+                data[field] = instance.plan_snapshot.get(key)
+        return data
 
 
 class AdminRoomPaymentReceiptImageView(generics.GenericAPIView):
@@ -492,8 +499,8 @@ class AdminRoomPaymentActionView(generics.GenericAPIView):
     queryset = RoomReceipt.objects.all()
 
     def post(self, request, pk):
-        action_kind = (request.data.get("action") or "").lower()
-        note = request.data.get("note") or ""
+        action_kind = request_text(request.data, "action", max_length=30).lower()
+        note = request_text(request.data, "note")
         if action_kind not in {"approve", "reject"}:
             return Response({"detail": "action debe ser approve|reject"}, status=400)
         with transaction.atomic():
@@ -516,7 +523,10 @@ class AdminRoomPaymentActionView(generics.GenericAPIView):
                     status=status.HTTP_409_CONFLICT,
                 )
             elif action_kind == "approve":
-                receipt.approve(reviewer=request.user)
+                try:
+                    receipt.approve(reviewer=request.user)
+                except DjangoValidationError as exc:
+                    return Response({"detail": " ".join(exc.messages)}, status=409)
                 changed = True
             else:
                 receipt.reject(reviewer=request.user, note=note)
@@ -584,10 +594,10 @@ class AdminRoomActionView(generics.GenericAPIView):
 
     def post(self, request, pk):
         listing = self.get_object()
-        action_kind = (request.data.get("action") or "").lower()
+        action_kind = request_text(request.data, "action", max_length=30).lower()
         if action_kind == "suspend":
             listing.is_suspended = True
-            listing.suspension_reason = (request.data.get("reason") or "")[:200]
+            listing.suspension_reason = request_text(request.data, "reason", max_length=200)
             listing.save(update_fields=["is_suspended", "suspension_reason", "updated_at"])
         elif action_kind == "unsuspend":
             listing.is_suspended = False
@@ -628,13 +638,13 @@ class AdminRoomReportActionView(generics.GenericAPIView):
 
     def post(self, request, pk):
         report = self.get_object()
-        action_kind = (request.data.get("action") or "").lower()
+        action_kind = request_text(request.data, "action", max_length=30).lower()
         if action_kind == "suspend":
             if not request.user.is_staff:
                 raise PermissionDenied("Solo administradores pueden suspender habitaciones.")
             listing = report.listing
             listing.is_suspended = True
-            listing.suspension_reason = (request.data.get("reason") or "Reportada")[:200]
+            listing.suspension_reason = request_text(request.data, "reason", default="Reportada", max_length=200)
             listing.save(update_fields=["is_suspended", "suspension_reason", "updated_at"])
             log_action(request.user, "room.suspend",
                        target=f"{listing.title} (#{listing.id})", note="por reporte")
@@ -702,10 +712,10 @@ class AdminHostActionView(generics.GenericAPIView):
 
     def post(self, request, pk):
         host = self.get_object()
-        action_kind = (request.data.get("action") or "").lower()
+        action_kind = request_text(request.data, "action", max_length=30).lower()
         if action_kind == "suspend":
             host.is_suspended = True
-            host.suspension_reason = (request.data.get("reason") or "")[:200]
+            host.suspension_reason = request_text(request.data, "reason", max_length=200)
             host.save(update_fields=["is_suspended", "suspension_reason", "updated_at"])
         elif action_kind == "unsuspend":
             host.is_suspended = False

@@ -4,6 +4,8 @@ from rest_framework import serializers
 from apps.profiles.models import City
 from apps.publications.models import SubscriptionPlan
 from core.upload_validation import UploadValidationError, validate_image_upload
+from core.payment_receipts import clean_receipt_image
+from apps.profiles.serializers import ModelProfileSerializer
 
 from .models import HostProfile, RoomListing, RoomPhoto, RoomReceipt
 
@@ -17,6 +19,7 @@ class RoomPlanSerializer(serializers.ModelSerializer):
 
 
 class HostProfileSerializer(serializers.ModelSerializer):
+    validate_whatsapp = ModelProfileSerializer.validate_whatsapp
     plan_name = serializers.CharField(source="active_plan.name", read_only=True, default=None)
     subscription_active = serializers.BooleanField(read_only=True)
     used_slots = serializers.SerializerMethodField()
@@ -50,7 +53,12 @@ class RoomPhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = RoomPhoto
         fields = ["id", "upload", "image_url", "order", "created_at"]
-    read_only_fields = ["image_url", "created_at"]
+        read_only_fields = ["image_url", "created_at"]
+
+    def validate(self, attrs):
+        if self.instance and set(attrs) - {"order"}:
+            raise serializers.ValidationError("Solo se puede modificar el orden. Para reemplazar una foto, elimínala y sube la nueva.")
+        return attrs
 
     def validate_upload(self, value):
         try:
@@ -79,6 +87,7 @@ class RoomPhotoReorderSerializer(serializers.Serializer):
 
 
 class RoomListingSerializer(serializers.ModelSerializer):
+    validate_whatsapp = ModelProfileSerializer.validate_whatsapp
     """Gestión por el anfitrión. El estado y la vigencia los controla el backend."""
 
     city_id = serializers.PrimaryKeyRelatedField(
@@ -105,6 +114,9 @@ class RoomListingSerializer(serializers.ModelSerializer):
 
 class RoomReceiptSerializer(serializers.ModelSerializer):
     """El anfitrión sube un comprobante para contratar/renovar un plan."""
+
+    def validate_image(self, upload):
+        return clean_receipt_image(upload)
 
     plan_id = serializers.PrimaryKeyRelatedField(
         queryset=SubscriptionPlan.objects.filter(

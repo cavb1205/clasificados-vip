@@ -293,6 +293,12 @@ export default async function ProfilePage({ params }: { params: Params }) {
                   {r.client_username} · ★ {r.rating}
                 </p>
                 {r.comment && <p className="mt-1 text-sm text-neutral-400">{r.comment}</p>}
+                {r.reply && (
+                  <div className="mt-3 border-l-2 border-pink-700 pl-3">
+                    <p className="text-xs font-medium text-pink-300">Respuesta de {profile.stage_name}</p>
+                    <p className="mt-1 whitespace-pre-line text-sm text-neutral-300">{r.reply}</p>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

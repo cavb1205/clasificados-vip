@@ -17,6 +17,8 @@ from apps.profiles.models import ModelProfile
 from apps.publications.models import Publication
 from core.image_processing import process_image
 from core.permissions import IsModel, IsModerator
+from core.request_validation import request_text
+from apps.audit.models import log_action
 from core.upload_validation import UploadValidationError, validate_image_upload, validate_video_upload
 from core.video_processing import strip_video_metadata, watermark_story_async
 
@@ -287,7 +289,7 @@ class StoryReportView(APIView):
             ),
             pk=pk,
         )
-        reason = (request.data.get("reason") or "")[:200].strip()
+        reason = request_text(request.data, "reason", max_length=200)
         StoryReport.objects.create(story=story, reason=reason)
         return Response({"detail": "Gracias por el reporte."}, status=status.HTTP_201_CREATED)
 
@@ -354,12 +356,14 @@ class AdminStoryReportActionView(generics.GenericAPIView):
 
     def post(self, request, pk):
         report = self.get_object()
-        action_kind = (request.data.get("action") or "").lower()
+        action_kind = request_text(request.data, "action", max_length=30).lower()
         if action_kind == "delete_story":
             story = report.story
+            log_action(request.user, "story.delete", target=f"Story #{story.pk} · {story.profile.stage_name}")
             story.delete()  # cascade borra el resto de reports asociados
             return Response({"detail": "Story eliminada."})
         if action_kind == "dismiss":
+            log_action(request.user, "story_report.dismiss", target=f"Reporte #{report.pk} · Story #{report.story_id}")
             report.delete()
             return Response({"detail": "Reporte descartado."})
         return Response({"detail": "action debe ser delete_story|dismiss"}, status=400)

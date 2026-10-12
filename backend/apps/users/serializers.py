@@ -12,7 +12,7 @@ User = get_user_model()
 class RegisterSerializer(serializers.ModelSerializer):
     """Registro de modelo, cliente o anfitrión (el rol 'admin' no se autoasigna)."""
 
-    password = serializers.CharField(write_only=True, validators=[validate_password])
+    password = serializers.CharField(write_only=True, max_length=1024, trim_whitespace=False)
     terms_accepted = serializers.BooleanField(write_only=True, required=True)
     privacy_accepted = serializers.BooleanField(write_only=True, required=True)
     role = serializers.ChoiceField(
@@ -36,6 +36,16 @@ class RegisterSerializer(serializers.ModelSerializer):
         if not value:
             raise serializers.ValidationError("Debes confirmar que leíste la Política de privacidad.")
         return value
+
+    def validate_email(self, value):
+        email = value.strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError("Ya existe una cuenta con este correo.")
+        return email
+
+    def validate(self, attrs):
+        validate_password(attrs["password"], User(email=attrs.get("email", ""), username=attrs.get("username", "")))
+        return attrs
 
     @transaction.atomic
     def create(self, validated_data):
@@ -65,8 +75,12 @@ class UserSerializer(serializers.ModelSerializer):
 class ChangePasswordSerializer(serializers.Serializer):
     """Cambio de contraseña estando logueado (requiere la actual)."""
 
-    current_password = serializers.CharField(write_only=True)
-    new_password = serializers.CharField(write_only=True, validators=[validate_password])
+    current_password = serializers.CharField(write_only=True, max_length=1024, trim_whitespace=False)
+    new_password = serializers.CharField(write_only=True, max_length=1024, trim_whitespace=False)
+
+    def validate_new_password(self, value):
+        validate_password(value, self.context["request"].user)
+        return value
 
     def validate_current_password(self, value):
         if not self.context["request"].user.check_password(value):

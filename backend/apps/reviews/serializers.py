@@ -19,9 +19,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         read_only_fields = ["status", "created_at"]
 
     def validate_profile_slug(self, value):
-        profile = ModelProfile.objects.filter(
-            slug=value, verification_status=ModelProfile.VerificationStatus.VERIFIED
-        ).first()
+        profile = ModelProfile.objects.publicly_visible().filter(slug=value).first()
         if profile is None:
             raise serializers.ValidationError("Perfil no encontrado o no verificado.")
         self._profile = profile
